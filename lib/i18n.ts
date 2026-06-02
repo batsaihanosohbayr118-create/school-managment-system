@@ -83,7 +83,7 @@ export const translations = {
       tabs: { login: "Login", register: "Register", forgot: "Reset" },
       fields: { name: "Full name", email: "Email", password: "Password" },
       messages: {
-        registered: "Account created. Please login.",
+        registered: "Account created. Use the same email and password to login.",
         demoLoginMissing: "Register first, then login with that email/password.",
         requestComplete: "Request completed successfully."
       },
@@ -284,7 +284,7 @@ export const translations = {
       tabs: { login: "Нэвтрэх", register: "Бүртгүүлэх", forgot: "Сэргээх" },
       fields: { name: "Бүтэн нэр", email: "Имэйл", password: "Нууц үг" },
       messages: {
-        registered: "Бүртгэл үүслээ. Одоо нэвтэрнэ үү.",
+        registered: "Бүртгэл үүслээ. Ижил имэйл, нууц үгээрээ нэвтэрнэ үү.",
         demoLoginMissing: "Эхлээд бүртгүүлээд, дараа нь тэр имэйл/нууц үгээрээ нэвтэрнэ.",
         requestComplete: "Хүсэлт амжилттай дууслаа."
       },

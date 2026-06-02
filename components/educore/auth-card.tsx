@@ -35,10 +35,11 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [language, setLanguage] = useState<Language>(getInitialLanguage);
-  const [email, setEmail] = useState("admin@educore.mn");
-  const [password, setPassword] = useState("educore-demo");
+  const registeredEmail = searchParams.get("email") ?? "";
+  const [email, setEmail] = useState(registeredEmail || (isSupabaseConfigured ? "" : "admin@educore.mn"));
+  const [password, setPassword] = useState(isSupabaseConfigured ? "" : "educore-demo");
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [name, setName] = useState("Admin User");
+  const [name, setName] = useState(isSupabaseConfigured ? "" : "Admin User");
   const copy = translations[language];
   const [message, setMessage] = useState("");
   const registeredMessage = searchParams.get("registered") ? copy.auth.messages.registered : "";
@@ -129,7 +130,7 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
 
             if (!isSupabaseConfigured && mode === "register") {
               saveDemoUser();
-              router.push("/login?registered=1");
+              router.push(`/login?registered=1&email=${encodeURIComponent(email)}`);
               return;
             }
 
@@ -146,20 +147,27 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
               return;
             }
 
+            const cleanEmail = email.trim();
             const result =
               mode === "login"
-                ? await authService.signIn(email, password)
+                ? await authService.signIn(cleanEmail, password)
                 : mode === "register"
-                  ? await authService.signUp(email, password, name)
-                  : await authService.resetPassword(email);
+                  ? await authService.signUp(cleanEmail, password, name)
+                  : await authService.resetPassword(cleanEmail);
 
             if ("error" in result && result.error) {
-              setMessage(result.error.message);
+              setMessage(
+                result.error.message === "Invalid login credentials"
+                  ? language === "mn"
+                    ? "Имэйл эсвэл нууц үг буруу байна. Бүртгүүлсэн имэйл/нууц үгээ оруулна уу."
+                    : "Email or password is incorrect. Use the email/password you registered with."
+                  : result.error.message
+              );
               return;
             }
 
             if (mode === "register") {
-              router.push("/login?registered=1");
+              router.push(`/login?registered=1&email=${encodeURIComponent(cleanEmail)}`);
               return;
             }
 
