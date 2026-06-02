@@ -101,7 +101,7 @@ const pieData = [
 
 const createConfig: Record<NavModule, { fields: string[] }> = {
   dashboard: { fields: ["Report title", "Date range"] },
-  students: { fields: ["Full name", "Class", "Parent name", "Phone"] },
+  students: { fields: ["Full name", "Class", "Parent name", "Phone", "Payment"] },
   teachers: { fields: ["Teacher name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"] },
   classes: { fields: ["Class name", "Section", "Class teacher"] },
   attendance: { fields: ["Student name", "Date", "Status"] },
@@ -151,6 +151,76 @@ function statusTone(status: string) {
   if (["Partial", "Late", "Pending"].includes(status)) return "amber";
   if (["Unpaid", "Absent"].includes(status)) return "rose";
   return "blue";
+}
+
+function statusOptionsFor(resource: NavModule, field: string) {
+  if (resource === "students" && field === "Payment") return ["Unpaid", "Partial", "Paid"];
+  if (resource === "payments" && field === "Status") return ["Unpaid", "Partial", "Paid"];
+  if (resource === "attendance" && field === "Status") return ["Present", "Late", "Absent"];
+  return null;
+}
+
+function StatusDropdown({
+  language,
+  onChange,
+  options,
+  placeholder,
+  value
+}: {
+  language: Language;
+  onChange: (value: string) => void;
+  options: string[];
+  placeholder: string;
+  value: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedLabel = value ? translateValue(value, language) : placeholder;
+
+  return (
+    <div
+      className={`ec-select-field${open ? " open" : ""}`}
+      onBlur={(event) => {
+        const nextTarget = event.relatedTarget;
+        if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+          setOpen(false);
+        }
+      }}
+    >
+      <button
+        aria-expanded={open}
+        className={`ec-input ec-select-trigger${value ? " selected" : ""}`}
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <span>{selectedLabel}</span>
+        <ChevronDown aria-hidden="true" size={18} />
+      </button>
+      {open ? (
+        <div className="ec-select-menu" role="listbox">
+          {options.map((option) => {
+            const selected = option === value;
+
+            return (
+              <button
+                aria-selected={selected}
+                className={selected ? "selected" : ""}
+                key={option}
+                onClick={() => {
+                  onChange(option);
+                  setOpen(false);
+                }}
+                role="option"
+                type="button"
+              >
+                <span>{translateValue(option, language)}</span>
+                {selected ? <Check aria-hidden="true" size={16} /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function AppShell() {
@@ -261,6 +331,10 @@ function AppShell() {
 
   function toggleNotificationRead(id: string) {
     setActivityNotifications((current) => current.map((item) => (item.id === id ? { ...item, read: !item.read } : item)));
+  }
+
+  function deleteNotification(id: string) {
+    setActivityNotifications((current) => current.filter((item) => item.id !== id));
   }
 
   useEffect(() => {
@@ -536,7 +610,15 @@ function AppShell() {
         </header>
 
         {notificationPageOpen ? (
-          <NotificationsPage language={language} notifications={activityNotifications} onToggleRead={toggleNotificationRead} onMarkAllRead={markAllNotificationsRead} unreadCount={unreadNotifications} />
+          <NotificationsPage
+            canDelete={role === "admin"}
+            language={language}
+            notifications={activityNotifications}
+            onDelete={deleteNotification}
+            onToggleRead={toggleNotificationRead}
+            onMarkAllRead={markAllNotificationsRead}
+            unreadCount={unreadNotifications}
+          />
         ) : (
           <>
             <motion.section className="ec-hero" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
@@ -651,17 +733,32 @@ function AppShell() {
                 <X size={18} />
               </button>
             </div>
-            {modalFields.map((field, index) => (
-              <label key={field}>
-                {translateColumn(field, language)}
-                <Input
-                  onChange={(event) => setFormValues((current) => ({ ...current, [field]: event.target.value }))}
-                  placeholder={translateColumn(field, language)}
-                  required={index === 0}
-                  value={formValues[field] ?? ""}
-                />
-              </label>
-            ))}
+            {modalFields.map((field, index) => {
+              const options = statusOptionsFor(activeModule, field);
+
+              return options ? (
+                <div className="record-field" key={field}>
+                  <span>{translateColumn(field, language)}</span>
+                  <StatusDropdown
+                    language={language}
+                    onChange={(value) => setFormValues((current) => ({ ...current, [field]: value }))}
+                    options={options}
+                    placeholder={translateColumn(field, language)}
+                    value={formValues[field] ?? ""}
+                  />
+                </div>
+              ) : (
+                <label className="record-field" key={field}>
+                  <span>{translateColumn(field, language)}</span>
+                  <Input
+                    onChange={(event) => setFormValues((current) => ({ ...current, [field]: event.target.value }))}
+                    placeholder={translateColumn(field, language)}
+                    required={index === 0}
+                    value={formValues[field] ?? ""}
+                  />
+                </label>
+              );
+            })}
             <Button type="submit">
               <Check size={17} />
               {modalAction}
@@ -740,14 +837,18 @@ function AppShell() {
 }
 
 function NotificationsPage({
+  canDelete,
   language,
   notifications,
+  onDelete,
   onMarkAllRead,
   onToggleRead,
   unreadCount
 }: {
+  canDelete: boolean;
   language: Language;
   notifications: ActivityNotification[];
+  onDelete: (id: string) => void;
   onMarkAllRead: () => void;
   onToggleRead: (id: string) => void;
   unreadCount: number;
@@ -766,14 +867,26 @@ function NotificationsPage({
       {notifications.length > 0 ? (
         <div className="notification-list">
           {notifications.map((item) => (
-            <button className="notification-card" data-read={item.read ? "true" : "false"} data-type={item.type} key={item.id} onClick={() => onToggleRead(item.id)} type="button">
-              <div>
-                {!item.read ? <span>{language === "mn" ? "Шинэ" : "New"}</span> : null}
-                <strong>{language === "mn" ? item.titleMn : item.titleEn}</strong>
-                <p>{language === "mn" ? item.detailMn : item.detailEn}</p>
-              </div>
+            <article className="notification-card" data-read={item.read ? "true" : "false"} data-type={item.type} key={item.id}>
+              <button className="notification-content" onClick={() => onToggleRead(item.id)} type="button">
+                <div>
+                  {!item.read ? <span>{language === "mn" ? "Шинэ" : "New"}</span> : null}
+                  <strong>{language === "mn" ? item.titleMn : item.titleEn}</strong>
+                  <p>{language === "mn" ? item.detailMn : item.detailEn}</p>
+                </div>
+              </button>
               <time>{item.time}</time>
-            </button>
+              {canDelete ? (
+                <button
+                  aria-label={language === "mn" ? "Мэдэгдэл устгах" : "Delete notification"}
+                  className="notification-delete"
+                  onClick={() => onDelete(item.id)}
+                  type="button"
+                >
+                  <Trash2 size={15} />
+                </button>
+              ) : null}
+            </article>
           ))}
         </div>
       ) : (

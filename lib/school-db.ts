@@ -368,7 +368,7 @@ async function listLocalResource(resource: SchoolResource): Promise<ResourceTabl
 function valuesForCreatedResource(resource: SchoolResource, values: Record<string, string>) {
   switch (resource) {
     case "students":
-      return [values["Full name"], values.Class, "0%", "0", "Unpaid"].map(stringValue);
+      return [values["Full name"], values.Class, "0%", "0", values.Payment || "Unpaid"].map(stringValue);
     case "teachers":
       return [
         values["Teacher name"],

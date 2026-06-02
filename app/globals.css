@@ -203,6 +203,144 @@ a {
   outline: 0;
 }
 
+.ec-select-field {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.ec-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding-right: 44px;
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 900;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.ec-select-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ec-select-trigger.selected {
+  color: var(--ink);
+}
+
+.ec-select-trigger:hover,
+.ec-select-field.open .ec-select-trigger {
+  border-color: rgba(79, 70, 229, 0.34);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.ec-select-trigger:focus,
+.ec-select-field.open .ec-select-trigger {
+  border-color: rgba(79, 70, 229, 0.64);
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+}
+
+.ec-select-trigger svg {
+  position: absolute;
+  top: 50%;
+  right: 13px;
+  pointer-events: none;
+  color: var(--muted);
+  transform: translateY(-50%);
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.ec-select-field.open .ec-select-trigger svg,
+.ec-select-trigger:focus svg {
+  color: var(--primary);
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.ec-select-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 90;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(129, 140, 248, 0.32);
+  border-radius: 16px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+}
+
+.ec-select-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 11px;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  font-weight: 900;
+  text-align: left;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.ec-select-menu button:hover,
+.ec-select-menu button.selected {
+  color: #4338ca;
+  background: rgba(79, 70, 229, 0.1);
+  transform: translateX(2px);
+}
+
+.ec-select-menu button svg {
+  color: var(--primary);
+  flex: 0 0 auto;
+}
+
+.ec-select-menu button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.educore-shell.dark .ec-select-trigger:hover,
+.educore-shell.dark .ec-select-field.open .ec-select-trigger {
+  background: rgba(30, 41, 59, 0.92);
+}
+
+.educore-shell.dark .ec-select-menu {
+  background: rgba(15, 23, 42, 0.98);
+  border-color: rgba(129, 140, 248, 0.32);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.36);
+}
+
+.educore-shell.dark .ec-select-menu button {
+  color: #f8fafc;
+}
+
+.educore-shell.dark .ec-select-menu button:hover,
+.educore-shell.dark .ec-select-menu button.selected {
+  color: #c7d2fe;
+  background: rgba(129, 140, 248, 0.16);
+}
+
 .ec-role-dropdown {
   position: relative;
 }
@@ -742,7 +880,7 @@ a {
 
 .notification-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: start;
   min-height: 74px;
@@ -757,12 +895,21 @@ a {
   text-align: left;
 }
 
+.notification-content {
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  text-align: left;
+}
+
 .notification-card[data-read="false"] {
   border-color: rgba(79, 70, 229, 0.28);
   background: rgba(238, 242, 255, 0.94);
 }
 
-.notification-card div > span {
+.notification-content div > span {
   display: inline-grid;
   min-height: 22px;
   place-items: center;
@@ -792,6 +939,28 @@ a {
   font-size: 12px;
   font-weight: 850;
   white-space: nowrap;
+}
+
+.notification-delete {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: #e11d48;
+  background: rgba(244, 63, 94, 0.1);
+  border: 1px solid rgba(244, 63, 94, 0.14);
+  border-radius: 12px;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.notification-delete:hover,
+.notification-delete:focus {
+  background: rgba(244, 63, 94, 0.16);
+  border-color: rgba(244, 63, 94, 0.28);
+  transform: translateY(-1px);
 }
 
 .notification-empty {
@@ -842,6 +1011,12 @@ a {
 .educore-shell.dark .notification-card[data-read="false"] {
   background: rgba(30, 41, 59, 0.96);
   border-color: rgba(129, 140, 248, 0.28);
+}
+
+.educore-shell.dark .notification-delete {
+  color: #fda4af;
+  background: rgba(244, 63, 94, 0.14);
+  border-color: rgba(244, 63, 94, 0.2);
 }
 
 .educore-shell.dark .notification-empty {
@@ -1083,6 +1258,7 @@ a {
 }
 
 .record-modal label,
+.record-modal .record-field,
 .auth-form label {
   display: grid;
   gap: 7px;
@@ -1091,11 +1267,13 @@ a {
   font-weight: 900;
 }
 
-.record-modal label {
+.record-modal label,
+.record-modal .record-field {
   min-width: 0;
 }
 
-.record-modal label:nth-of-type(n) {
+.record-modal label:nth-of-type(n),
+.record-modal .record-field {
   display: grid;
 }
 

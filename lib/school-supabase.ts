@@ -100,7 +100,7 @@ function createPayload(resource: SchoolResource, values: Record<string, string>)
         roll_number: id,
         attendance: 0,
         gpa: 0,
-        payment_status: "Unpaid"
+        payment_status: values.Payment ?? "Unpaid"
       };
     case "teachers":
       return {
