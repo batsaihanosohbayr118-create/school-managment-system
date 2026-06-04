@@ -126,7 +126,7 @@ function createPayload(resource: SchoolResource, values: Record<string, string>)
       return {
         id,
         student: values["Student name"] ?? "",
-        class_name: "",
+        class_name: values.Class ?? "",
         date: values.Date || new Date().toISOString().slice(0, 10),
         status: values.Status || "Present"
       };

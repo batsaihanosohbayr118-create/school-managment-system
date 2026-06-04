@@ -2,23 +2,27 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, GraduationCap, LockKeyhole, Mail, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { Check, ChevronDown, Eye, EyeOff, GraduationCap, KeyRound, LockKeyhole, Mail, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { authService, isSupabaseConfigured } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { type Language, getInitialLanguage, getStoredLanguage, languageStorageKey, translations } from "@/lib/i18n";
+import type { Role } from "@/lib/types";
 
 type AuthMode = "login" | "register" | "forgot";
+type ResetStep = "email" | "code" | "password";
 
 type DemoUser = {
   email: string;
   password: string;
   name: string;
+  role: Role;
 };
 
 const demoUsersKey = "educore_demo_users";
 const demoSessionKey = "educore_session";
+const registrationRoles: Role[] = ["admin", "teacher", "student"];
 
 function GoogleIcon() {
   return (
@@ -38,11 +42,25 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
   const registeredEmail = searchParams.get("email") ?? "";
   const [email, setEmail] = useState(registeredEmail || (isSupabaseConfigured ? "" : "admin@educore.mn"));
   const [password, setPassword] = useState(isSupabaseConfigured ? "" : "educore-demo");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [resetStep, setResetStep] = useState<ResetStep>("email");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [name, setName] = useState(isSupabaseConfigured ? "" : "Admin User");
+  const [selectedRole, setSelectedRole] = useState<Role | "">("");
+  const [roleOpen, setRoleOpen] = useState(false);
   const copy = translations[language];
   const [message, setMessage] = useState("");
   const registeredMessage = searchParams.get("registered") ? copy.auth.messages.registered : "";
+  const resetCompleteMessage = searchParams.get("reset") ? copy.auth.messages.resetComplete : "";
+  const modeCopy = copy.auth.modes[mode];
+  const resetButtonLabel =
+    mode === "forgot"
+      ? resetStep === "email"
+        ? copy.auth.reset.sendCode
+        : resetStep === "code"
+          ? copy.auth.reset.verifyCode
+          : copy.auth.reset.savePassword
+      : modeCopy.button;
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -56,8 +74,6 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
     window.localStorage.setItem(languageStorageKey, language);
   }, [language]);
 
-  const modeCopy = copy.auth.modes[mode];
-
   function readDemoUsers() {
     try {
       return JSON.parse(window.localStorage.getItem(demoUsersKey) ?? "[]") as DemoUser[];
@@ -66,14 +82,14 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
     }
   }
 
-  function saveDemoUser() {
-    const users = readDemoUsers().filter((user) => user.email.toLowerCase() !== email.toLowerCase());
-    users.push({ email, password, name });
+  function saveDemoUser(cleanEmail: string, cleanName: string, role: Role) {
+    const users = readDemoUsers().filter((user) => user.email.toLowerCase() !== cleanEmail.toLowerCase());
+    users.push({ email: cleanEmail, password, name: cleanName, role });
     window.localStorage.setItem(demoUsersKey, JSON.stringify(users));
   }
 
-  function findDemoUser() {
-    return readDemoUsers().find((user) => user.email.toLowerCase() === email.toLowerCase() && user.password === password);
+  function findDemoUser(cleanEmail: string) {
+    return readDemoUsers().find((user) => user.email.toLowerCase() === cleanEmail.toLowerCase() && user.password === password);
   }
 
   async function signInWithGoogle() {
@@ -127,32 +143,86 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
           className="auth-form"
           onSubmit={async (event) => {
             event.preventDefault();
+            const cleanEmail = email.trim();
+            const cleanName = name.trim();
+            const registrationRole: Role | null = selectedRole || null;
+
+            if (mode === "forgot") {
+              if (!isSupabaseConfigured) {
+                setMessage(language === "mn" ? "Нууц үг сэргээх code авахын тулд Supabase тохируулна уу." : "Configure Supabase to receive a password reset code.");
+                return;
+              }
+
+              if (resetStep === "email") {
+                const result = await authService.resetPassword(cleanEmail);
+
+                if ("error" in result && result.error) {
+                  setMessage(result.error.message);
+                  return;
+                }
+
+                setMessage(copy.auth.messages.codeSent);
+                setResetStep("code");
+                return;
+              }
+
+              if (resetStep === "code") {
+                const result = await authService.verifyRecoveryCode(cleanEmail, verificationCode.trim());
+
+                if ("error" in result && result.error) {
+                  setMessage(result.error.message);
+                  return;
+                }
+
+                setMessage(copy.auth.messages.codeVerified);
+                setPassword("");
+                setResetStep("password");
+                return;
+              }
+
+              const result = await authService.updatePassword(password);
+
+              if ("error" in result && result.error) {
+                setMessage(result.error.message);
+                return;
+              }
+
+              await authService.signOut();
+              router.push(`/login?reset=1&email=${encodeURIComponent(cleanEmail)}`);
+              return;
+            }
+
+            if (mode === "register" && !registrationRole) {
+              setMessage(language === "mn" ? "Role сонгоод бүртгүүлнэ үү." : "Choose a role before registering.");
+              return;
+            }
 
             if (!isSupabaseConfigured && mode === "register") {
-              saveDemoUser();
-              router.push(`/login?registered=1&email=${encodeURIComponent(email)}`);
+              if (!registrationRole) return;
+              saveDemoUser(cleanEmail, cleanName, registrationRole);
+              router.push(`/login?registered=1&email=${encodeURIComponent(cleanEmail)}`);
               return;
             }
 
             if (!isSupabaseConfigured && mode === "login") {
-              const user = findDemoUser();
+              const user = findDemoUser(cleanEmail);
 
               if (!user) {
                 setMessage("Эхлээд Register хийсэн email/password-аараа login хийнэ.");
                 return;
               }
 
-              window.localStorage.setItem(demoSessionKey, JSON.stringify({ email: user.email, name: user.name }));
+              window.localStorage.removeItem(demoSessionKey);
+              window.sessionStorage.setItem(demoSessionKey, JSON.stringify({ email: user.email, name: user.name, role: user.role }));
               router.push("/");
               return;
             }
 
-            const cleanEmail = email.trim();
             const result =
               mode === "login"
                 ? await authService.signIn(cleanEmail, password)
-                : mode === "register"
-                  ? await authService.signUp(cleanEmail, password, name)
+                : mode === "register" && registrationRole
+                  ? await authService.signUp(cleanEmail, password, cleanName, registrationRole)
                   : await authService.resetPassword(cleanEmail);
 
             if ("error" in result && result.error) {
@@ -188,16 +258,74 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
               </span>
             </label>
           ) : null}
+          {mode === "register" ? (
+            <label>
+              {copy.auth.fields.role}
+              <div
+                className={`auth-field auth-role-field${roleOpen ? " open" : ""}`}
+                onBlur={(event) => {
+                  const nextTarget = event.relatedTarget;
+                  if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+                    setRoleOpen(false);
+                  }
+                }}
+              >
+                <ShieldCheck size={18} />
+                <button
+                  aria-expanded={roleOpen}
+                  className={`ec-input auth-role-trigger${selectedRole ? "" : " placeholder"}`}
+                  onClick={() => setRoleOpen((value) => !value)}
+                  type="button"
+                >
+                  <span>{selectedRole ? copy.roles[selectedRole] : copy.auth.fields.rolePlaceholder}</span>
+                  <ChevronDown size={17} />
+                </button>
+                {roleOpen ? (
+                  <div className="auth-role-menu" role="listbox">
+                    {registrationRoles.map((role) => {
+                      const selected = selectedRole === role;
+
+                      return (
+                        <button
+                          aria-selected={selected}
+                          className={selected ? "active" : ""}
+                          key={role}
+                          onClick={() => {
+                            setSelectedRole(role);
+                            setRoleOpen(false);
+                          }}
+                          role="option"
+                          type="button"
+                        >
+                          <span>{copy.roles[role]}</span>
+                          {selected ? <Check size={16} /> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            </label>
+          ) : null}
           <label>
             {copy.auth.fields.email}
             <span className="auth-field">
               <Mail size={18} />
-              <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+              <Input disabled={mode === "forgot" && resetStep !== "email"} type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
             </span>
           </label>
-          {mode !== "forgot" ? (
+          {mode === "forgot" && resetStep === "code" ? (
             <label>
-              {copy.auth.fields.password}
+              {copy.auth.fields.code}
+              <span className="auth-field">
+                <KeyRound size={18} />
+                <Input inputMode="numeric" value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} />
+              </span>
+            </label>
+          ) : null}
+          {mode !== "forgot" || resetStep === "password" ? (
+            <label>
+              {mode === "forgot" ? copy.auth.fields.newPassword : copy.auth.fields.password}
               <span className="auth-field auth-password-field">
                 <LockKeyhole size={18} />
                 <Input type={passwordVisible ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} />
@@ -212,12 +340,25 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
               </span>
             </label>
           ) : null}
+          {mode === "forgot" && resetStep !== "email" ? (
+            <button
+              className="auth-link-button"
+              onClick={() => {
+                setMessage("");
+                setVerificationCode("");
+                setResetStep("email");
+              }}
+              type="button"
+            >
+              {copy.auth.reset.changeEmail}
+            </button>
+          ) : null}
           <Button type="submit">
             {mode === "forgot" ? <Mail size={17} /> : <ShieldCheck size={17} />}
-            {modeCopy.button}
+            {resetButtonLabel}
           </Button>
         </form>
-        {message || registeredMessage ? <p className="auth-message">{message || registeredMessage}</p> : null}
+        {message || registeredMessage || resetCompleteMessage ? <p className="auth-message">{message || registeredMessage || resetCompleteMessage}</p> : null}
       </Card>
     </main>
   );

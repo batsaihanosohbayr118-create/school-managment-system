@@ -104,7 +104,7 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
   students: { fields: ["Full name", "Class", "Parent name", "Phone", "Payment"] },
   teachers: { fields: ["Teacher name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"] },
   classes: { fields: ["Class name", "Section", "Class teacher"] },
-  attendance: { fields: ["Student name", "Date", "Status"] },
+  attendance: { fields: ["Student name", "Class", "Date", "Status"] },
   grades: { fields: ["Student name", "Subject", "Score", "Semester"] },
   payments: { fields: ["Student name", "Amount", "Status", "Due date"] },
   timetable: { fields: ["Day", "Time", "Subject", "Teacher"] },
@@ -120,6 +120,10 @@ const visibleModulesByRole: Record<Role, NavModule[]> = {
 
 const demoSessionKey = "educore_session";
 const notificationStorageKey = "educore_activity_notifications";
+
+function isRole(value: unknown): value is Role {
+  return value === "admin" || value === "teacher" || value === "student";
+}
 
 function getInitialNotifications(): ActivityNotification[] {
   if (typeof window === "undefined") return [];
@@ -231,7 +235,6 @@ function AppShell() {
   const [query, setQuery] = useState("");
   const [darkMode, setDarkMode] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [roleOpen, setRoleOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>("create");
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
@@ -255,9 +258,12 @@ function AppShell() {
   const modalTitle = modalMode === "edit" ? `${copy.common.edit} ${copy.recordLabel[activeModule]}` : createCopy.title;
   const modalAction = modalMode === "edit" ? copy.common.saveChanges : createCopy.action;
   const unreadNotifications = activityNotifications.filter((item) => !item.read).length;
+  const canManageAttendance = role === "admin" || role === "teacher";
+  const canManageActiveModule = activeModule === "attendance" ? canManageAttendance : role === "admin";
 
   async function logout() {
     window.localStorage.removeItem(demoSessionKey);
+    window.sessionStorage.removeItem(demoSessionKey);
     await authService.signOut();
     router.push("/login");
   }
@@ -354,6 +360,8 @@ function AppShell() {
   }, [activityNotifications]);
 
   function openCreateModal() {
+    if (!canManageActiveModule || activeModule === "settings") return;
+
     setModalMode("create");
     setEditingRecordId(null);
     setFormValues({});
@@ -429,6 +437,11 @@ function AppShell() {
             return;
           }
 
+          const sessionRole = data.session.user.user_metadata?.role;
+          const nextRole = isRole(sessionRole) ? sessionRole : "student";
+          setRole(nextRole);
+          setActiveModule((currentModule) => (visibleModulesByRole[nextRole].includes(currentModule) ? currentModule : "dashboard"));
+
           setAuthChecked(true);
         }
 
@@ -438,9 +451,22 @@ function AppShell() {
       await Promise.resolve();
 
       if (!ignore) {
-        if (!window.localStorage.getItem(demoSessionKey)) {
+        window.localStorage.removeItem(demoSessionKey);
+        const demoSession = window.sessionStorage.getItem(demoSessionKey);
+
+        if (!demoSession) {
           router.replace("/login");
           return;
+        }
+
+        try {
+          const parsedSession = JSON.parse(demoSession) as { role?: unknown };
+          const nextRole = isRole(parsedSession.role) ? parsedSession.role : "student";
+          setRole(nextRole);
+          setActiveModule((currentModule) => (visibleModulesByRole[nextRole].includes(currentModule) ? currentModule : "dashboard"));
+        } catch {
+          setRole("student");
+          setActiveModule((currentModule) => (visibleModulesByRole.student.includes(currentModule) ? currentModule : "dashboard"));
         }
 
         setAuthChecked(true);
@@ -561,32 +587,10 @@ function AppShell() {
             ))}
           </div>
           <div className="ec-role-dropdown">
-            <button className="ec-role-trigger" onClick={() => setRoleOpen((value) => !value)} type="button">
+            <div className="ec-role-trigger ec-role-static" aria-label={copy.common.account}>
               <span>{copy.roles[role]}</span>
-              <ChevronDown size={16} />
-            </button>
-            {roleOpen ? (
-              <div className="ec-role-menu">
-                {(["admin", "teacher", "student"] as Role[]).map((item) => (
-                  <button
-                    className={role === item ? "active" : ""}
-                    key={item}
-                    onClick={() => {
-                      setRole(item);
-                      if (!visibleModulesByRole[item].includes(activeModule)) {
-                        setActiveModule("dashboard");
-                      }
-                      setNotificationPageOpen(false);
-                      setRoleOpen(false);
-                    }}
-                    type="button"
-                  >
-                    <span>{copy.roles[item]}</span>
-                    {role === item ? <Check size={16} /> : null}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+              <Check size={16} />
+            </div>
           </div>
           <button className="ec-icon-button theme-toggle" onClick={() => setDarkMode((value) => !value)} type="button">
             {darkMode ? <Sun size={19} /> : <Moon size={19} />}
@@ -627,7 +631,7 @@ function AppShell() {
                 <h1>{activeModule === "dashboard" ? dashboard.title : copy.nav[activeNav.id].label}</h1>
                 <span>{activeModule === "dashboard" ? dashboard.subtitle : (copy.moduleSubtitle as Partial<Record<NavModule, string>>)[activeModule] ?? copy.app.defaultModuleSubtitle}</span>
               </div>
-              {activeModule !== "settings" ? (
+              {activeModule !== "settings" && canManageActiveModule ? (
                 <Button onClick={openCreateModal} type="button">
                   <Plus size={17} />
                   {createCopy.action}
@@ -646,7 +650,7 @@ function AppShell() {
               <ClassesModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
             {activeModule === "attendance" ? (
-              <AttendanceModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+              <AttendanceModule apiData={resourceData} canManage={canManageAttendance} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
             {activeModule === "grades" ? (
               <GradesModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
@@ -660,7 +664,7 @@ function AppShell() {
             {activeModule === "announcements" ? (
               <AnnouncementsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
-            {activeModule === "settings" ? <SettingsModule copy={copy} darkMode={darkMode} language={language} logout={logout} role={role} setDarkMode={setDarkMode} setLanguage={setLanguage} setRole={setRole} /> : null}
+            {activeModule === "settings" ? <SettingsModule copy={copy} darkMode={darkMode} language={language} logout={logout} role={role} setDarkMode={setDarkMode} setLanguage={setLanguage} /> : null}
 
             {activeModule !== "settings" && query.trim() ? (
               <Card className="search-panel">
@@ -713,7 +717,10 @@ function AppShell() {
                       },
                       body: JSON.stringify({ id: editingRecordId, values: formValues })
                     }).then(async (response) => {
-                      if (!response.ok) throw new Error("Save failed");
+                      if (!response.ok) {
+                        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+                        throw new Error(payload?.message ?? "Save failed");
+                      }
                       return (await response.json()) as ResourceTableData;
                     });
                 addActivityNotification(activeResource, modalMode === "edit" ? "updated" : "created", Object.values(formValues).find(Boolean) ?? "");
@@ -722,8 +729,8 @@ function AppShell() {
                 setEditingRecordId(null);
                 setModalOpen(false);
                 setToast(modalMode === "edit" ? copy.common.recordUpdated : copy.common.savedToDatabase(createCopy.action));
-              } catch {
-                setToast(copy.common.databaseSaveFailed);
+              } catch (error) {
+                setToast(error instanceof Error && error.message ? `${copy.common.databaseSaveFailed}: ${error.message}` : copy.common.databaseSaveFailed);
               }
             }}
           >
@@ -1097,8 +1104,7 @@ function SettingsModule({
   logout,
   role,
   setDarkMode,
-  setLanguage,
-  setRole
+  setLanguage
 }: {
   copy: AppCopy;
   darkMode: boolean;
@@ -1107,7 +1113,6 @@ function SettingsModule({
   role: Role;
   setDarkMode: (value: boolean) => void;
   setLanguage: (value: Language) => void;
-  setRole: (value: Role) => void;
 }) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -1125,12 +1130,10 @@ function SettingsModule({
               <Badge tone="blue">{copy.roles[role]}</Badge>
             </div>
             <div className="mobile-role-list">
-              {(["admin", "teacher", "student"] as Role[]).map((item) => (
-                <button className={role === item ? "active" : ""} key={item} onClick={() => setRole(item)} type="button">
-                  <span>{copy.roles[item]}</span>
-                  {role === item ? <Check size={16} /> : null}
-                </button>
-              ))}
+              <span className="mobile-role-current">
+                <span>{copy.roles[role]}</span>
+                <Check size={16} />
+              </span>
             </div>
             <button className="mobile-account-logout" onClick={logout} type="button">
               {copy.common.logout}
@@ -1271,10 +1274,12 @@ function ModuleTable({
         </div>
         <div className="table-actions">
           <Input value={filterQuery} onChange={(event) => setFilterQuery(event.target.value)} placeholder={copy.common.filterRecords} />
-          <Button onClick={onAdd} type="button">
-            <Plus size={17} />
-            {copy.common.add}
-          </Button>
+          {canManage ? (
+            <Button onClick={onAdd} type="button">
+              <Plus size={17} />
+              {copy.common.add}
+            </Button>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent>

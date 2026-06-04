@@ -81,11 +81,20 @@ export const translations = {
       secure: "Secure",
       eyebrow: "School Management System",
       tabs: { login: "Login", register: "Register", forgot: "Reset" },
-      fields: { name: "Full name", email: "Email", password: "Password" },
+      fields: { name: "Full name", role: "Role", rolePlaceholder: "Choose role", email: "Email", password: "Password", code: "Verification code", newPassword: "New password" },
       messages: {
         registered: "Account created. Use the same email and password to login.",
         demoLoginMissing: "Register first, then login with that email/password.",
-        requestComplete: "Request completed successfully."
+        requestComplete: "Request completed successfully.",
+        codeSent: "Verification code sent. Check your email.",
+        codeVerified: "Code verified. Enter your new password.",
+        resetComplete: "Password updated. Login with your new password."
+      },
+      reset: {
+        sendCode: "Send code",
+        verifyCode: "Verify code",
+        savePassword: "Save new password",
+        changeEmail: "Change email"
       },
       modes: {
         login: { title: "Welcome back", subtitle: "Sign in to EduCore", button: "Login" },
@@ -282,11 +291,20 @@ export const translations = {
       secure: "Аюулгүй",
       eyebrow: "Сургуулийн удирдлагын систем",
       tabs: { login: "Нэвтрэх", register: "Бүртгүүлэх", forgot: "Сэргээх" },
-      fields: { name: "Бүтэн нэр", email: "Имэйл", password: "Нууц үг" },
+      fields: { name: "Бүтэн нэр", role: "Role", rolePlaceholder: "Role сонгох", email: "Имэйл", password: "Нууц үг", code: "Баталгаажуулах код", newPassword: "Шинэ нууц үг" },
       messages: {
         registered: "Бүртгэл үүслээ. Ижил имэйл, нууц үгээрээ нэвтэрнэ үү.",
         demoLoginMissing: "Эхлээд бүртгүүлээд, дараа нь тэр имэйл/нууц үгээрээ нэвтэрнэ.",
-        requestComplete: "Хүсэлт амжилттай дууслаа."
+        requestComplete: "Хүсэлт амжилттай дууслаа.",
+        codeSent: "Баталгаажуулах код илгээгдлээ. Имэйлээ шалгана уу.",
+        codeVerified: "Код баталгаажлаа. Шинэ нууц үгээ оруулна уу.",
+        resetComplete: "Нууц үг шинэчлэгдлээ. Шинэ нууц үгээрээ нэвтэрнэ үү."
+      },
+      reset: {
+        sendCode: "Код авах",
+        verifyCode: "Код шалгах",
+        savePassword: "Шинэ нууц үг хадгалах",
+        changeEmail: "Имэйл солих"
       },
       modes: {
         login: { title: "Тавтай морил", subtitle: "EduCore-д нэвтрэх", button: "Нэвтрэх" },

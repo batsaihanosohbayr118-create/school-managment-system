@@ -382,7 +382,7 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
     case "classes":
       return [values["Class name"], values.Section, values["Class teacher"], "0", "Mon-Fri"].map(stringValue);
     case "attendance":
-      return [values["Student name"], "", values.Date || new Date().toISOString().slice(0, 10), values.Status || "Present"].map(stringValue);
+      return [values["Student name"], values.Class, values.Date || new Date().toISOString().slice(0, 10), values.Status || "Present"].map(stringValue);
     case "grades":
       return [values["Student name"], values.Subject, `${numberValue(values.Score)}%`, values.Semester].map(stringValue);
     case "payments":
@@ -534,8 +534,8 @@ export async function createResource(resource: SchoolResource, values: Record<st
       case "attendance":
         await pool.query(
           `INSERT INTO attendance_records (id, student, class_name, date, status)
-           VALUES ($1, $2, '', $3, $4)`,
-          [id, values["Student name"], values.Date ?? new Date().toISOString().slice(0, 10), values.Status ?? "Present"]
+           VALUES ($1, $2, $3, $4, $5)`,
+          [id, values["Student name"], values.Class ?? "", values.Date ?? new Date().toISOString().slice(0, 10), values.Status ?? "Present"]
         );
         break;
       case "grades":
