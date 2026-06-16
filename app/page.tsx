@@ -7,6 +7,7 @@ import {
   Bell,
   Check,
   ChevronDown,
+  GraduationCap,
   House,
   LogOut,
   Menu,
@@ -15,7 +16,6 @@ import {
   Plus,
   Search,
   Settings as SettingsIcon,
-  Sparkles,
   Sun,
   Trash2,
   X
@@ -529,7 +529,7 @@ function AppShell() {
     return (
       <main className={`educore-shell auth-check${darkMode ? " dark" : ""}`}>
         <div className="auth-loading">
-          <Sparkles size={24} />
+          <GraduationCap size={24} />
           <strong>{copy.app.loadingSession}</strong>
         </div>
       </main>
@@ -542,7 +542,7 @@ function AppShell() {
       <aside className={`ec-sidebar${mobileOpen ? " open" : ""}`}>
         <div className="ec-brand">
           <span>
-            <Sparkles size={22} />
+            <GraduationCap size={24} />
           </span>
           <div>
             <strong>EduCore</strong>
