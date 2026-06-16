@@ -3,7 +3,7 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, Eye, EyeOff, GraduationCap, KeyRound, LockKeyhole, Mail, ShieldCheck, Sparkles, UserRound } from "lucide-react";
-import { authService, isSupabaseConfigured } from "@/lib/supabase";
+import { authService, getAuthRedirectUrl, isSupabaseConfigured } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -98,10 +98,15 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
       return;
     }
 
-    const result = await authService.signInWithGoogle(`${window.location.origin}/`);
+    const result = await authService.signInWithGoogle(getAuthRedirectUrl("/"));
 
     if ("error" in result && result.error) {
       setMessage(result.error.message);
+      return;
+    }
+
+    if ("data" in result && result.data?.url) {
+      window.location.assign(result.data.url);
     }
   }
 

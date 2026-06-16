@@ -6,6 +6,21 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
+export function getAuthRedirectUrl(path = "/") {
+  if (typeof window !== "undefined") {
+    return new URL(path, window.location.origin).toString();
+  }
+
+  let baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env.NEXT_PUBLIC_VERCEL_URL ??
+    "http://localhost:3000";
+
+  baseUrl = baseUrl.startsWith("http") ? baseUrl : `https://${baseUrl}`;
+
+  return new URL(path, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString();
+}
+
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl!, supabaseAnonKey!, {
       auth: {
@@ -71,7 +86,8 @@ export const authService = {
     return supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo
+        redirectTo,
+        skipBrowserRedirect: true
       }
     });
   },
