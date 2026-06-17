@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS students (
   birth_date TEXT NOT NULL DEFAULT '',
   address TEXT NOT NULL DEFAULT '',
   parent_name TEXT NOT NULL DEFAULT '',
+  parent_email TEXT,
   class_name TEXT NOT NULL,
   roll_number TEXT NOT NULL,
   attendance INTEGER NOT NULL DEFAULT 0,
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
 CREATE TABLE IF NOT EXISTS grade_records (
   id TEXT PRIMARY KEY,
   student TEXT NOT NULL,
+  student_email TEXT NOT NULL DEFAULT '',
   subject TEXT NOT NULL,
   score INTEGER NOT NULL DEFAULT 0,
   semester TEXT NOT NULL DEFAULT '',
@@ -83,11 +85,14 @@ CREATE TABLE IF NOT EXISTS announcements (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO students (id, full_name, email, phone, gender, birth_date, address, parent_name, class_name, roll_number, attendance, gpa, payment_status)
+ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_email TEXT;
+ALTER TABLE grade_records ADD COLUMN IF NOT EXISTS student_email TEXT NOT NULL DEFAULT '';
+
+INSERT INTO students (id, full_name, email, phone, gender, birth_date, address, parent_name, parent_email, class_name, roll_number, attendance, gpa, payment_status)
 VALUES
-  ('ST-1001', 'Anand Bayarsaikhan', 'anand@educore.mn', '+976 9911 2030', 'Male', '2010-03-12', 'Ulaanbaatar, Khan-Uul', 'Bayarsaikhan', 'Grade 8A', '08A-01', 96, 3.8, 'Paid'),
-  ('ST-1002', 'Saruul Enkhjin', 'saruul@educore.mn', '+976 8800 4412', 'Female', '2011-07-08', 'Ulaanbaatar, Bayanzurkh', 'Enkhjin', 'Grade 7B', '07B-09', 89, 3.5, 'Partial'),
-  ('ST-1003', 'Temuulen Ganbat', 'temuulen@educore.mn', '+976 9505 1177', 'Male', '2009-11-21', 'Ulaanbaatar, Sukhbaatar', 'Ganbat', 'Grade 9A', '09A-12', 78, 3.1, 'Unpaid')
+  ('ST-1001', 'Anand Bayarsaikhan', 'anand@educore.mn', '+976 9911 2030', 'Male', '2010-03-12', 'Ulaanbaatar, Khan-Uul', 'Bayarsaikhan', 'parent@educore.mn', 'Grade 8A', '08A-01', 96, 3.8, 'Paid'),
+  ('ST-1002', 'Saruul Enkhjin', 'saruul@educore.mn', '+976 8800 4412', 'Female', '2011-07-08', 'Ulaanbaatar, Bayanzurkh', 'Enkhjin', 'parent2@educore.mn', 'Grade 7B', '07B-09', 89, 3.5, 'Partial'),
+  ('ST-1003', 'Temuulen Ganbat', 'temuulen@educore.mn', '+976 9505 1177', 'Male', '2009-11-21', 'Ulaanbaatar, Sukhbaatar', 'Ganbat', 'parent3@educore.mn', 'Grade 9A', '09A-12', 78, 3.1, 'Unpaid')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO teachers (id, name, subject, email, experience, salary, contact, classes)
@@ -111,11 +116,11 @@ VALUES
   ('AT-3', 'Temuulen Ganbat', 'Grade 9A', '2026-05-18', 'Absent')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO grade_records (id, student, subject, score, semester)
+INSERT INTO grade_records (id, student, student_email, subject, score, semester)
 VALUES
-  ('GR-1', 'Anand Bayarsaikhan', 'Mathematics', 94, 'Spring 2026'),
-  ('GR-2', 'Saruul Enkhjin', 'English', 88, 'Spring 2026'),
-  ('GR-3', 'Temuulen Ganbat', 'Physics', 81, 'Spring 2026')
+  ('GR-1', 'Anand Bayarsaikhan', 'anand@educore.mn', 'Mathematics', 94, 'Spring 2026'),
+  ('GR-2', 'Saruul Enkhjin', 'saruul@educore.mn', 'English', 88, 'Spring 2026'),
+  ('GR-3', 'Temuulen Ganbat', 'temuulen@educore.mn', 'Physics', 81, 'Spring 2026')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO payment_records (id, student, amount, status, due_date)

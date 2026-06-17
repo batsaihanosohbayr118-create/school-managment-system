@@ -5,6 +5,13 @@ export type Language = "en" | "mn";
 export const languageStorageKey = "educore_language";
 
 export function getInitialLanguage(): Language {
+  if (typeof window !== "undefined") {
+    const stored = getStoredLanguage();
+    if (stored) return stored;
+
+    const browserLang = navigator.language.split("-")[0];
+    if (browserLang === "mn") return "mn";
+  }
   return "en";
 }
 
@@ -114,7 +121,7 @@ export const translations = {
       announcements: { label: "Announcements", description: "Notices and dashboard notifications" },
       settings: { label: "Settings", description: "Profile, roles, permissions, preferences" }
     } satisfies Record<NavModule, { label: string; description: string }>,
-    roles: { admin: "Admin", teacher: "Teacher", student: "Student" } satisfies Record<Role, string>,
+    roles: { admin: "Admin", teacher: "Teacher", student: "Student", parent: "Parent" } satisfies Record<Role, string>,
     rolePermissions: {
       admin: [
         "Manage students",
@@ -128,7 +135,8 @@ export const translations = {
         "View reports"
       ],
       teacher: ["View assigned classes", "Mark attendance", "Add grades", "Upload assignments", "View student profiles"],
-      student: ["View timetable", "View grades", "View attendance", "View announcements", "View payment status"]
+      student: ["View timetable", "View grades", "View attendance", "View announcements", "View payment status"],
+      parent: ["View child's grades", "View child's attendance", "View announcements", "View payment status"]
     } satisfies Record<Role, string[]>,
     dashboards: {
       admin: {
@@ -159,6 +167,16 @@ export const translations = {
           ["Attendance", "96%", "Excellent"],
           ["Upcoming Classes", "4", "Today"],
           ["Payment Status", "Paid", "May invoice"]
+        ]
+      },
+      parent: {
+        title: "Parent Portal",
+        subtitle: "Child attendance, grades, announcements, and payment status in one place.",
+        stats: [
+          ["Child Attendance", "96%", "Current month"],
+          ["Latest GPA", "3.8", "Spring 2026"],
+          ["Open Payments", "$0", "All clear"],
+          ["Announcements", "3", "This week"]
         ]
       }
     } satisfies Record<Role, { title: string; subtitle: string; stats: string[][] }>,
@@ -324,7 +342,7 @@ export const translations = {
       announcements: { label: "Зарлал", description: "Мэдэгдэл болон dashboard-ийн зарлал" },
       settings: { label: "Тохиргоо", description: "Профайл, эрх, зөвшөөрөл, тохиргоо" }
     } satisfies Record<NavModule, { label: string; description: string }>,
-    roles: { admin: "Админ", teacher: "Багш", student: "Сурагч" } satisfies Record<Role, string>,
+    roles: { admin: "Админ", teacher: "Багш", student: "Сурагч", parent: "Эцэг эх" } satisfies Record<Role, string>,
     rolePermissions: {
       admin: [
         "Сурагч удирдах",
@@ -338,7 +356,8 @@ export const translations = {
         "Тайлан харах"
       ],
       teacher: ["Хуваарилагдсан анги харах", "Ирц бүртгэх", "Дүн нэмэх", "Даалгавар оруулах", "Сурагчийн профайл харах"],
-      student: ["Хуваарь харах", "Дүн харах", "Ирц харах", "Зарлал харах", "Төлбөрийн төлөв харах"]
+      student: ["Хуваарь харах", "Дүн харах", "Ирц харах", "Зарлал харах", "Төлбөрийн төлөв харах"],
+      parent: ["Хүүхдийн дүн харах", "Хүүхдийн ирц харах", "Зарлал харах", "Төлбөрийн төлөв харах"]
     } satisfies Record<Role, string[]>,
     dashboards: {
       admin: {
@@ -369,6 +388,16 @@ export const translations = {
           ["Ирц", "96%", "Маш сайн"],
           ["Дараагийн хичээл", "4", "Өнөөдөр"],
           ["Төлбөрийн төлөв", "Төлсөн", "5-р сарын нэхэмжлэх"]
+        ]
+      },
+      parent: {
+        title: "Эцэг эхийн портал",
+        subtitle: "Хүүхдийн ирц, дүн, зарлал болон төлбөрийн төлөвийг нэг дор харна.",
+        stats: [
+          ["Хүүхдийн ирц", "96%", "Энэ сар"],
+          ["Сүүлийн GPA", "3.8", "2026 оны хавар"],
+          ["Төлөх төлбөр", "$0", "Бүгд цэвэр"],
+          ["Зарлал", "3", "Энэ долоо хоног"]
         ]
       }
     } satisfies Record<Role, { title: string; subtitle: string; stats: string[][] }>,

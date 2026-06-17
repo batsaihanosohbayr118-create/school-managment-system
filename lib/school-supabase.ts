@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, getCurrentUserEmailAndRole } from "@/lib/supabase";
 import type { NavModule } from "@/lib/types";
 
 export type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
@@ -10,13 +10,18 @@ export type ResourceTable = {
 };
 
 type SupabaseRow = Record<string, string | number | null>;
+type SupabasePayload = Record<string, unknown>;
+type SupabaseError = {
+  code?: string;
+  message?: string;
+};
 
 const resourceColumns: Record<SchoolResource, string[]> = {
-  students: ["Name", "Class", "Attendance", "GPA", "Payment"],
+  students: ["Name", "Class", "Attendance", "GPA", "Payment", "Parent Email"],
   teachers: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"],
   classes: ["Class", "Section", "Teacher", "Students", "Schedule"],
   attendance: ["Student", "Class", "Date", "Status"],
-  grades: ["Student", "Subject", "Score", "Semester"],
+  grades: ["Student", "Subject", "Score", "Semester", "Student Email"],
   payments: ["Student", "Amount", "Status", "Due Date"],
   timetable: ["Day", "Time", "Subject", "Teacher", "Class"],
   announcements: ["Title", "Content", "Audience", "Date"]
@@ -61,10 +66,33 @@ function numberValue(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function isMissingOptionalColumnError(error: SupabaseError | null) {
+  const message = error?.message?.toLowerCase() ?? "";
+  return error?.code === "PGRST204" || (message.includes("schema cache") && message.includes("column"));
+}
+
+function stripOptionalColumns(resource: SchoolResource, payload: SupabasePayload) {
+  const nextPayload = { ...payload };
+
+  if (resource === "students") {
+    delete nextPayload.parent_email;
+  }
+
+  if (resource === "grades") {
+    delete nextPayload.student_email;
+  }
+
+  return nextPayload;
+}
+
+function hasOptionalColumnPayload(resource: SchoolResource, payload: SupabasePayload) {
+  return (resource === "students" && "parent_email" in payload) || (resource === "grades" && "student_email" in payload);
+}
+
 function rowToArray(resource: SchoolResource, row: SupabaseRow) {
   switch (resource) {
     case "students":
-      return [row.full_name, row.class_name, `${row.attendance}%`, row.gpa, row.payment_status].map(stringValue);
+      return [row.full_name, row.class_name, `${row.attendance}%`, row.gpa, row.payment_status, row.parent_email].map(stringValue);
     case "teachers":
       return [row.name, row.subject, row.email, row.experience, row.salary, phoneValue(row.contact), row.classes].map(stringValue);
     case "classes":
@@ -72,7 +100,7 @@ function rowToArray(resource: SchoolResource, row: SupabaseRow) {
     case "attendance":
       return [row.student, row.class_name, row.date, row.status].map(stringValue);
     case "grades":
-      return [row.student, row.subject, `${row.score}%`, row.semester].map(stringValue);
+      return [row.student, row.subject, `${row.score}%`, row.semester, row.student_email].map(stringValue);
     case "payments":
       return [row.student, row.amount, row.status, row.due_date].map(stringValue);
     case "timetable":
@@ -89,13 +117,14 @@ function createPayload(resource: SchoolResource, values: Record<string, string>)
     case "students":
       return {
         id,
-        full_name: values["Full name"] ?? "",
+        full_name: values.Name ?? "",
         email: `${id.toLowerCase()}@educore.mn`,
         phone: values.Phone ?? "",
         gender: "Unknown",
         birth_date: "",
         address: "",
         parent_name: values["Parent name"] ?? "",
+        parent_email: values["Parent Email"] ?? "",
         class_name: values.Class ?? "",
         roll_number: id,
         attendance: 0,
@@ -105,7 +134,7 @@ function createPayload(resource: SchoolResource, values: Record<string, string>)
     case "teachers":
       return {
         id,
-        name: values["Teacher name"] ?? "",
+        name: values.Name ?? "",
         subject: values.Subject ?? "",
         email: values.Email ?? `${id.toLowerCase()}@educore.mn`,
         experience: values.Experience ?? "",
@@ -116,16 +145,16 @@ function createPayload(resource: SchoolResource, values: Record<string, string>)
     case "classes":
       return {
         id,
-        name: values["Class name"] ?? "",
+        name: values.Class ?? "",
         section: values.Section ?? "",
-        teacher: values["Class teacher"] ?? "",
+        teacher: values.Teacher ?? "",
         students: 0,
         schedule: "Mon-Fri"
       };
     case "attendance":
       return {
         id,
-        student: values["Student name"] ?? "",
+        student: values.Student ?? "",
         class_name: values.Class ?? "",
         date: values.Date || new Date().toISOString().slice(0, 10),
         status: values.Status || "Present"
@@ -133,7 +162,8 @@ function createPayload(resource: SchoolResource, values: Record<string, string>)
     case "grades":
       return {
         id,
-        student: values["Student name"] ?? "",
+        student: values.Student ?? "",
+        student_email: values["Student Email"] ?? "",
         subject: values.Subject ?? "",
         score: numberValue(values.Score),
         semester: values.Semester ?? ""
@@ -141,10 +171,10 @@ function createPayload(resource: SchoolResource, values: Record<string, string>)
     case "payments":
       return {
         id,
-        student: values["Student name"] ?? "",
+        student: values.Student ?? "",
         amount: values.Amount ?? "$0",
         status: values.Status ?? "Unpaid",
-        due_date: values["Due date"] ?? ""
+        due_date: values["Due Date"] ?? ""
       };
     case "timetable":
       return {
@@ -174,7 +204,8 @@ function updatePayload(resource: SchoolResource, values: Record<string, string>)
         class_name: values.Class ?? "",
         attendance: numberValue(values.Attendance),
         gpa: numberValue(values.GPA),
-        payment_status: values.Payment ?? "Unpaid"
+        payment_status: values.Payment ?? "Unpaid",
+        parent_email: values["Parent Email"] ?? ""
       };
     case "teachers":
       return {
@@ -204,6 +235,7 @@ function updatePayload(resource: SchoolResource, values: Record<string, string>)
     case "grades":
       return {
         student: values.Student ?? "",
+        student_email: values["Student Email"] ?? "",
         subject: values.Subject ?? "",
         score: numberValue(values.Score),
         semester: values.Semester ?? ""
@@ -235,15 +267,53 @@ function updatePayload(resource: SchoolResource, values: Record<string, string>)
 
 export async function listSupabaseResource(resource: SchoolResource): Promise<ResourceTable> {
   const client = requireSupabase();
-  const { data, error } = await client
-    .from(tableNames[resource])
-    .select("*")
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false });
+  const { email, role } = await getCurrentUserEmailAndRole();
 
-  if (error) throw error;
+  const createBaseQuery = () =>
+    client
+      .from(tableNames[resource])
+      .select("*")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
 
-  const rows = (data ?? []) as SupabaseRow[];
+  let query = createBaseQuery();
+
+  if (resource === "grades" && role === "student" && email) {
+    query = query.eq("student_email", email);
+  } else if ((resource === "grades" || resource === "attendance") && role === "parent" && email) {
+    const { data: studentData } = await client
+      .from("students")
+      .select("email, full_name")
+      .eq("parent_email", email)
+      .single();
+
+    if (resource === "grades" && studentData?.email) {
+      query = query.eq("student_email", studentData.email);
+    } else if (resource === "attendance" && studentData?.full_name) {
+      query = query.eq("student", studentData.full_name);
+    }
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    if (isMissingOptionalColumnError(error)) {
+      const fallback = await createBaseQuery();
+      if (fallback.error) throw fallback.error;
+
+      const fallbackRows = (fallback.data as unknown as SupabaseRow[]) ?? [];
+
+      return {
+        columns: resourceColumns[resource],
+        ids: fallbackRows.map((row) => stringValue(row.id)),
+        rows: fallbackRows.map((row) => rowToArray(resource, row))
+      };
+    }
+
+    throw error;
+  }
+
+  const rows = (data as unknown as SupabaseRow[]) ?? [];
 
   return {
     columns: resourceColumns[resource],
@@ -254,7 +324,13 @@ export async function listSupabaseResource(resource: SchoolResource): Promise<Re
 
 export async function createSupabaseResource(resource: SchoolResource, values: Record<string, string>) {
   const client = requireSupabase();
-  const { error } = await client.from(tableNames[resource]).insert(createPayload(resource, values) as Record<string, unknown>);
+  const payload = createPayload(resource, values) as SupabasePayload;
+  let { error } = await client.from(tableNames[resource]).insert(payload);
+
+  if (error && hasOptionalColumnPayload(resource, payload) && isMissingOptionalColumnError(error)) {
+    const retry = await client.from(tableNames[resource]).insert(stripOptionalColumns(resource, payload));
+    error = retry.error;
+  }
 
   if (error) throw error;
 
@@ -263,7 +339,13 @@ export async function createSupabaseResource(resource: SchoolResource, values: R
 
 export async function updateSupabaseResource(resource: SchoolResource, id: string, values: Record<string, string>) {
   const client = requireSupabase();
-  const { error } = await client.from(tableNames[resource]).update(updatePayload(resource, values) as Record<string, unknown>).eq("id", id);
+  const payload = updatePayload(resource, values) as SupabasePayload;
+  let { error } = await client.from(tableNames[resource]).update(payload).eq("id", id);
+
+  if (error && hasOptionalColumnPayload(resource, payload) && isMissingOptionalColumnError(error)) {
+    const retry = await client.from(tableNames[resource]).update(stripOptionalColumns(resource, payload)).eq("id", id);
+    error = retry.error;
+  }
 
   if (error) throw error;
 

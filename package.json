@@ -18,6 +18,7 @@
     "framer-motion": "^12.38.0",
     "lucide-react": "latest",
     "next": "latest",
+    "next-pwa": "^5.6.0",
     "pg": "^8.20.0",
     "react": "latest",
     "react-dom": "latest",

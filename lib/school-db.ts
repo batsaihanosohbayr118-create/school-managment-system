@@ -2,15 +2,10 @@ import { Pool } from "pg";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export type SchoolResource =
-  | "students"
-  | "teachers"
-  | "classes"
-  | "attendance"
-  | "grades"
-  | "payments"
-  | "timetable"
-  | "announcements";
+import type { NavModule } from "@/lib/types";
+import { getCurrentUserEmailAndRole } from "./supabase";
+
+export type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
 
 export type ResourceTable = {
   columns: string[];
@@ -18,13 +13,13 @@ export type ResourceTable = {
   rows: string[][];
 };
 
-type QueryRow = Record<string, string | number | Date | null>;
-
 type LocalResourceRow = {
   id: string;
-  values: string[];
   createdAt: string;
-};
+  values?: string[];
+} & Record<string, string | number | string[] | undefined>;
+
+type QueryRow = Record<string, string | number | Date | null | undefined>;
 
 type LocalStore = Record<SchoolResource, LocalResourceRow[]>;
 
@@ -34,11 +29,11 @@ declare global {
 }
 
 const resourceColumns: Record<SchoolResource, string[]> = {
-  students: ["Name", "Class", "Attendance", "GPA", "Payment"],
+  students: ["Name", "Class", "Attendance", "GPA", "Payment", "Parent Email"],
   teachers: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"],
   classes: ["Class", "Section", "Teacher", "Students", "Schedule"],
   attendance: ["Student", "Class", "Date", "Status"],
-  grades: ["Student", "Subject", "Score", "Semester"],
+  grades: ["Student", "Subject", "Score", "Semester", "Student Email"],
   payments: ["Student", "Amount", "Status", "Due Date"],
   timetable: ["Day", "Time", "Subject", "Teacher", "Class"],
   announcements: ["Title", "Content", "Audience", "Date"]
@@ -48,44 +43,44 @@ const localStorePath = path.join(process.cwd(), ".local-data", "school-store.jso
 
 const localSeedData: LocalStore = {
   students: [
-    { id: "ST-1001", values: ["Anand Bayarsaikhan", "Grade 8A", "96%", "3.8", "Paid"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "ST-1002", values: ["Saruul Enkhjin", "Grade 7B", "89%", "3.5", "Partial"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "ST-1003", values: ["Temuulen Ganbat", "Grade 9A", "78%", "3.1", "Unpaid"], createdAt: "2026-05-18T00:00:00.000Z" }
+    { id: "ST-1001", full_name: "Anand Bayarsaikhan", email: "anand@educore.mn", parent_email: "parent@educore.mn", class_name: "Grade 8A", attendance: 96, gpa: 3.8, payment_status: "Paid", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "ST-1002", full_name: "Saruul Enkhjin", email: "saruul@educore.mn", parent_email: "parent2@educore.mn", class_name: "Grade 7B", attendance: 89, gpa: 3.5, payment_status: "Partial", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "ST-1003", full_name: "Temuulen Ganbat", email: "temuulen@educore.mn", parent_email: "parent3@educore.mn", class_name: "Grade 9A", attendance: 78, gpa: 3.1, payment_status: "Unpaid", createdAt: "2026-05-18T00:00:00.000Z" }
   ],
   teachers: [
-    { id: "TC-201", values: ["Ms. Saraa", "Mathematics", "saraa@educore.mn", "8 years", "$1,450", "9919 8000", "Grade 8A, Grade 9A"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "TC-202", values: ["Mr. Bold", "Physics", "bold@educore.mn", "6 years", "$1,320", "8808 5500", "Grade 9A"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "TC-203", values: ["Ms. Nomin", "English", "nomin@educore.mn", "5 years", "$1,280", "9900 8080", "Grade 7B, Grade 8A"], createdAt: "2026-05-18T00:00:00.000Z" }
+    { id: "TC-201", name: "Ms. Saraa", subject: "Mathematics", email: "saraa@educore.mn", experience: "8 years", salary: "$1,450", contact: "+976 9919 8000", classes: "Grade 8A, Grade 9A", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "TC-202", name: "Mr. Bold", subject: "Physics", email: "bold@educore.mn", experience: "6 years", salary: "$1,320", contact: "+976 8808 5500", classes: "Grade 9A", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "TC-203", name: "Ms. Nomin", subject: "English", email: "nomin@educore.mn", experience: "5 years", salary: "$1,280", contact: "+976 9900 8080", classes: "Grade 7B, Grade 8A", createdAt: "2026-05-18T00:00:00.000Z" }
   ],
   classes: [
-    { id: "CL-8A", values: ["Grade 8", "A", "Ms. Saraa", "32", "Mon-Fri"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "CL-7B", values: ["Grade 7", "B", "Ms. Nomin", "29", "Mon-Fri"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "CL-9A", values: ["Grade 9", "A", "Mr. Bold", "34", "Mon-Fri"], createdAt: "2026-05-18T00:00:00.000Z" }
+    { id: "CL-8A", name: "Grade 8", section: "A", teacher: "Ms. Saraa", students: 32, schedule: "Mon-Fri", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "CL-7B", name: "Grade 7", section: "B", teacher: "Ms. Nomin", students: 29, schedule: "Mon-Fri", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "CL-9A", name: "Grade 9", section: "A", teacher: "Mr. Bold", students: 34, schedule: "Mon-Fri", createdAt: "2026-05-18T00:00:00.000Z" }
   ],
   attendance: [
-    { id: "AT-1", values: ["Anand Bayarsaikhan", "Grade 8A", "2026-05-18", "Present"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "AT-2", values: ["Saruul Enkhjin", "Grade 7B", "2026-05-18", "Late"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "AT-3", values: ["Temuulen Ganbat", "Grade 9A", "2026-05-18", "Absent"], createdAt: "2026-05-18T00:00:00.000Z" }
+    { id: "AT-1", student: "Anand Bayarsaikhan", class_name: "Grade 8A", date: "2026-05-18", status: "Present", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "AT-2", student: "Saruul Enkhjin", class_name: "Grade 7B", date: "2026-05-18", status: "Late", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "AT-3", student: "Temuulen Ganbat", class_name: "Grade 9A", date: "2026-05-18", status: "Absent", createdAt: "2026-05-18T00:00:00.000Z" }
   ],
   grades: [
-    { id: "GR-1", values: ["Anand Bayarsaikhan", "Mathematics", "94%", "Spring 2026"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "GR-2", values: ["Saruul Enkhjin", "English", "88%", "Spring 2026"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "GR-3", values: ["Temuulen Ganbat", "Physics", "81%", "Spring 2026"], createdAt: "2026-05-18T00:00:00.000Z" }
+    { id: "GR-1", student: "Anand Bayarsaikhan", student_email: "anand@educore.mn", subject: "Mathematics", score: 94, semester: "Spring 2026", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "GR-2", student: "Saruul Enkhjin", student_email: "saruul@educore.mn", subject: "English", score: 88, semester: "Spring 2026", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "GR-3", student: "Temuulen Ganbat", student_email: "temuulen@educore.mn", subject: "Physics", score: 81, semester: "Spring 2026", createdAt: "2026-05-18T00:00:00.000Z" }
   ],
   payments: [
-    { id: "PY-1", values: ["Anand Bayarsaikhan", "$450", "Paid", "2026-05-01"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "PY-2", values: ["Saruul Enkhjin", "$450", "Partial", "2026-05-10"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "PY-3", values: ["Temuulen Ganbat", "$450", "Unpaid", "2026-05-15"], createdAt: "2026-05-18T00:00:00.000Z" }
+    { id: "PY-1", student: "Anand Bayarsaikhan", amount: "$450", status: "Paid", due_date: "2026-05-01", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "PY-2", student: "Saruul Enkhjin", amount: "$450", status: "Partial", due_date: "2026-05-10", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "PY-3", student: "Temuulen Ganbat", amount: "$450", status: "Unpaid", due_date: "2026-05-15", createdAt: "2026-05-18T00:00:00.000Z" }
   ],
   timetable: [
-    { id: "TT-1", values: ["Monday", "09:00", "Mathematics", "Ms. Saraa", "Grade 8A"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "TT-2", values: ["Tuesday", "10:30", "Physics", "Mr. Bold", "Grade 9A"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "TT-3", values: ["Wednesday", "11:30", "English", "Ms. Nomin", "Grade 7B"], createdAt: "2026-05-18T00:00:00.000Z" }
+    { id: "TT-1", day: "Monday", time: "09:00", subject: "Mathematics", teacher: "Ms. Saraa", class_name: "Grade 8A", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "TT-2", day: "Tuesday", time: "10:30", subject: "Physics", teacher: "Mr. Bold", class_name: "Grade 9A", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "TT-3", day: "Wednesday", time: "11:30", subject: "English", teacher: "Ms. Nomin", class_name: "Grade 7B", createdAt: "2026-05-18T00:00:00.000Z" }
   ],
   announcements: [
-    { id: "AN-1", values: ["Midterm timetable published", "Students can now view upcoming midterm schedules.", "All", "2026-05-18"], createdAt: "2026-05-18T00:00:00.000Z" },
-    { id: "AN-2", values: ["Teacher workshop", "Professional development workshop starts Friday.", "Teachers", "2026-05-17"], createdAt: "2026-05-17T00:00:00.000Z" },
-    { id: "AN-3", values: ["Payment reminder", "May tuition invoices are due this week.", "Students", "2026-05-16"], createdAt: "2026-05-16T00:00:00.000Z" }
+    { id: "AN-1", title: "Midterm timetable published", content: "Students can now view upcoming midterm schedules.", audience: "All", date: "2026-05-18", createdAt: "2026-05-18T00:00:00.000Z" },
+    { id: "AN-2", title: "Teacher workshop", content: "Professional development workshop starts Friday.", audience: "Teachers", date: "2026-05-17", createdAt: "2026-05-17T00:00:00.000Z" },
+    { id: "AN-3", title: "Payment reminder", content: "May tuition invoices are due this week.", audience: "Students", date: "2026-05-16", createdAt: "2026-05-16T00:00:00.000Z" }
   ]
 };
 
@@ -133,6 +128,7 @@ async function initializeSchoolDatabase() {
       birth_date TEXT NOT NULL,
       address TEXT NOT NULL,
       parent_name TEXT NOT NULL,
+      parent_email TEXT,
       class_name TEXT NOT NULL,
       roll_number TEXT NOT NULL,
       attendance INTEGER NOT NULL DEFAULT 0,
@@ -175,6 +171,7 @@ async function initializeSchoolDatabase() {
     CREATE TABLE IF NOT EXISTS grade_records (
       id TEXT PRIMARY KEY,
       student TEXT NOT NULL,
+      student_email TEXT NOT NULL,
       subject TEXT NOT NULL,
       score INTEGER NOT NULL DEFAULT 0,
       semester TEXT NOT NULL,
@@ -208,6 +205,9 @@ async function initializeSchoolDatabase() {
       date TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_email TEXT;
+    ALTER TABLE grade_records ADD COLUMN IF NOT EXISTS student_email TEXT NOT NULL DEFAULT '';
   `);
 
   await seedIfEmpty();
@@ -220,11 +220,11 @@ async function seedIfEmpty() {
   if (Number(count.rows[0]?.count ?? 0) > 0) return;
 
   await pool.query(`
-    INSERT INTO students (id, full_name, email, phone, gender, birth_date, address, parent_name, class_name, roll_number, attendance, gpa, payment_status)
+    INSERT INTO students (id, full_name, email, phone, gender, birth_date, address, parent_name, parent_email, class_name, roll_number, attendance, gpa, payment_status)
     VALUES
-      ('ST-1001', 'Anand Bayarsaikhan', 'anand@educore.mn', '+976 9911 2030', 'Male', '2010-03-12', 'Ulaanbaatar, Khan-Uul', 'Bayarsaikhan', 'Grade 8A', '08A-01', 96, 3.8, 'Paid'),
-      ('ST-1002', 'Saruul Enkhjin', 'saruul@educore.mn', '+976 8800 4412', 'Female', '2011-07-08', 'Ulaanbaatar, Bayanzurkh', 'Enkhjin', 'Grade 7B', '07B-09', 89, 3.5, 'Partial'),
-      ('ST-1003', 'Temuulen Ganbat', 'temuulen@educore.mn', '+976 9505 1177', 'Male', '2009-11-21', 'Ulaanbaatar, Sukhbaatar', 'Ganbat', 'Grade 9A', '09A-12', 78, 3.1, 'Unpaid')
+      ('ST-1001', 'Anand Bayarsaikhan', 'anand@educore.mn', '+976 9911 2030', 'Male', '2010-03-12', 'Ulaanbaatar, Khan-Uul', 'Bayarsaikhan', 'parent@educore.mn', 'Grade 8A', '08A-01', 96, 3.8, 'Paid'),
+      ('ST-1002', 'Saruul Enkhjin', 'saruul@educore.mn', '+976 8800 4412', 'Female', '2011-07-08', 'Ulaanbaatar, Bayanzurkh', 'Enkhjin', 'parent2@educore.mn', 'Grade 7B', '07B-09', 89, 3.5, 'Partial'),
+      ('ST-1003', 'Temuulen Ganbat', 'temuulen@educore.mn', '+976 9505 1177', 'Male', '2009-11-21', 'Ulaanbaatar, Sukhbaatar', 'Ganbat', 'parent3@educore.mn', 'Grade 9A', '09A-12', 78, 3.1, 'Unpaid')
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO teachers (id, name, subject, email, experience, salary, contact, classes)
@@ -248,11 +248,11 @@ async function seedIfEmpty() {
       ('AT-3', 'Temuulen Ganbat', 'Grade 9A', '2026-05-18', 'Absent')
     ON CONFLICT (id) DO NOTHING;
 
-    INSERT INTO grade_records (id, student, subject, score, semester)
+    INSERT INTO grade_records (id, student, student_email, subject, score, semester)
     VALUES
-      ('GR-1', 'Anand Bayarsaikhan', 'Mathematics', 94, 'Spring 2026'),
-      ('GR-2', 'Saruul Enkhjin', 'English', 88, 'Spring 2026'),
-      ('GR-3', 'Temuulen Ganbat', 'Physics', 81, 'Spring 2026')
+      ('GR-1', 'Anand Bayarsaikhan', 'anand@educore.mn', 'Mathematics', 94, 'Spring 2026'),
+      ('GR-2', 'Saruul Enkhjin', 'saruul@educore.mn', 'English', 88, 'Spring 2026'),
+      ('GR-3', 'Temuulen Ganbat', 'temuulen@educore.mn', 'Physics', 81, 'Spring 2026')
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO payment_records (id, student, amount, status, due_date)
@@ -295,12 +295,7 @@ function numberValue(value: unknown) {
 }
 
 function cloneSeedData(): LocalStore {
-  return Object.fromEntries(
-    Object.entries(localSeedData).map(([resource, rows]) => [
-      resource,
-      rows.map((row) => ({ ...row, values: [...row.values] }))
-    ])
-  ) as LocalStore;
+  return JSON.parse(JSON.stringify(localSeedData));
 }
 
 function normalizeLocalStore(value: unknown): LocalStore {
@@ -314,13 +309,10 @@ function normalizeLocalStore(value: unknown): LocalStore {
     const rows = parsed[resource];
 
     if (Array.isArray(rows)) {
-      base[resource] = rows
-        .filter((row) => row && typeof row.id === "string" && Array.isArray(row.values))
-        .map((row) => ({
-          id: row.id,
-          values: row.values.map(stringValue),
-          createdAt: stringValue(row.createdAt) || new Date().toISOString()
-        }));
+      base[resource] = rows.map((row) => ({
+        ...row,
+        createdAt: stringValue(row.createdAt) || new Date().toISOString()
+      }));
     }
   }
 
@@ -356,7 +348,7 @@ function toResourceTable(resource: SchoolResource, rows: LocalResourceRow[]): Re
   return {
     columns: resourceColumns[resource],
     ids: sortedRows.map((row) => row.id),
-    rows: sortedRows.map((row) => row.values)
+    rows: sortedRows.map((row) => row.values || rowToArray(resource, row))
   };
 }
 
@@ -368,10 +360,10 @@ async function listLocalResource(resource: SchoolResource): Promise<ResourceTabl
 function valuesForCreatedResource(resource: SchoolResource, values: Record<string, string>) {
   switch (resource) {
     case "students":
-      return [values["Full name"], values.Class, "0%", "0", values.Payment || "Unpaid"].map(stringValue);
+      return [values.Name, values.Class, "0%", "0", values.Payment || "Unpaid", values["Parent Email"]].map(stringValue);
     case "teachers":
       return [
-        values["Teacher name"],
+        values.Name,
         values.Subject,
         values.Email,
         values.Experience,
@@ -380,13 +372,13 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
         values.Classes
       ].map(stringValue);
     case "classes":
-      return [values["Class name"], values.Section, values["Class teacher"], "0", "Mon-Fri"].map(stringValue);
+      return [values.Class, values.Section, values.Teacher, "0", "Mon-Fri"].map(stringValue);
     case "attendance":
-      return [values["Student name"], values.Class, values.Date || new Date().toISOString().slice(0, 10), values.Status || "Present"].map(stringValue);
+      return [values.Student, values.Class, values.Date || new Date().toISOString().slice(0, 10), values.Status || "Present"].map(stringValue);
     case "grades":
-      return [values["Student name"], values.Subject, `${numberValue(values.Score)}%`, values.Semester].map(stringValue);
+      return [values.Student, values.Subject, `${numberValue(values.Score)}%`, values.Semester, values["Student Email"]].map(stringValue);
     case "payments":
-      return [values["Student name"], values.Amount || "$0", values.Status || "Unpaid", values["Due date"]].map(stringValue);
+      return [values.Student, values.Amount || "$0", values.Status || "Unpaid", values["Due Date"]].map(stringValue);
     case "timetable":
       return [values.Day, values.Time, values.Subject, values.Teacher, ""].map(stringValue);
     case "announcements":
@@ -432,10 +424,10 @@ function logDatabaseFallback(error: unknown) {
   console.warn(`PostgreSQL unavailable; using local file store at ${localStorePath}.`, message);
 }
 
-function rowToArray(resource: SchoolResource, row: QueryRow) {
+function rowToArray(resource: SchoolResource, row: QueryRow | LocalResourceRow) {
   switch (resource) {
     case "students":
-      return [row.full_name, row.class_name, `${row.attendance}%`, row.gpa, row.payment_status].map(stringValue);
+      return [row.full_name, row.class_name, `${row.attendance}%`, row.gpa, row.payment_status, row.parent_email].map(stringValue);
     case "teachers":
       return [row.name, row.subject, row.email, row.experience, row.salary, phoneValue(row.contact), row.classes].map(stringValue);
     case "classes":
@@ -443,7 +435,7 @@ function rowToArray(resource: SchoolResource, row: QueryRow) {
     case "attendance":
       return [row.student, row.class_name, row.date, row.status].map(stringValue);
     case "grades":
-      return [row.student, row.subject, `${row.score}%`, row.semester].map(stringValue);
+      return [row.student, row.subject, `${row.score}%`, row.semester, row.student_email].map(stringValue);
     case "payments":
       return [row.student, row.amount, row.status, row.due_date].map(stringValue);
     case "timetable":
@@ -476,11 +468,22 @@ export async function listResource(resource: SchoolResource): Promise<ResourceTa
   try {
     await ensureSchoolDatabase();
 
+    const { email, role } = await getCurrentUserEmailAndRole();
+
+    const filters: string[] = [];
+    const params: string[] = [];
+
+    if (resource === "grades" && role === "student" && email) {
+      params.push(email);
+      filters.push(`student_email = $${params.length}`);
+    }
+
     const result = await getPool().query<QueryRow>(`
       SELECT *
       FROM ${tableName(resource)}
+      ${filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : ""}
       ORDER BY created_at DESC, id DESC
-    `);
+    `, params);
 
     return {
       columns: resourceColumns[resource],
@@ -503,9 +506,9 @@ export async function createResource(resource: SchoolResource, values: Record<st
     switch (resource) {
       case "students":
         await pool.query(
-          `INSERT INTO students (id, full_name, email, phone, gender, birth_date, address, parent_name, class_name, roll_number, attendance, gpa, payment_status)
-           VALUES ($1, $2, $3, $4, 'Unknown', '', '', $5, $6, $7, 0, 0, 'Unpaid')`,
-          [id, values["Full name"], `${id.toLowerCase()}@educore.mn`, values.Phone ?? "", values["Parent name"] ?? "", values.Class ?? "", id]
+          `INSERT INTO students (id, full_name, email, phone, gender, birth_date, address, parent_name, parent_email, class_name, roll_number, attendance, gpa, payment_status)
+           VALUES ($1, $2, $3, $4, 'Unknown', '', '', $5, $6, $7, $8, 0, 0, $9)`,
+          [id, values.Name, `${id.toLowerCase()}@educore.mn`, values.Phone ?? "", values["Parent name"] ?? "", values["Parent Email"] ?? "", values.Class ?? "", id, values.Payment ?? "Unpaid"]
         );
         break;
       case "teachers":
@@ -514,7 +517,7 @@ export async function createResource(resource: SchoolResource, values: Record<st
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [
             id,
-            values["Teacher name"],
+            values.Name,
             values.Subject,
             values.Email ?? `${id.toLowerCase()}@educore.mn`,
             values.Experience ?? "",
@@ -528,28 +531,28 @@ export async function createResource(resource: SchoolResource, values: Record<st
         await pool.query(
           `INSERT INTO class_rooms (id, name, section, teacher, students, schedule)
            VALUES ($1, $2, $3, $4, 0, 'Mon-Fri')`,
-          [id, values["Class name"], values.Section ?? "", values["Class teacher"] ?? ""]
+          [id, values.Class, values.Section ?? "", values.Teacher ?? ""]
         );
         break;
       case "attendance":
         await pool.query(
           `INSERT INTO attendance_records (id, student, class_name, date, status)
            VALUES ($1, $2, $3, $4, $5)`,
-          [id, values["Student name"], values.Class ?? "", values.Date ?? new Date().toISOString().slice(0, 10), values.Status ?? "Present"]
+          [id, values.Student, values.Class ?? "", values.Date ?? new Date().toISOString().slice(0, 10), values.Status ?? "Present"]
         );
         break;
       case "grades":
         await pool.query(
-          `INSERT INTO grade_records (id, student, subject, score, semester)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [id, values["Student name"], values.Subject, Number(values.Score ?? 0), values.Semester ?? ""]
+          `INSERT INTO grade_records (id, student, student_email, subject, score, semester)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [id, values.Student, values["Student Email"] ?? "", values.Subject, Number(values.Score ?? 0), values.Semester ?? ""]
         );
         break;
       case "payments":
         await pool.query(
           `INSERT INTO payment_records (id, student, amount, status, due_date)
            VALUES ($1, $2, $3, $4, $5)`,
-          [id, values["Student name"], values.Amount ?? "$0", values.Status ?? "Unpaid", values["Due date"] ?? ""]
+          [id, values.Student, values.Amount ?? "$0", values.Status ?? "Unpaid", values["Due Date"] ?? ""]
         );
         break;
       case "timetable":
@@ -596,9 +599,9 @@ export async function updateResource(resource: SchoolResource, id: string, value
       case "students":
         await pool.query(
           `UPDATE students
-           SET full_name = $1, class_name = $2, attendance = $3, gpa = $4, payment_status = $5
-           WHERE id = $6`,
-          [values.Name, values.Class, numberValue(values.Attendance), numberValue(values.GPA), values.Payment ?? "Unpaid", id]
+           SET full_name = $1, class_name = $2, attendance = $3, gpa = $4, payment_status = $5, parent_email = $6
+           WHERE id = $7`,
+          [values.Name, values.Class, numberValue(values.Attendance), numberValue(values.GPA), values.Payment ?? "Unpaid", values["Parent Email"] ?? "", id]
         );
         break;
       case "teachers":
@@ -637,9 +640,9 @@ export async function updateResource(resource: SchoolResource, id: string, value
       case "grades":
         await pool.query(
           `UPDATE grade_records
-           SET student = $1, subject = $2, score = $3, semester = $4
-           WHERE id = $5`,
-          [values.Student, values.Subject, numberValue(values.Score), values.Semester, id]
+           SET student = $1, student_email = $2, subject = $3, score = $4, semester = $5
+           WHERE id = $6`,
+          [values.Student, values["Student Email"] ?? "", values.Subject, numberValue(values.Score), values.Semester, id]
         );
         break;
       case "payments":

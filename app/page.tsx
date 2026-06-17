@@ -52,7 +52,6 @@ import {
   type AppCopy,
   type Language,
   getInitialLanguage,
-  getStoredLanguage,
   languageStorageKey,
   languages,
   translateColumn,
@@ -101,12 +100,12 @@ const pieData = [
 
 const createConfig: Record<NavModule, { fields: string[] }> = {
   dashboard: { fields: ["Report title", "Date range"] },
-  students: { fields: ["Full name", "Class", "Parent name", "Phone", "Payment"] },
-  teachers: { fields: ["Teacher name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"] },
-  classes: { fields: ["Class name", "Section", "Class teacher"] },
-  attendance: { fields: ["Student name", "Class", "Date", "Status"] },
-  grades: { fields: ["Student name", "Subject", "Score", "Semester"] },
-  payments: { fields: ["Student name", "Amount", "Status", "Due date"] },
+  students: { fields: ["Name", "Class", "Parent name", "Phone", "Payment", "Parent Email"] },
+  teachers: { fields: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"] },
+  classes: { fields: ["Class", "Section", "Teacher"] },
+  attendance: { fields: ["Student", "Class", "Date", "Status"] },
+  grades: { fields: ["Student", "Subject", "Score", "Semester", "Student Email"] },
+  payments: { fields: ["Student", "Amount", "Status", "Due Date"] },
   timetable: { fields: ["Day", "Time", "Subject", "Teacher"] },
   announcements: { fields: ["Title", "Audience", "Content"] },
   settings: { fields: ["Setting name", "Value"] }
@@ -115,14 +114,15 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
 const visibleModulesByRole: Record<Role, NavModule[]> = {
   admin: ["dashboard", "students", "teachers", "classes", "attendance", "grades", "payments", "timetable", "announcements", "settings"],
   teacher: ["dashboard", "students", "classes", "attendance", "grades", "timetable", "announcements", "settings"],
-  student: ["dashboard", "attendance", "grades", "payments", "timetable", "announcements", "settings"]
+  student: ["dashboard", "attendance", "grades", "payments", "timetable", "announcements", "settings"],
+  parent: ["dashboard", "attendance", "grades", "payments", "announcements", "settings"]
 };
 
 const demoSessionKey = "educore_session";
 const notificationStorageKey = "educore_activity_notifications";
 
 function isRole(value: unknown): value is Role {
-  return value === "admin" || value === "teacher" || value === "student";
+  return value === "admin" || value === "teacher" || value === "student" || value === "parent";
 }
 
 function getInitialNotifications(): ActivityNotification[] {
@@ -162,6 +162,25 @@ function statusOptionsFor(resource: NavModule, field: string) {
   if (resource === "payments" && field === "Status") return ["Unpaid", "Partial", "Paid"];
   if (resource === "attendance" && field === "Status") return ["Present", "Late", "Absent"];
   return null;
+}
+
+function mergeSubmittedValues(
+  data: ResourceTableData,
+  recordId: string | null,
+  values: Record<string, string>
+): ResourceTableData {
+  if (!recordId) return data;
+
+  const rowIndex = data.ids?.findIndex((id) => id === recordId) ?? -1;
+  if (rowIndex < 0) return data;
+
+  const nextRows = data.rows.map((row, index) => {
+    if (index !== rowIndex) return row;
+
+    return data.columns.map((column, columnIndex) => values[column] ?? row[columnIndex] ?? "");
+  });
+
+  return { ...data, rows: nextRows };
 }
 
 function StatusDropdown({
@@ -231,7 +250,7 @@ function AppShell() {
   const router = useRouter();
   const [activeModule, setActiveModule] = useState<NavModule>("dashboard");
   const [role, setRole] = useState<Role>("admin");
-  const [language, setLanguage] = useState<Language>(getInitialLanguage);
+  const [language, setLanguage] = useState<Language>("en");
   const [query, setQuery] = useState("");
   const [darkMode, setDarkMode] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -246,7 +265,7 @@ function AppShell() {
   const [resourceError, setResourceError] = useState("");
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [notificationPageOpen, setNotificationPageOpen] = useState(false);
-  const [activityNotifications, setActivityNotifications] = useState<ActivityNotification[]>(getInitialNotifications);
+  const [activityNotifications, setActivityNotifications] = useState<ActivityNotification[]>([]);
 
   const activeNav = navItems.find((item) => item.id === activeModule) ?? navItems[0];
   const visibleNavItems = navItems.filter((item) => visibleModulesByRole[role].includes(item.id));
@@ -345,8 +364,8 @@ function AppShell() {
 
   useEffect(() => {
     queueMicrotask(() => {
-      const storedLanguage = getStoredLanguage();
-      if (storedLanguage) setLanguage(storedLanguage);
+      setLanguage(getInitialLanguage());
+      setActivityNotifications(getInitialNotifications());
     });
   }, []);
 
@@ -723,8 +742,10 @@ function AppShell() {
                       }
                       return (await response.json()) as ResourceTableData;
                     });
+                const nextData = modalMode === "edit" ? mergeSubmittedValues(data, editingRecordId, formValues) : data;
+
                 addActivityNotification(activeResource, modalMode === "edit" ? "updated" : "created", Object.values(formValues).find(Boolean) ?? "");
-                setResourceData(data);
+                setResourceData(nextData);
                 setFormValues({});
                 setEditingRecordId(null);
                 setModalOpen(false);

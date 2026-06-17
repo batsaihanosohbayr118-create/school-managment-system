@@ -106,3 +106,17 @@ export const authService = {
     return supabase.auth.signOut();
   }
 };
+
+// New function to get current user's email and role
+export async function getCurrentUserEmailAndRole(): Promise<{ email: string | null; role: Role | null }> {
+  if (!supabase) {
+    return { email: null, role: null };
+  }
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error || !session) {
+    return { email: null, role: null };
+  }
+  const user = session.user;
+  const role = user.user_metadata?.role as Role | undefined;
+  return { email: user.email ?? null, role: role ?? null };
+};

@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-export type Role = "admin" | "teacher" | "student";
+export type Role = "admin" | "teacher" | "student" | "parent";
 
 export type NavModule =
   | "dashboard"
@@ -30,6 +30,7 @@ export type Student = {
   birthDate: string;
   address: string;
   parentName: string;
+  parentEmail: string;
   className: string;
   rollNumber: string;
   attendance: number;
