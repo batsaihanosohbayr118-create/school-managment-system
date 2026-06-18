@@ -7,7 +7,7 @@ import { authService, getAuthRedirectUrl, isSupabaseConfigured } from "@/lib/sup
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { type Language, getInitialLanguage, getStoredLanguage, languageStorageKey, translations } from "@/lib/i18n";
+import { type Language, getInitialLanguage, languageStorageKey, translations } from "@/lib/i18n";
 import type { Role } from "@/lib/types";
 
 type AuthMode = "login" | "register" | "forgot";
@@ -22,7 +22,7 @@ type DemoUser = {
 
 const demoUsersKey = "educore_demo_users";
 const demoSessionKey = "educore_session";
-const registrationRoles: Role[] = ["admin", "teacher", "student"];
+const registrationRoles: Role[] = ["admin", "teacher", "student", "parent"];
 
 function GoogleIcon() {
   return (
@@ -38,7 +38,7 @@ function GoogleIcon() {
 export function AuthCard({ mode }: { mode: AuthMode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [language, setLanguage] = useState<Language>(getInitialLanguage);
+  const [language, setLanguage] = useState<Language>("en");
   const registeredEmail = searchParams.get("email") ?? "";
   const [email, setEmail] = useState(registeredEmail || (isSupabaseConfigured ? "" : "admin@educore.mn"));
   const [password, setPassword] = useState(isSupabaseConfigured ? "" : "educore-demo");
@@ -64,8 +64,7 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
 
   useEffect(() => {
     queueMicrotask(() => {
-      const storedLanguage = getStoredLanguage();
-      if (storedLanguage) setLanguage(storedLanguage);
+      setLanguage(getInitialLanguage());
     });
   }, []);
 

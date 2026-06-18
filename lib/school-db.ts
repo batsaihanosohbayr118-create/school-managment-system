@@ -298,6 +298,31 @@ function cloneSeedData(): LocalStore {
   return JSON.parse(JSON.stringify(localSeedData));
 }
 
+function seedRowValues(resource: SchoolResource, id: string) {
+  const row = localSeedData[resource].find((item) => item.id === id);
+  return row ? row.values || rowToArray(resource, row) : null;
+}
+
+function normalizeLocalRow(resource: SchoolResource, row: LocalResourceRow): LocalResourceRow {
+  const columns = resourceColumns[resource];
+  const seedValues = seedRowValues(resource, row.id);
+  const values = row.values ? [...row.values] : rowToArray(resource, row);
+
+  if (resource === "students" && values.length === columns.length - 1) {
+    values.push(seedValues?.[columns.length - 1] ?? "");
+  }
+
+  if (resource === "grades" && values.length === columns.length - 1) {
+    values.push(seedValues?.[columns.length - 1] ?? "");
+  }
+
+  return {
+    ...row,
+    values: columns.map((_, index) => stringValue(values[index] ?? seedValues?.[index] ?? "")),
+    createdAt: stringValue(row.createdAt) || new Date().toISOString()
+  };
+}
+
 function normalizeLocalStore(value: unknown): LocalStore {
   const base = cloneSeedData();
 
@@ -309,10 +334,7 @@ function normalizeLocalStore(value: unknown): LocalStore {
     const rows = parsed[resource];
 
     if (Array.isArray(rows)) {
-      base[resource] = rows.map((row) => ({
-        ...row,
-        createdAt: stringValue(row.createdAt) || new Date().toISOString()
-      }));
+      base[resource] = rows.map((row) => normalizeLocalRow(resource, row));
     }
   }
 
@@ -476,6 +498,15 @@ export async function listResource(resource: SchoolResource): Promise<ResourceTa
     if (resource === "grades" && role === "student" && email) {
       params.push(email);
       filters.push(`student_email = $${params.length}`);
+    } else if ((resource === "grades" || resource === "attendance" || resource === "payments") && role === "parent" && email) {
+      params.push(email);
+      const parentParam = `$${params.length}`;
+
+      if (resource === "grades") {
+        filters.push(`student_email IN (SELECT email FROM students WHERE parent_email = ${parentParam})`);
+      } else {
+        filters.push(`student IN (SELECT full_name FROM students WHERE parent_email = ${parentParam})`);
+      }
     }
 
     const result = await getPool().query<QueryRow>(`

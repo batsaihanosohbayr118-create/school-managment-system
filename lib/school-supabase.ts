@@ -280,17 +280,21 @@ export async function listSupabaseResource(resource: SchoolResource): Promise<Re
 
   if (resource === "grades" && role === "student" && email) {
     query = query.eq("student_email", email);
-  } else if ((resource === "grades" || resource === "attendance") && role === "parent" && email) {
-    const { data: studentData } = await client
+  } else if ((resource === "grades" || resource === "attendance" || resource === "payments") && role === "parent" && email) {
+    const { data: studentData, error: studentError } = await client
       .from("students")
       .select("email, full_name")
-      .eq("parent_email", email)
-      .single();
+      .eq("parent_email", email);
 
-    if (resource === "grades" && studentData?.email) {
-      query = query.eq("student_email", studentData.email);
-    } else if (resource === "attendance" && studentData?.full_name) {
-      query = query.eq("student", studentData.full_name);
+    if (studentError) throw studentError;
+
+    const childEmails = (studentData ?? []).map((student) => student.email).filter(Boolean);
+    const childNames = (studentData ?? []).map((student) => student.full_name).filter(Boolean);
+
+    if (resource === "grades") {
+      query = childEmails.length > 0 ? query.in("student_email", childEmails) : query.eq("student_email", "__no_child__");
+    } else {
+      query = childNames.length > 0 ? query.in("student", childNames) : query.eq("student", "__no_child__");
     }
   }
 

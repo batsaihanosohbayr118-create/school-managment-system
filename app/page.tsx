@@ -120,6 +120,7 @@ const visibleModulesByRole: Record<Role, NavModule[]> = {
 
 const demoSessionKey = "educore_session";
 const notificationStorageKey = "educore_activity_notifications";
+const parentScopedResources = new Set<SchoolResource>(["attendance", "grades", "payments"]);
 
 function isRole(value: unknown): value is Role {
   return value === "admin" || value === "teacher" || value === "student" || value === "parent";
@@ -181,6 +182,60 @@ function mergeSubmittedValues(
   });
 
   return { ...data, rows: nextRows };
+}
+
+function columnIndex(columns: string[], column: string) {
+  return columns.findIndex((item) => item.toLowerCase() === column.toLowerCase());
+}
+
+function normalizedLookupValue(value: string | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function filterRowsByParent(
+  data: ResourceTableData,
+  resource: SchoolResource,
+  parentEmail: string,
+  studentData: ResourceTableData | null
+) {
+  if (!parentScopedResources.has(resource) || !parentEmail || !studentData) return data;
+
+  const normalizedParentEmail = normalizedLookupValue(parentEmail);
+  const studentNameIndex = columnIndex(studentData.columns, "Name");
+  const studentEmailIndex = columnIndex(studentData.columns, "Email");
+  const parentEmailIndex = columnIndex(studentData.columns, "Parent Email");
+
+  if (studentNameIndex < 0 || parentEmailIndex < 0) return { ...data, ids: [], rows: [] };
+
+  const childRows = studentData.rows.filter((row) => normalizedLookupValue(row[parentEmailIndex]) === normalizedParentEmail);
+  const childNames = new Set(childRows.map((row) => normalizedLookupValue(row[studentNameIndex])).filter(Boolean));
+  const childEmails = new Set(studentEmailIndex >= 0 ? childRows.map((row) => normalizedLookupValue(row[studentEmailIndex])).filter(Boolean) : []);
+
+  const rowStudentIndex = columnIndex(data.columns, "Student");
+  const rowStudentEmailIndex = columnIndex(data.columns, "Student Email");
+
+  const nextRows: string[][] = [];
+  const nextIds: string[] = [];
+
+  data.rows.forEach((row, index) => {
+    const studentName = rowStudentIndex >= 0 ? normalizedLookupValue(row[rowStudentIndex]) : "";
+    const studentEmail = rowStudentEmailIndex >= 0 ? normalizedLookupValue(row[rowStudentEmailIndex]) : "";
+    const matchesChild = (studentName && childNames.has(studentName)) || (studentEmail && childEmails.has(studentEmail));
+
+    if (matchesChild) {
+      nextRows.push(row);
+      if (data.ids?.[index]) nextIds.push(data.ids[index]);
+    }
+  });
+
+  return { ...data, ids: nextIds, rows: nextRows };
+}
+
+async function fetchLocalResource(resource: SchoolResource) {
+  return fetch(`/api/school/${resource}`).then(async (response) => {
+    if (!response.ok) throw new Error("Database unavailable");
+    return (await response.json()) as ResourceTableData;
+  });
 }
 
 function StatusDropdown({
@@ -263,6 +318,7 @@ function AppShell() {
   const [resourceData, setResourceData] = useState<ResourceTableData | null>(null);
   const [resourceLoading, setResourceLoading] = useState(false);
   const [resourceError, setResourceError] = useState("");
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [notificationPageOpen, setNotificationPageOpen] = useState(false);
   const [activityNotifications, setActivityNotifications] = useState<ActivityNotification[]>([]);
@@ -458,6 +514,7 @@ function AppShell() {
 
           const sessionRole = data.session.user.user_metadata?.role;
           const nextRole = isRole(sessionRole) ? sessionRole : "student";
+          setCurrentUserEmail(data.session.user.email ?? "");
           setRole(nextRole);
           setActiveModule((currentModule) => (visibleModulesByRole[nextRole].includes(currentModule) ? currentModule : "dashboard"));
 
@@ -479,12 +536,14 @@ function AppShell() {
         }
 
         try {
-          const parsedSession = JSON.parse(demoSession) as { role?: unknown };
+          const parsedSession = JSON.parse(demoSession) as { email?: unknown; role?: unknown };
           const nextRole = isRole(parsedSession.role) ? parsedSession.role : "student";
+          setCurrentUserEmail(typeof parsedSession.email === "string" ? parsedSession.email : "");
           setRole(nextRole);
           setActiveModule((currentModule) => (visibleModulesByRole[nextRole].includes(currentModule) ? currentModule : "dashboard"));
         } catch {
           setRole("student");
+          setCurrentUserEmail("");
           setActiveModule((currentModule) => (visibleModulesByRole.student.includes(currentModule) ? currentModule : "dashboard"));
         }
 
@@ -515,12 +574,26 @@ function AppShell() {
       setResourceError("");
 
       try {
-        const data = isSupabaseConfigured
-          ? await listSupabaseResource(activeResource)
-          : await fetch(`/api/school/${activeResource}`).then(async (response) => {
-              if (!response.ok) throw new Error("Database unavailable");
-              return (await response.json()) as ResourceTableData;
-            });
+        let data: ResourceTableData;
+        let shouldApplyLocalParentFilter = !isSupabaseConfigured;
+
+        if (isSupabaseConfigured) {
+          try {
+            data = await listSupabaseResource(activeResource);
+          } catch (error) {
+            console.warn("Supabase resource unavailable; using local school data fallback.", error);
+            data = await fetchLocalResource(activeResource);
+            shouldApplyLocalParentFilter = true;
+          }
+        } else {
+          data = await fetchLocalResource(activeResource);
+        }
+
+        if (shouldApplyLocalParentFilter && role === "parent" && currentUserEmail && parentScopedResources.has(activeResource)) {
+          const studentData = await fetchLocalResource("students");
+
+          data = filterRowsByParent(data, activeResource, currentUserEmail, studentData);
+        }
 
         if (!ignore) {
           setResourceData(data);
@@ -542,7 +615,7 @@ function AppShell() {
     return () => {
       ignore = true;
     };
-  }, [activeResource, authChecked, copy.common.databaseOffline]);
+  }, [activeResource, authChecked, copy.common.databaseOffline, currentUserEmail, role]);
 
   if (!authChecked) {
     return (
