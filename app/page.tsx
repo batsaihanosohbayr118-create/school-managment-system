@@ -238,6 +238,68 @@ async function fetchLocalResource(resource: SchoolResource) {
   });
 }
 
+function demoResourceData(resource: SchoolResource): ResourceTableData {
+  switch (resource) {
+    case "students":
+      return {
+        columns: ["Name", "Class", "Attendance", "GPA", "Payment", "Parent Email"],
+        ids: students.map((item) => item.id),
+        rows: students.map((item) => [item.fullName, item.className, `${item.attendance}%`, item.gpa.toString(), item.paymentStatus, item.parentEmail])
+      };
+    case "teachers":
+      return {
+        columns: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"],
+        ids: teachers.map((item) => item.id),
+        rows: teachers.map((item) => [item.name, item.subject, item.email, item.experience, item.salary, item.contact, item.classes.join(", ")])
+      };
+    case "classes":
+      return {
+        columns: ["Class", "Section", "Teacher", "Students", "Schedule"],
+        ids: classes.map((item) => item.id),
+        rows: classes.map((item) => [item.name, item.section, item.teacher, item.students.toString(), item.schedule])
+      };
+    case "attendance":
+      return {
+        columns: ["Student", "Class", "Date", "Status"],
+        ids: attendance.map((item) => item.id),
+        rows: attendance.map((item) => [item.student, item.className, item.date, item.status])
+      };
+    case "grades":
+      return {
+        columns: ["Student", "Subject", "Score", "Semester", "Student Email"],
+        ids: grades.map((item) => item.id),
+        rows: grades.map((item) => [item.student, item.subject, `${item.score}%`, item.semester, ""])
+      };
+    case "payments":
+      return {
+        columns: ["Student", "Amount", "Status", "Due Date"],
+        ids: payments.map((item) => item.id),
+        rows: payments.map((item) => [item.student, item.amount, item.status, item.dueDate])
+      };
+    case "timetable":
+      return {
+        columns: ["Day", "Time", "Subject", "Teacher", "Class"],
+        ids: timetable.map((item, index) => `TT-${index + 1}`),
+        rows: timetable.map((item) => [item.day, item.time, item.subject, item.teacher, item.className])
+      };
+    case "announcements":
+      return {
+        columns: ["Title", "Content", "Audience", "Date"],
+        ids: announcements.map((item) => item.id),
+        rows: announcements.map((item) => [item.title, item.content, item.audience, item.date])
+      };
+  }
+}
+
+async function fetchFallbackResource(resource: SchoolResource) {
+  try {
+    return await fetchLocalResource(resource);
+  } catch (error) {
+    console.warn("Local school API unavailable; using bundled demo data fallback.", error);
+    return demoResourceData(resource);
+  }
+}
+
 function StatusDropdown({
   language,
   onChange,
@@ -582,15 +644,15 @@ function AppShell() {
             data = await listSupabaseResource(activeResource);
           } catch (error) {
             console.warn("Supabase resource unavailable; using local school data fallback.", error);
-            data = await fetchLocalResource(activeResource);
+            data = await fetchFallbackResource(activeResource);
             shouldApplyLocalParentFilter = true;
           }
         } else {
-          data = await fetchLocalResource(activeResource);
+          data = await fetchFallbackResource(activeResource);
         }
 
         if (shouldApplyLocalParentFilter && role === "parent" && currentUserEmail && parentScopedResources.has(activeResource)) {
-          const studentData = await fetchLocalResource("students");
+          const studentData = await fetchFallbackResource("students");
 
           data = filterRowsByParent(data, activeResource, currentUserEmail, studentData);
         }
