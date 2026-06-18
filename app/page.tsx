@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
+  ArrowLeft,
   Bell,
+  BookOpen,
   Check,
   ChevronDown,
+  Download,
+  FileUp,
   GraduationCap,
   House,
   LogOut,
@@ -14,6 +18,7 @@ import {
   Moon,
   Pencil,
   Plus,
+  Printer,
   Search,
   Settings as SettingsIcon,
   Sun,
@@ -44,6 +49,7 @@ import {
   grades,
   navItems,
   payments,
+  subjects,
   students,
   teachers,
   timetable
@@ -58,6 +64,7 @@ import {
   translateValue,
   translations
 } from "@/lib/i18n";
+import { loadSubjectContent, saveSubjectContent, uploadSubjectFiles } from "@/lib/subjectContent";
 import {
   createSupabaseResource,
   deleteSupabaseResource,
@@ -66,7 +73,8 @@ import {
   updateSupabaseResource
 } from "@/lib/school-supabase";
 import { authService, isSupabaseConfigured } from "@/lib/supabase";
-import type { NavModule, Role } from "@/lib/types";
+import { subjectOptions } from "@/lib/subjects";
+import type { NavModule, Role, SubjectContent, SubjectLesson } from "@/lib/types";
 
 type ResourceTableData = {
   columns: string[];
@@ -92,6 +100,11 @@ type ActivityNotification = {
   read: boolean;
 };
 
+type SubjectContentTarget = {
+  id: string;
+  name: string;
+} | null;
+
 const pieData = [
   { name: "Present", value: 76, color: "#10b981" },
   { name: "Late", value: 12, color: "#f59e0b" },
@@ -102,6 +115,7 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
   dashboard: { fields: ["Report title", "Date range"] },
   students: { fields: ["Name", "Class", "Parent name", "Phone", "Payment", "Parent Email"] },
   teachers: { fields: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"] },
+  subjects: { fields: ["Name", "Category", "Grade Levels"] },
   classes: { fields: ["Class", "Section", "Teacher"] },
   attendance: { fields: ["Student", "Class", "Date", "Status"] },
   grades: { fields: ["Student", "Subject", "Score", "Semester", "Student Email"] },
@@ -112,10 +126,10 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
 };
 
 const visibleModulesByRole: Record<Role, NavModule[]> = {
-  admin: ["dashboard", "students", "teachers", "classes", "attendance", "grades", "payments", "timetable", "announcements", "settings"],
-  teacher: ["dashboard", "students", "classes", "attendance", "grades", "timetable", "announcements", "settings"],
-  student: ["dashboard", "attendance", "grades", "payments", "timetable", "announcements", "settings"],
-  parent: ["dashboard", "attendance", "grades", "payments", "announcements", "settings"]
+  admin: ["dashboard", "students", "teachers", "subjects", "classes", "attendance", "grades", "payments", "timetable", "announcements", "settings"],
+  teacher: ["dashboard", "students", "subjects", "classes", "attendance", "grades", "timetable", "announcements", "settings"],
+  student: ["dashboard", "subjects", "attendance", "grades", "payments", "timetable", "announcements", "settings"],
+  parent: ["dashboard", "subjects", "attendance", "grades", "payments", "announcements", "settings"]
 };
 
 const demoSessionKey = "educore_session";
@@ -159,10 +173,41 @@ function statusTone(status: string) {
 }
 
 function statusOptionsFor(resource: NavModule, field: string) {
+  if ((resource === "teachers" || resource === "grades" || resource === "timetable") && field === "Subject") return subjectOptions;
   if (resource === "students" && field === "Payment") return ["Unpaid", "Partial", "Paid"];
   if (resource === "payments" && field === "Status") return ["Unpaid", "Partial", "Paid"];
   if (resource === "attendance" && field === "Status") return ["Present", "Late", "Absent"];
   return null;
+}
+
+function emptySubjectContent(subjectId: string): SubjectContent {
+  return {
+    subjectId,
+    topics: [],
+    lessons: [],
+    assignments: []
+  };
+}
+
+function formatFileSize(size: number | undefined) {
+  if (!size) return "";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 102.4) / 10} KB`;
+  return `${Math.round(size / 1024 / 102.4) / 10} MB`;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "\"": "&quot;",
+      "'": "&#039;"
+    };
+
+    return entities[character] ?? character;
+  });
 }
 
 function mergeSubmittedValues(
@@ -238,6 +283,22 @@ async function fetchLocalResource(resource: SchoolResource) {
   });
 }
 
+async function requestLocalResource(
+  resource: SchoolResource,
+  options: RequestInit & { search?: string } = {}
+) {
+  const { search = "", ...requestOptions } = options;
+
+  return fetch(`/api/school/${resource}${search}`, requestOptions).then(async (response) => {
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+      throw new Error(payload?.message ?? "Database request failed");
+    }
+
+    return (await response.json()) as ResourceTableData;
+  });
+}
+
 function demoResourceData(resource: SchoolResource): ResourceTableData {
   switch (resource) {
     case "students":
@@ -251,6 +312,12 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
         columns: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"],
         ids: teachers.map((item) => item.id),
         rows: teachers.map((item) => [item.name, item.subject, item.email, item.experience, item.salary, item.contact, item.classes.join(", ")])
+      };
+    case "subjects":
+      return {
+        columns: ["Name", "Category", "Grade Levels"],
+        ids: subjects.map((item) => item.id),
+        rows: subjects.map((item) => [item.name, item.category, item.gradeLevels])
       };
     case "classes":
       return {
@@ -298,6 +365,58 @@ async function fetchFallbackResource(resource: SchoolResource) {
     console.warn("Local school API unavailable; using bundled demo data fallback.", error);
     return demoResourceData(resource);
   }
+}
+
+async function loadResourceData(resource: SchoolResource) {
+  if (isSupabaseConfigured) {
+    try {
+      return { data: await listSupabaseResource(resource), needsLocalParentFilter: false };
+    } catch (error) {
+      console.warn("Supabase resource unavailable; using local school data fallback.", error);
+    }
+  }
+
+  return { data: await fetchFallbackResource(resource), needsLocalParentFilter: true };
+}
+
+async function saveResourceData(
+  resource: SchoolResource,
+  mode: ModalMode,
+  recordId: string | null,
+  values: Record<string, string>
+) {
+  if (isSupabaseConfigured) {
+    try {
+      return mode === "edit" && recordId
+        ? await updateSupabaseResource(resource, recordId, values)
+        : await createSupabaseResource(resource, values);
+    } catch (error) {
+      console.warn("Supabase save unavailable; using local school data fallback.", error);
+    }
+  }
+
+  return requestLocalResource(resource, {
+    method: mode === "edit" ? "PATCH" : "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ id: recordId, values })
+  });
+}
+
+async function deleteResourceData(resource: SchoolResource, recordId: string) {
+  if (isSupabaseConfigured) {
+    try {
+      return await deleteSupabaseResource(resource, recordId);
+    } catch (error) {
+      console.warn("Supabase delete unavailable; using local school data fallback.", error);
+    }
+  }
+
+  return requestLocalResource(resource, {
+    method: "DELETE",
+    search: `?id=${encodeURIComponent(recordId)}`
+  });
 }
 
 function StatusDropdown({
@@ -384,6 +503,7 @@ function AppShell() {
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [notificationPageOpen, setNotificationPageOpen] = useState(false);
   const [activityNotifications, setActivityNotifications] = useState<ActivityNotification[]>([]);
+  const [selectedSubjectContent, setSelectedSubjectContent] = useState<SubjectContentTarget>(null);
 
   const activeNav = navItems.find((item) => item.id === activeModule) ?? navItems[0];
   const visibleNavItems = navItems.filter((item) => visibleModulesByRole[role].includes(item.id));
@@ -407,14 +527,23 @@ function AppShell() {
 
   function openModule(module: NavModule) {
     setActiveModule(module);
+    setSelectedSubjectContent(null);
     setNotificationPageOpen(false);
     setMobileOpen(false);
+  }
+
+  function openSubjectContent(recordId: string, row: string[]) {
+    setSelectedSubjectContent({
+      id: recordId,
+      name: row[0] ?? recordId
+    });
   }
 
   function addActivityNotification(resource: NavModule, action: "created" | "updated" | "deleted", label: string) {
     const resourceLabels: Record<string, { en: string; mn: string }> = {
       students: { en: "Student", mn: "Сурагч" },
       teachers: { en: "Teacher", mn: "Багш" },
+      subjects: { en: "Subject", mn: "Хичээл" },
       classes: { en: "Class", mn: "Анги" },
       attendance: { en: "Attendance", mn: "Ирц" },
       grades: { en: "Grade", mn: "Дүн" },
@@ -445,6 +574,7 @@ function AppShell() {
     const notificationTypes: Partial<Record<NavModule, ActivityNotification["type"]>> = {
       students: "student",
       teachers: "teacher",
+      subjects: "record",
       payments: "payment",
       attendance: "attendance",
       announcements: "announcement"
@@ -528,14 +658,7 @@ function AppShell() {
     if (!activeResource) return;
 
     try {
-      const data = isSupabaseConfigured
-        ? await deleteSupabaseResource(activeResource, recordId)
-        : await fetch(`/api/school/${activeResource}?id=${encodeURIComponent(recordId)}`, {
-            method: "DELETE"
-          }).then(async (response) => {
-            if (!response.ok) throw new Error("Delete failed");
-            return (await response.json()) as ResourceTableData;
-          });
+      const data = await deleteResourceData(activeResource, recordId);
       setResourceData(data);
       setDeleteTarget(null);
       addActivityNotification(activeResource, "deleted", deleteTarget?.label ?? "");
@@ -636,22 +759,10 @@ function AppShell() {
       setResourceError("");
 
       try {
-        let data: ResourceTableData;
-        let shouldApplyLocalParentFilter = !isSupabaseConfigured;
+        const result = await loadResourceData(activeResource);
+        let data = result.data;
 
-        if (isSupabaseConfigured) {
-          try {
-            data = await listSupabaseResource(activeResource);
-          } catch (error) {
-            console.warn("Supabase resource unavailable; using local school data fallback.", error);
-            data = await fetchFallbackResource(activeResource);
-            shouldApplyLocalParentFilter = true;
-          }
-        } else {
-          data = await fetchFallbackResource(activeResource);
-        }
-
-        if (shouldApplyLocalParentFilter && role === "parent" && currentUserEmail && parentScopedResources.has(activeResource)) {
+        if (result.needsLocalParentFilter && role === "parent" && currentUserEmail && parentScopedResources.has(activeResource)) {
           const studentData = await fetchFallbackResource("students");
 
           data = filterRowsByParent(data, activeResource, currentUserEmail, studentData);
@@ -659,11 +770,12 @@ function AppShell() {
 
         if (!ignore) {
           setResourceData(data);
+          setResourceError("");
         }
       } catch {
         if (!ignore) {
-          setResourceData(null);
-          setResourceError(copy.common.databaseOffline);
+          setResourceData(demoResourceData(activeResource));
+          setResourceError("");
         }
       } finally {
         if (!ignore) {
@@ -800,6 +912,33 @@ function AppShell() {
             {activeModule === "teachers" ? (
               <TeachersModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
+            {activeModule === "subjects" ? (
+              selectedSubjectContent ? (
+                <SubjectContentPanel
+                  canManage={role === "admin" || role === "teacher"}
+                  language={language}
+                  subject={selectedSubjectContent}
+                  onBack={() => setSelectedSubjectContent(null)}
+                  onSaved={(label) => {
+                    addActivityNotification("subjects", "updated", label);
+                    setToast(language === "mn" ? "Хичээлийн агуулга хадгалагдлаа" : "Subject content saved");
+                  }}
+                />
+              ) : (
+                <SubjectsModule
+                  apiData={resourceData}
+                  canManage={role === "admin"}
+                  copy={copy}
+                  error={resourceError}
+                  language={language}
+                  loading={resourceLoading}
+                  onAdd={openCreateModal}
+                  onDelete={requestDeleteRecord}
+                  onEdit={openEditModal}
+                  onOpenContent={openSubjectContent}
+                />
+              )
+            ) : null}
             {activeModule === "classes" ? (
               <ClassesModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
@@ -860,23 +999,7 @@ function AppShell() {
               }
 
               try {
-                const data = isSupabaseConfigured
-                  ? modalMode === "edit" && editingRecordId
-                    ? await updateSupabaseResource(activeResource, editingRecordId, formValues)
-                    : await createSupabaseResource(activeResource, formValues)
-                  : await fetch(`/api/school/${activeResource}`, {
-                      method: modalMode === "edit" ? "PATCH" : "POST",
-                      headers: {
-                        "Content-Type": "application/json"
-                      },
-                      body: JSON.stringify({ id: editingRecordId, values: formValues })
-                    }).then(async (response) => {
-                      if (!response.ok) {
-                        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-                        throw new Error(payload?.message ?? "Save failed");
-                      }
-                      return (await response.json()) as ResourceTableData;
-                    });
+                const data = await saveResourceData(activeResource, modalMode, editingRecordId, formValues);
                 const nextData = modalMode === "edit" ? mergeSubmittedValues(data, editingRecordId, formValues) : data;
 
                 addActivityNotification(activeResource, modalMode === "edit" ? "updated" : "created", Object.values(formValues).find(Boolean) ?? "");
@@ -1157,6 +1280,500 @@ function TeachersModule({ apiData, copy, error, language, loading, ...controls }
   );
 }
 
+function SubjectsModule({
+  apiData,
+  copy,
+  error,
+  language,
+  loading,
+  onOpenContent,
+  ...controls
+}: ModuleApiProps & { onOpenContent: (recordId: string, row: string[]) => void }) {
+  return (
+    <ModuleTable
+      apiData={apiData}
+      copy={copy}
+      error={error}
+      language={language}
+      loading={loading}
+      title={copy.tables.subjects}
+      columns={["Name", "Category", "Grade Levels"]}
+      rows={subjects.map((item) => [item.name, item.category, item.gradeLevels])}
+      contentActionLabel={language === "mn" ? "Агуулга нээх" : "Open content"}
+      onOpenContent={onOpenContent}
+      {...controls}
+    />
+  );
+}
+
+function SubjectContentPanel({
+  canManage,
+  language,
+  subject,
+  onBack,
+  onSaved
+}: {
+  canManage: boolean;
+  language: Language;
+  subject: Exclude<SubjectContentTarget, null>;
+  onBack: () => void;
+  onSaved: (label: string) => void;
+}) {
+  const [content, setContent] = useState<SubjectContent | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [topicForm, setTopicForm] = useState({ title: "", description: "" });
+  const [lessonForm, setLessonForm] = useState({ title: "", topicId: "", duration: "", objectives: "" });
+
+  const currentContent = content ?? emptySubjectContent(subject.id);
+  const selectedTopicId = lessonForm.topicId || currentContent.topics[0]?.id || "";
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadContent() {
+      setLoading(true);
+      setMessage("");
+
+      const loadedContent = await loadSubjectContent(subject.id);
+
+      if (!ignore) {
+        const nextContent = loadedContent ?? emptySubjectContent(subject.id);
+        setContent(nextContent);
+        setLessonForm((current) => ({ ...current, topicId: nextContent.topics[0]?.id ?? "" }));
+        setLoading(false);
+      }
+    }
+
+    loadContent();
+
+    return () => {
+      ignore = true;
+    };
+  }, [subject.id]);
+
+  async function persistContent(nextContent: SubjectContent, label: string) {
+    setSaving(true);
+    setMessage("");
+
+    try {
+      await saveSubjectContent(subject.id, nextContent);
+      setContent(nextContent);
+      onSaved(label);
+      setMessage(language === "mn" ? "Амжилттай хадгаллаа." : "Saved successfully.");
+    } catch {
+      setMessage(language === "mn" ? "Файл хадгалж чадсангүй." : "Could not save the content file.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function uploadLessonFiles(fileList: FileList | null) {
+    const files = Array.from(fileList ?? []);
+    if (files.length === 0) return;
+
+    try {
+      setSaving(true);
+      setMessage("");
+      const nextContent = await uploadSubjectFiles(subject.id, files);
+      setContent(nextContent);
+      onSaved(files.map((file) => file.name).join(", "));
+      setMessage(language === "mn" ? "Файл амжилттай нэмэгдлээ." : "Files uploaded successfully.");
+    } catch {
+      setMessage(language === "mn" ? "Файл upload хийж чадсангүй." : "The files could not be uploaded.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function printLessonFile(lesson: SubjectLesson, topicTitle: string) {
+    if (!lesson.fileUrl) return;
+
+    const printWindow = window.open("", "_blank", "width=1080,height=760");
+
+    if (!printWindow) {
+      setMessage(language === "mn" ? "Хэвлэх цонх нээгдсэнгүй." : "The print window could not be opened.");
+      return;
+    }
+
+    const fileUrl = new URL(lesson.fileUrl, window.location.origin).href;
+    const fileName = lesson.fileName ?? lesson.title;
+    const lowerFileName = fileName.toLowerCase();
+    const fileType = (lesson.fileType ?? "").toLowerCase();
+    const isPdf = fileType.includes("pdf") || lowerFileName.endsWith(".pdf");
+    const isImage = /\.(png|jpe?g|webp|gif|bmp)$/i.test(lowerFileName) || fileType.startsWith("image/");
+    const isText = lowerFileName.endsWith(".txt") || fileType.startsWith("text/");
+    const safeTitle = escapeHtml(lesson.title);
+    const safeTopic = escapeHtml(topicTitle);
+    const safeFileName = escapeHtml(fileName);
+    const safeFileUrl = escapeHtml(fileUrl);
+    const safeSize = escapeHtml(formatFileSize(lesson.fileSize));
+    const previewMarkup = isPdf || isText
+      ? `<iframe class="print-preview" src="${safeFileUrl}"></iframe>`
+      : isImage
+        ? `<img class="print-image" src="${safeFileUrl}" alt="${safeFileName}" />`
+        : `<div class="print-fallback">
+            <p>${language === "mn" ? "Энэ файлыг браузер шууд preview хийх боломжгүй байж магадгүй." : "This file may not be directly previewable in the browser."}</p>
+            <a href="${safeFileUrl}" target="_blank" rel="noreferrer">${language === "mn" ? "Файл нээх" : "Open file"}</a>
+          </div>`;
+
+    printWindow.document.write(`<!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>${safeTitle} - PDF</title>
+          <style>
+            @page { margin: 12mm; }
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              color: #0f172a;
+              background: #fff;
+              font-family: Arial, Helvetica, sans-serif;
+            }
+            .print-header {
+              display: grid;
+              gap: 6px;
+              padding: 20px 0 14px;
+              border-bottom: 1px solid #e2e8f0;
+            }
+            .print-header p,
+            .print-header h1 {
+              margin: 0;
+            }
+            .print-header p {
+              color: #64748b;
+              font-size: 13px;
+              font-weight: 700;
+            }
+            .print-header h1 {
+              font-size: 28px;
+              line-height: 1.15;
+            }
+            .print-meta {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 10px;
+              margin-top: 4px;
+              color: #475569;
+              font-size: 13px;
+            }
+            .print-body {
+              padding-top: 18px;
+            }
+            .print-preview {
+              width: 100%;
+              height: 78vh;
+              border: 0;
+            }
+            .print-image {
+              display: block;
+              max-width: 100%;
+              max-height: 80vh;
+              margin: 0 auto;
+              object-fit: contain;
+            }
+            .print-fallback {
+              display: grid;
+              gap: 12px;
+              padding: 22px;
+              background: #f8fafc;
+              border-radius: 14px;
+              color: #475569;
+            }
+            .print-fallback p {
+              margin: 0;
+            }
+            .print-fallback a {
+              color: #2563eb;
+              font-weight: 700;
+            }
+            @media print {
+              .print-header {
+                break-after: avoid;
+              }
+              .print-preview {
+                height: 82vh;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <main>
+            <header class="print-header">
+              <p>${language === "mn" ? "Хичээлийн файл" : "Lesson file"}</p>
+              <h1>${safeTitle}</h1>
+              <div class="print-meta">
+                <span>${safeTopic}</span>
+                <span>${safeFileName}</span>
+                ${safeSize ? `<span>${safeSize}</span>` : ""}
+              </div>
+            </header>
+            <section class="print-body">
+              ${previewMarkup}
+            </section>
+          </main>
+          <script>
+            const runPrint = () => setTimeout(() => {
+              window.focus();
+              window.print();
+            }, 500);
+            const preview = document.querySelector(".print-preview, .print-image");
+            if (preview) {
+              preview.addEventListener("load", runPrint, { once: true });
+              setTimeout(runPrint, 1800);
+            } else {
+              runPrint();
+            }
+          </script>
+        </body>
+      </html>`);
+    printWindow.document.close();
+  }
+
+  async function addTopic(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const title = topicForm.title.trim();
+    if (!title) return;
+
+    const topic = {
+      id: `T-${Date.now()}`,
+      title,
+      description: topicForm.description.trim() || undefined
+    };
+    const nextContent = {
+      ...currentContent,
+      topics: [...currentContent.topics, topic]
+    };
+
+    await persistContent(nextContent, title);
+    setTopicForm({ title: "", description: "" });
+    setLessonForm((current) => ({ ...current, topicId: current.topicId || topic.id }));
+  }
+
+  async function addLesson(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const title = lessonForm.title.trim();
+    if (!title) return;
+
+    const topicId = selectedTopicId || `T-${Date.now()}`;
+    const topics = currentContent.topics.length > 0
+      ? currentContent.topics
+      : [{ id: topicId, title: language === "mn" ? "Ерөнхий сэдэв" : "General topic" }];
+    const nextContent = {
+      ...currentContent,
+      topics,
+      lessons: [
+        ...currentContent.lessons,
+        {
+          id: `L-${Date.now()}`,
+          title,
+          topicId,
+          duration: lessonForm.duration.trim() || undefined,
+          objectives: lessonForm.objectives
+            .split(/\r?\n|,/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+        }
+      ]
+    };
+
+    await persistContent(nextContent, title);
+    setLessonForm({ title: "", topicId, duration: "", objectives: "" });
+  }
+
+  return (
+    <section className="subject-content-panel">
+      <div className="subject-content-header">
+        <button className="subject-back-button" onClick={onBack} type="button">
+          <ArrowLeft size={17} />
+          {language === "mn" ? "Буцах" : "Back"}
+        </button>
+        <div>
+          <p>{language === "mn" ? "Хичээлийн агуулга" : "Subject content"}</p>
+          <h2>{translateValue(subject.name, language)}</h2>
+        </div>
+      </div>
+
+      {loading ? (
+        <Card>
+          <CardContent>
+            <div className="table-empty">
+              <strong>{language === "mn" ? "Агуулга ачаалж байна..." : "Loading content..."}</strong>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="subject-content-stats">
+            <span>
+              <strong>{currentContent.topics.length}</strong>
+              {language === "mn" ? "Сэдэв" : "Topics"}
+            </span>
+            <span>
+              <strong>{currentContent.lessons.length}</strong>
+              {language === "mn" ? "Хичээл" : "Lessons"}
+            </span>
+            <span>
+              <strong>{currentContent.assignments.length}</strong>
+              {language === "mn" ? "Даалгавар" : "Assignments"}
+            </span>
+          </div>
+
+          {canManage ? (
+            <div className="subject-editor-grid">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{language === "mn" ? "Файлаас нэмэх" : "Add from file"}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <label className="subject-file-import">
+                    <FileUp size={20} />
+                    <span>{language === "mn" ? "Файл сонгох" : "Choose files"}</span>
+                    <input
+                      accept=".doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx,.txt,.rtf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf"
+                      multiple
+                      onChange={(event) => {
+                        uploadLessonFiles(event.target.files);
+                        event.currentTarget.value = "";
+                      }}
+                      type="file"
+                    />
+                  </label>
+                  <p className="subject-help-text">
+                    {language === "mn"
+                      ? "Компьютер дээр бэлдсэн хичээлийн файлуудаа сонгоно."
+                      : "Upload prepared lesson files from your computer."}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>{language === "mn" ? "Сэдэв нэмэх" : "Add topic"}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form className="subject-inline-form" onSubmit={addTopic}>
+                    <Input onChange={(event) => setTopicForm((current) => ({ ...current, title: event.target.value }))} placeholder={language === "mn" ? "Сэдвийн нэр" : "Topic title"} required value={topicForm.title} />
+                    <Input onChange={(event) => setTopicForm((current) => ({ ...current, description: event.target.value }))} placeholder={language === "mn" ? "Тайлбар" : "Description"} value={topicForm.description} />
+                    <Button disabled={saving} type="submit">
+                      <Plus size={16} />
+                      {language === "mn" ? "Сэдэв нэмэх" : "Add topic"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card className="subject-lesson-card">
+                <CardHeader>
+                  <CardTitle>{language === "mn" ? "Хичээл нэмэх" : "Add lesson"}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form className="subject-inline-form subject-lesson-form" onSubmit={addLesson}>
+                    <Input onChange={(event) => setLessonForm((current) => ({ ...current, title: event.target.value }))} placeholder={language === "mn" ? "Хичээлийн нэр" : "Lesson title"} required value={lessonForm.title} />
+                    <select className="ec-input" onChange={(event) => setLessonForm((current) => ({ ...current, topicId: event.target.value }))} value={selectedTopicId}>
+                      {currentContent.topics.length > 0 ? (
+                        currentContent.topics.map((topic) => (
+                          <option key={topic.id} value={topic.id}>
+                            {translateValue(topic.title, language)}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">{language === "mn" ? "Ерөнхий сэдэв" : "General topic"}</option>
+                      )}
+                    </select>
+                    <Input onChange={(event) => setLessonForm((current) => ({ ...current, duration: event.target.value }))} placeholder={language === "mn" ? "Үргэлжлэх хугацаа" : "Duration"} value={lessonForm.duration} />
+                    <Input onChange={(event) => setLessonForm((current) => ({ ...current, objectives: event.target.value }))} placeholder={language === "mn" ? "Зорилго, таслалаар" : "Objectives, comma-separated"} value={lessonForm.objectives} />
+                    <Button disabled={saving} type="submit">
+                      <Plus size={16} />
+                      {language === "mn" ? "Хичээл нэмэх" : "Add lesson"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {message ? <p className="subject-content-message">{message}</p> : null}
+
+          <div className="subject-content-grid">
+            <Card>
+              <CardHeader>
+                <CardTitle>{language === "mn" ? "Сэдвүүд" : "Topics"}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="subject-list">
+                  {currentContent.topics.length > 0 ? (
+                    currentContent.topics.map((topic) => (
+                      <article key={topic.id}>
+                        <strong>{translateValue(topic.title, language)}</strong>
+                        {topic.description ? <p>{translateValue(topic.description, language)}</p> : null}
+                      </article>
+                    ))
+                  ) : (
+                    <p className="subject-help-text">{language === "mn" ? "Сэдэв нэмэгдээгүй байна." : "No topics yet."}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{language === "mn" ? "Хичээлүүд" : "Lessons"}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="subject-list">
+                  {currentContent.lessons.length > 0 ? (
+                    currentContent.lessons.map((lesson) => {
+                      const topic = currentContent.topics.find((item) => item.id === lesson.topicId);
+
+                      return (
+                        <article key={lesson.id}>
+                          <strong>{lesson.title}</strong>
+                          <p>
+                            {topic?.title ? translateValue(topic.title, language) : lesson.topicId}
+                            {lesson.duration ? ` - ${lesson.duration}` : ""}
+                          </p>
+                          {lesson.fileUrl ? (
+                            <div className="subject-file-actions">
+                              <a className="subject-file-link" href={lesson.fileUrl} target="_blank" rel="noreferrer">
+                                <Download size={15} />
+                                <span>{lesson.fileName ?? (language === "mn" ? "Файл нээх" : "Open file")}</span>
+                                {lesson.fileSize ? <small>{formatFileSize(lesson.fileSize)}</small> : null}
+                              </a>
+                              <button className="subject-file-print" onClick={() => printLessonFile(lesson, topic?.title ? translateValue(topic.title, language) : lesson.topicId)} type="button">
+                                <Printer size={15} />
+                                <span>{language === "mn" ? "PDF-р хэвлэх" : "Print PDF"}</span>
+                              </button>
+                            </div>
+                          ) : null}
+                          {lesson.objectives?.length ? (
+                            <ul>
+                              {lesson.objectives.map((objective) => (
+                                <li key={objective}>{objective}</li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </article>
+                      );
+                    })
+                  ) : (
+                    <p className="subject-help-text">{language === "mn" ? "Хичээл нэмэгдээгүй байна." : "No lessons yet."}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function ClassesModule({ apiData, copy, error, language, loading, ...controls }: ModuleApiProps) {
   return (
     <ModuleTable
@@ -1381,6 +1998,8 @@ type ModuleControls = {
   onAdd: () => void;
   onDelete: (recordId: string, row: string[]) => void;
   onEdit: (recordId: string, row: string[], columns: string[]) => void;
+  contentActionLabel?: string;
+  onOpenContent?: (recordId: string, row: string[]) => void;
 };
 
 function ModuleTable({
@@ -1393,9 +2012,11 @@ function ModuleTable({
   language,
   loading,
   canManage,
+  contentActionLabel,
   onAdd,
   onDelete,
-  onEdit
+  onEdit,
+  onOpenContent
 }: {
   title: string;
   columns: string[];
@@ -1418,8 +2039,9 @@ function ModuleTable({
         ? row.some((cell) => translateValue(cell, language).toLowerCase().includes(normalizedFilter) || cell.toLowerCase().includes(normalizedFilter))
         : true
     );
-  const showActions = canManage && displayIds.length > 0;
-  const gridColumns = `repeat(${displayColumns.length}, minmax(0, 1fr))${showActions ? " 88px" : ""}`;
+  const showActions = (canManage || Boolean(onOpenContent)) && displayIds.length > 0;
+  const actionColumnWidth = canManage && onOpenContent ? "132px" : "88px";
+  const gridColumns = `repeat(${displayColumns.length}, minmax(0, 1fr))${showActions ? ` ${actionColumnWidth}` : ""}`;
 
   return (
     <Card>
@@ -1460,12 +2082,21 @@ function ModuleTable({
                 ))}
                 {showActions ? (
                   <span className="row-actions">
-                    <button aria-label={copy.common.editRecord} onClick={() => id && onEdit(id, row, displayColumns)} type="button">
-                      <Pencil size={15} />
-                    </button>
-                    <button aria-label={copy.common.deleteRecord} onClick={() => id && onDelete(id, row)} type="button">
-                      <Trash2 size={15} />
-                    </button>
+                    {onOpenContent ? (
+                      <button aria-label={contentActionLabel} className="content-action" onClick={() => id && onOpenContent(id, row)} type="button">
+                        <BookOpen size={15} />
+                      </button>
+                    ) : null}
+                    {canManage ? (
+                      <>
+                        <button aria-label={copy.common.editRecord} onClick={() => id && onEdit(id, row, displayColumns)} type="button">
+                          <Pencil size={15} />
+                        </button>
+                        <button aria-label={copy.common.deleteRecord} className="delete-action" onClick={() => id && onDelete(id, row)} type="button">
+                          <Trash2 size={15} />
+                        </button>
+                      </>
+                    ) : null}
                   </span>
                 ) : null}
               </div>

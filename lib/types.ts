@@ -6,6 +6,7 @@ export type NavModule =
   | "dashboard"
   | "students"
   | "teachers"
+  | "subjects"
   | "classes"
   | "attendance"
   | "grades"
@@ -56,6 +57,49 @@ export type ClassRoom = {
   teacher: string;
   students: number;
   schedule: string;
+};
+
+export type SubjectTopic = {
+  id: string;
+  title: string;
+  description?: string;
+};
+
+export type SubjectLesson = {
+  id: string;
+  title: string;
+  topicId: string;
+  duration?: string; // "45 min"
+  objectives?: string[];
+  fileName?: string;
+  fileUrl?: string;
+  fileType?: string;
+  fileSize?: number;
+  uploadedAt?: string;
+};
+
+export type SubjectAssignment = {
+  id: string;
+  title: string;
+  lessonId?: string;
+  dueDate?: string;
+  maxScore?: number;
+  description?: string;
+};
+
+export type SubjectContent = {
+  subjectId: string;
+  topics: SubjectTopic[];
+  lessons: SubjectLesson[];
+  assignments: SubjectAssignment[];
+};
+
+export type Subject = {
+  id: string;
+  name: string;
+  category: string;
+  gradeLevels: string;
+  content?: SubjectContent;
 };
 
 export type AttendanceRecord = {

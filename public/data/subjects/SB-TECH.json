@@ -1,0 +1,23 @@
+{
+  "subjectId": "SB-TECH",
+  "topics": [
+    {
+      "id": "T-FILES",
+      "title": "Uploaded lesson files",
+      "description": "Word, PowerPoint, PDF, and other prepared lesson materials"
+    }
+  ],
+  "lessons": [
+    {
+      "id": "L-FILE-1781759338390-1",
+      "title": "Capstone Project Report",
+      "topicId": "T-FILES",
+      "fileName": "Capstone Project Report.pdf",
+      "fileUrl": "/data/subjects/SB-TECH/files/1781759338383-1-Capstone-Project-Report.pdf",
+      "fileType": "application/pdf",
+      "fileSize": 29842,
+      "uploadedAt": "2026-06-18T05:08:58.391Z"
+    }
+  ],
+  "assignments": []
+}

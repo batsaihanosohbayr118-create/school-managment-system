@@ -1,9 +1,11 @@
 import { Pool } from "pg";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import type { NavModule } from "@/lib/types";
 import { getCurrentUserEmailAndRole } from "./supabase";
+import { subjectCatalog } from "@/lib/subjects";
 
 export type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
 
@@ -31,6 +33,7 @@ declare global {
 const resourceColumns: Record<SchoolResource, string[]> = {
   students: ["Name", "Class", "Attendance", "GPA", "Payment", "Parent Email"],
   teachers: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"],
+  subjects: ["Name", "Category", "Grade Levels"],
   classes: ["Class", "Section", "Teacher", "Students", "Schedule"],
   attendance: ["Student", "Class", "Date", "Status"],
   grades: ["Student", "Subject", "Score", "Semester", "Student Email"],
@@ -39,7 +42,8 @@ const resourceColumns: Record<SchoolResource, string[]> = {
   announcements: ["Title", "Content", "Audience", "Date"]
 };
 
-const localStorePath = path.join(process.cwd(), ".local-data", "school-store.json");
+const localStoreRoot = process.env.VERCEL ? path.join(tmpdir(), "educore") : path.join(process.cwd(), ".local-data");
+const localStorePath = path.join(localStoreRoot, "school-store.json");
 
 const localSeedData: LocalStore = {
   students: [
@@ -52,6 +56,13 @@ const localSeedData: LocalStore = {
     { id: "TC-202", name: "Mr. Bold", subject: "Physics", email: "bold@educore.mn", experience: "6 years", salary: "$1,320", contact: "+976 8808 5500", classes: "Grade 9A", createdAt: "2026-05-18T00:00:00.000Z" },
     { id: "TC-203", name: "Ms. Nomin", subject: "English", email: "nomin@educore.mn", experience: "5 years", salary: "$1,280", contact: "+976 9900 8080", classes: "Grade 7B, Grade 8A", createdAt: "2026-05-18T00:00:00.000Z" }
   ],
+  subjects: subjectCatalog.map((subject) => ({
+    id: subject.id,
+    name: subject.name,
+    category: subject.category,
+    grade_levels: subject.gradeLevels,
+    createdAt: "2026-05-18T00:00:00.000Z"
+  })),
   classes: [
     { id: "CL-8A", name: "Grade 8", section: "A", teacher: "Ms. Saraa", students: 32, schedule: "Mon-Fri", createdAt: "2026-05-18T00:00:00.000Z" },
     { id: "CL-7B", name: "Grade 7", section: "B", teacher: "Ms. Nomin", students: 29, schedule: "Mon-Fri", createdAt: "2026-05-18T00:00:00.000Z" },
@@ -149,6 +160,14 @@ async function initializeSchoolDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS subjects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT '',
+      grade_levels TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS class_rooms (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -215,6 +234,31 @@ async function initializeSchoolDatabase() {
 
 async function seedIfEmpty() {
   const pool = getPool();
+
+  await pool.query(`
+    INSERT INTO subjects (id, name, category, grade_levels)
+    VALUES
+      ('SB-MATH', 'Mathematics', 'Core', 'Grade 7-12'),
+      ('SB-MN-LANG', 'Mongolian Language', 'Core', 'Grade 7-12'),
+      ('SB-MN-LIT', 'Mongolian Literature', 'Core', 'Grade 7-12'),
+      ('SB-EN', 'English', 'Language', 'Grade 7-12'),
+      ('SB-RU', 'Russian', 'Language', 'Grade 7-12'),
+      ('SB-HIST', 'History', 'Social Science', 'Grade 7-12'),
+      ('SB-SOC', 'Social Studies', 'Social Science', 'Grade 7-12'),
+      ('SB-GEO', 'Geography', 'Social Science', 'Grade 7-12'),
+      ('SB-PHY', 'Physics', 'Science', 'Grade 8-12'),
+      ('SB-CHEM', 'Chemistry', 'Science', 'Grade 8-12'),
+      ('SB-BIO', 'Biology', 'Science', 'Grade 7-12'),
+      ('SB-CS', 'Computer Science', 'Technology', 'Grade 7-12'),
+      ('SB-PE', 'Physical Education', 'Wellbeing', 'Grade 7-12'),
+      ('SB-ART', 'Art', 'Arts', 'Grade 7-12'),
+      ('SB-MUSIC', 'Music', 'Arts', 'Grade 7-12'),
+      ('SB-TECH', 'Technology', 'Technology', 'Grade 7-12'),
+      ('SB-HEALTH', 'Health', 'Wellbeing', 'Grade 7-12'),
+      ('SB-CIVIC', 'Civic Education', 'Social Science', 'Grade 7-12')
+    ON CONFLICT (id) DO NOTHING;
+  `);
+
   const count = await pool.query<{ count: string }>("SELECT COUNT(*) as count FROM students");
 
   if (Number(count.rows[0]?.count ?? 0) > 0) return;
@@ -393,6 +437,8 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
         phoneValue(values.Contact),
         values.Classes
       ].map(stringValue);
+    case "subjects":
+      return [values.Name, values.Category, values["Grade Levels"]].map(stringValue);
     case "classes":
       return [values.Class, values.Section, values.Teacher, "0", "Mon-Fri"].map(stringValue);
     case "attendance":
@@ -452,6 +498,8 @@ function rowToArray(resource: SchoolResource, row: QueryRow | LocalResourceRow) 
       return [row.full_name, row.class_name, `${row.attendance}%`, row.gpa, row.payment_status, row.parent_email].map(stringValue);
     case "teachers":
       return [row.name, row.subject, row.email, row.experience, row.salary, phoneValue(row.contact), row.classes].map(stringValue);
+    case "subjects":
+      return [row.name, row.category, row.grade_levels].map(stringValue);
     case "classes":
       return [row.name, row.section, row.teacher, row.students, row.schedule].map(stringValue);
     case "attendance":
@@ -471,6 +519,7 @@ function tableName(resource: SchoolResource) {
   const names: Record<SchoolResource, string> = {
     students: "students",
     teachers: "teachers",
+    subjects: "subjects",
     classes: "class_rooms",
     attendance: "attendance_records",
     grades: "grade_records",
@@ -556,6 +605,13 @@ export async function createResource(resource: SchoolResource, values: Record<st
             phoneValue(values.Contact),
             values.Classes ?? ""
           ]
+        );
+        break;
+      case "subjects":
+        await pool.query(
+          `INSERT INTO subjects (id, name, category, grade_levels)
+           VALUES ($1, $2, $3, $4)`,
+          [id, values.Name, values.Category ?? "", values["Grade Levels"] ?? ""]
         );
         break;
       case "classes":
@@ -650,6 +706,14 @@ export async function updateResource(resource: SchoolResource, id: string, value
             values.Classes ?? "",
             id
           ]
+        );
+        break;
+      case "subjects":
+        await pool.query(
+          `UPDATE subjects
+           SET name = $1, category = $2, grade_levels = $3
+           WHERE id = $4`,
+          [values.Name, values.Category ?? "", values["Grade Levels"] ?? "", id]
         );
         break;
       case "classes":

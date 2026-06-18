@@ -1,4 +1,5 @@
 import {
+  BookMarked,
   BookOpen,
   CalendarDays,
   ClipboardCheck,
@@ -16,15 +17,18 @@ import type {
   GradeRecord,
   NavItem,
   PaymentRecord,
+  Subject,
   Student,
   Teacher,
   TimetableSlot
 } from "@/lib/types";
+import { subjectCatalog } from "@/lib/subjects";
 
 export const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Role-based analytics and activity center" },
   { id: "students", label: "Students", icon: GraduationCap, description: "Student CRUD, profiles, class filters" },
   { id: "teachers", label: "Teachers", icon: UsersRound, description: "Teacher records, subject and class assignment" },
+  { id: "subjects", label: "Subjects", icon: BookMarked, description: "Subject catalog, categories and grade levels" },
   { id: "classes", label: "Classes", icon: BookOpen, description: "Class sections, teachers, students, schedules" },
   { id: "attendance", label: "Attendance", icon: ClipboardCheck, description: "Daily attendance and reports" },
   { id: "grades", label: "Grades", icon: CalendarDays, description: "Scores, GPA, semester reports" },
@@ -33,6 +37,8 @@ export const navItems: NavItem[] = [
   { id: "announcements", label: "Announcements", icon: Megaphone, description: "Notices and dashboard notifications" },
   { id: "settings", label: "Settings", icon: Settings, description: "Profile, roles, permissions, preferences" }
 ];
+
+export const subjects: Subject[] = subjectCatalog;
 
 export const students: Student[] = [
   {

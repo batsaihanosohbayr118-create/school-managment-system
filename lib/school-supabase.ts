@@ -19,6 +19,7 @@ type SupabaseError = {
 const resourceColumns: Record<SchoolResource, string[]> = {
   students: ["Name", "Class", "Attendance", "GPA", "Payment", "Parent Email"],
   teachers: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"],
+  subjects: ["Name", "Category", "Grade Levels"],
   classes: ["Class", "Section", "Teacher", "Students", "Schedule"],
   attendance: ["Student", "Class", "Date", "Status"],
   grades: ["Student", "Subject", "Score", "Semester", "Student Email"],
@@ -30,6 +31,7 @@ const resourceColumns: Record<SchoolResource, string[]> = {
 const tableNames: Record<SchoolResource, string> = {
   students: "students",
   teachers: "teachers",
+  subjects: "subjects",
   classes: "class_rooms",
   attendance: "attendance_records",
   grades: "grade_records",
@@ -95,6 +97,8 @@ function rowToArray(resource: SchoolResource, row: SupabaseRow) {
       return [row.full_name, row.class_name, `${row.attendance}%`, row.gpa, row.payment_status, row.parent_email].map(stringValue);
     case "teachers":
       return [row.name, row.subject, row.email, row.experience, row.salary, phoneValue(row.contact), row.classes].map(stringValue);
+    case "subjects":
+      return [row.name, row.category, row.grade_levels].map(stringValue);
     case "classes":
       return [row.name, row.section, row.teacher, row.students, row.schedule].map(stringValue);
     case "attendance":
@@ -141,6 +145,13 @@ function createPayload(resource: SchoolResource, values: Record<string, string>)
         salary: values.Salary ?? "",
         contact: phoneValue(values.Contact),
         classes: values.Classes ?? ""
+      };
+    case "subjects":
+      return {
+        id,
+        name: values.Name ?? "",
+        category: values.Category ?? "",
+        grade_levels: values["Grade Levels"] ?? ""
       };
     case "classes":
       return {
@@ -216,6 +227,12 @@ function updatePayload(resource: SchoolResource, values: Record<string, string>)
         salary: values.Salary ?? "",
         contact: phoneValue(values.Contact),
         classes: values.Classes ?? ""
+      };
+    case "subjects":
+      return {
+        name: values.Name ?? "",
+        category: values.Category ?? "",
+        grade_levels: values["Grade Levels"] ?? ""
       };
     case "classes":
       return {
