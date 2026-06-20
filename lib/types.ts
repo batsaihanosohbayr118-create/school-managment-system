@@ -71,6 +71,7 @@ export type SubjectLesson = {
   topicId: string;
   duration?: string; // "45 min"
   objectives?: string[];
+  videoUrl?: string;
   fileName?: string;
   fileUrl?: string;
   fileType?: string;

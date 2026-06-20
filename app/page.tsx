@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -23,6 +23,7 @@ import {
   Settings as SettingsIcon,
   Sun,
   Trash2,
+  Video,
   X
 } from "lucide-react";
 import {
@@ -194,6 +195,50 @@ function formatFileSize(size: number | undefined) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${Math.round(size / 102.4) / 10} KB`;
   return `${Math.round(size / 1024 / 102.4) / 10} MB`;
+}
+
+function isVideoFile(lesson: SubjectLesson) {
+  const fileName = (lesson.fileName ?? lesson.fileUrl ?? "").toLowerCase();
+  const fileType = (lesson.fileType ?? "").toLowerCase();
+
+  return fileType.startsWith("video/") || /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(fileName);
+}
+
+function videoEmbedUrl(value: string | undefined) {
+  if (!value) return "";
+
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, "");
+
+    if (host === "youtu.be") {
+      const videoId = url.pathname.split("/").filter(Boolean)[0];
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : "";
+    }
+
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      const videoId = url.searchParams.get("v");
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+
+      const parts = url.pathname.split("/").filter(Boolean);
+      if ((parts[0] === "shorts" || parts[0] === "embed") && parts[1]) {
+        return `https://www.youtube.com/embed/${parts[1]}`;
+      }
+    }
+
+    if (host === "vimeo.com") {
+      const videoId = url.pathname.split("/").filter(Boolean)[0];
+      return videoId ? `https://player.vimeo.com/video/${videoId}` : "";
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function isDirectVideoUrl(value: string | undefined) {
+  return Boolean(value && /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(value));
 }
 
 function escapeHtml(value: string) {
@@ -1325,9 +1370,14 @@ function SubjectContentPanel({
   const [saving, setSaving] = useState(false);
   const [topicForm, setTopicForm] = useState({ title: "", description: "" });
   const [lessonForm, setLessonForm] = useState({ title: "", topicId: "", duration: "", objectives: "" });
+  const [videoForm, setVideoForm] = useState({ title: "", topicId: "", duration: "", videoUrl: "" });
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const videoFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const currentContent = content ?? emptySubjectContent(subject.id);
   const selectedTopicId = lessonForm.topicId || currentContent.topics[0]?.id || "";
+  const selectedVideoTopicId = videoForm.topicId || currentContent.topics[0]?.id || "";
+  const videoLessonCount = currentContent.lessons.filter((lesson) => lesson.videoUrl || isVideoFile(lesson)).length;
 
   useEffect(() => {
     let ignore = false;
@@ -1342,6 +1392,7 @@ function SubjectContentPanel({
         const nextContent = loadedContent ?? emptySubjectContent(subject.id);
         setContent(nextContent);
         setLessonForm((current) => ({ ...current, topicId: nextContent.topics[0]?.id ?? "" }));
+        setVideoForm((current) => ({ ...current, topicId: nextContent.topics[0]?.id ?? "" }));
         setLoading(false);
       }
     }
@@ -1379,9 +1430,9 @@ function SubjectContentPanel({
       const nextContent = await uploadSubjectFiles(subject.id, files);
       setContent(nextContent);
       onSaved(files.map((file) => file.name).join(", "));
-      setMessage(language === "mn" ? "Файл амжилттай нэмэгдлээ." : "Files uploaded successfully.");
+      setMessage(language === "mn" ? "Файл/видео амжилттай нэмэгдлээ." : "Files and videos uploaded successfully.");
     } catch {
-      setMessage(language === "mn" ? "Файл upload хийж чадсангүй." : "The files could not be uploaded.");
+      setMessage(language === "mn" ? "Файл/видео upload хийж чадсангүй." : "The files or videos could not be uploaded.");
     } finally {
       setSaving(false);
     }
@@ -1552,6 +1603,7 @@ function SubjectContentPanel({
     await persistContent(nextContent, title);
     setTopicForm({ title: "", description: "" });
     setLessonForm((current) => ({ ...current, topicId: current.topicId || topic.id }));
+    setVideoForm((current) => ({ ...current, topicId: current.topicId || topic.id }));
   }
 
   async function addLesson(event: FormEvent<HTMLFormElement>) {
@@ -1584,6 +1636,60 @@ function SubjectContentPanel({
 
     await persistContent(nextContent, title);
     setLessonForm({ title: "", topicId, duration: "", objectives: "" });
+  }
+
+  async function addVideoLesson(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const title = videoForm.title.trim();
+    const videoUrl = videoForm.videoUrl.trim();
+    if (!title || (!videoUrl && !videoFile)) return;
+
+    const topicId = selectedVideoTopicId || `T-${Date.now()}`;
+
+    if (videoFile) {
+      try {
+        setSaving(true);
+        setMessage("");
+        const nextContent = await uploadSubjectFiles(subject.id, [videoFile], {
+          title,
+          topicId,
+          duration: videoForm.duration.trim() || undefined
+        });
+        setContent(nextContent);
+        onSaved(title);
+        setMessage(language === "mn" ? "Видео файл амжилттай нэмэгдлээ." : "Video file uploaded successfully.");
+        setVideoForm({ title: "", topicId, duration: "", videoUrl: "" });
+        setVideoFile(null);
+        if (videoFileInputRef.current) videoFileInputRef.current.value = "";
+      } catch {
+        setMessage(language === "mn" ? "Видео файл upload хийж чадсангүй." : "The video file could not be uploaded.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    const topics = currentContent.topics.length > 0
+      ? currentContent.topics
+      : [{ id: topicId, title: language === "mn" ? "Ерөнхий сэдэв" : "General topic" }];
+    const nextContent = {
+      ...currentContent,
+      topics,
+      lessons: [
+        ...currentContent.lessons,
+        {
+          id: `L-VIDEO-${Date.now()}`,
+          title,
+          topicId,
+          duration: videoForm.duration.trim() || undefined,
+          videoUrl
+        }
+      ]
+    };
+
+    await persistContent(nextContent, title);
+    setVideoForm({ title: "", topicId, duration: "", videoUrl: "" });
   }
 
   return (
@@ -1619,6 +1725,10 @@ function SubjectContentPanel({
               {language === "mn" ? "Хичээл" : "Lessons"}
             </span>
             <span>
+              <strong>{videoLessonCount}</strong>
+              {language === "mn" ? "Видео" : "Videos"}
+            </span>
+            <span>
               <strong>{currentContent.assignments.length}</strong>
               {language === "mn" ? "Даалгавар" : "Assignments"}
             </span>
@@ -1635,7 +1745,7 @@ function SubjectContentPanel({
                     <FileUp size={20} />
                     <span>{language === "mn" ? "Файл сонгох" : "Choose files"}</span>
                     <input
-                      accept=".doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx,.txt,.rtf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf"
+                      accept=".doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx,.txt,.rtf,.mp4,.webm,.ogg,.mov,.m4v,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf,video/mp4,video/webm,video/ogg,video/quicktime"
                       multiple
                       onChange={(event) => {
                         uploadLessonFiles(event.target.files);
@@ -1646,8 +1756,8 @@ function SubjectContentPanel({
                   </label>
                   <p className="subject-help-text">
                     {language === "mn"
-                      ? "Компьютер дээр бэлдсэн хичээлийн файлуудаа сонгоно."
-                      : "Upload prepared lesson files from your computer."}
+                      ? "Компьютер дээр бэлдсэн хичээлийн файл эсвэл video сонгоно."
+                      : "Upload prepared lesson files or videos from your computer."}
                   </p>
                 </CardContent>
               </Card>
@@ -1695,6 +1805,49 @@ function SubjectContentPanel({
                   </form>
                 </CardContent>
               </Card>
+
+              <Card className="subject-video-card">
+                <CardHeader>
+                  <CardTitle>{language === "mn" ? "Видео хичээл нэмэх" : "Add video lesson"}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form className="subject-inline-form subject-lesson-form" onSubmit={addVideoLesson}>
+                    <Input onChange={(event) => setVideoForm((current) => ({ ...current, title: event.target.value }))} placeholder={language === "mn" ? "Видео хичээлийн нэр" : "Video lesson title"} required value={videoForm.title} />
+                    <select className="ec-input" onChange={(event) => setVideoForm((current) => ({ ...current, topicId: event.target.value }))} value={selectedVideoTopicId}>
+                      {currentContent.topics.length > 0 ? (
+                        currentContent.topics.map((topic) => (
+                          <option key={topic.id} value={topic.id}>
+                            {translateValue(topic.title, language)}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">{language === "mn" ? "Ерөнхий сэдэв" : "General topic"}</option>
+                      )}
+                    </select>
+                    <Input onChange={(event) => setVideoForm((current) => ({ ...current, duration: event.target.value }))} placeholder={language === "mn" ? "Үргэлжлэх хугацаа" : "Duration"} value={videoForm.duration} />
+                    <Input onChange={(event) => setVideoForm((current) => ({ ...current, videoUrl: event.target.value }))} placeholder={language === "mn" ? "YouTube, Vimeo эсвэл MP4 холбоос" : "YouTube, Vimeo, or MP4 link"} type="url" value={videoForm.videoUrl} />
+                    <label className="subject-video-file-import">
+                      <FileUp size={18} />
+                      <span>
+                        {videoFile?.name ?? (language === "mn" ? "Видео файл сонгох" : "Choose video file")}
+                      </span>
+                      <input
+                        accept=".mp4,.webm,.ogg,.mov,.m4v,video/mp4,video/webm,video/ogg,video/quicktime"
+                        onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)}
+                        ref={videoFileInputRef}
+                        type="file"
+                      />
+                    </label>
+                    <p className="subject-video-choice">
+                      {language === "mn" ? "URL оруулах эсвэл компьютерээсээ video file сонгоно." : "Add a URL or choose a video file from your computer."}
+                    </p>
+                    <Button disabled={saving} type="submit">
+                      <Video size={16} />
+                      {language === "mn" ? "Видео нэмэх" : "Add video"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
             </div>
           ) : null}
 
@@ -1730,6 +1883,9 @@ function SubjectContentPanel({
                   {currentContent.lessons.length > 0 ? (
                     currentContent.lessons.map((lesson) => {
                       const topic = currentContent.topics.find((item) => item.id === lesson.topicId);
+                      const lessonVideoUrl = lesson.videoUrl || (isVideoFile(lesson) ? lesson.fileUrl : "");
+                      const lessonVideoEmbedUrl = videoEmbedUrl(lessonVideoUrl);
+                      const showDirectVideo = Boolean(lessonVideoUrl && !lessonVideoEmbedUrl && (isVideoFile(lesson) || isDirectVideoUrl(lessonVideoUrl)));
 
                       return (
                         <article key={lesson.id}>
@@ -1738,6 +1894,25 @@ function SubjectContentPanel({
                             {topic?.title ? translateValue(topic.title, language) : lesson.topicId}
                             {lesson.duration ? ` - ${lesson.duration}` : ""}
                           </p>
+                          {lessonVideoUrl ? (
+                            <div className="subject-video-preview">
+                              {lessonVideoEmbedUrl ? (
+                                <iframe
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                  allowFullScreen
+                                  src={lessonVideoEmbedUrl}
+                                  title={lesson.title}
+                                />
+                              ) : showDirectVideo ? (
+                                <video controls preload="metadata" src={lessonVideoUrl} />
+                              ) : (
+                                <a className="subject-video-link" href={lessonVideoUrl} target="_blank" rel="noreferrer">
+                                  <Video size={15} />
+                                  <span>{language === "mn" ? "Видео нээх" : "Open video"}</span>
+                                </a>
+                              )}
+                            </div>
+                          ) : null}
                           {lesson.fileUrl ? (
                             <div className="subject-file-actions">
                               <a className="subject-file-link" href={lesson.fileUrl} target="_blank" rel="noreferrer">

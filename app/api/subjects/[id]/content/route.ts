@@ -84,10 +84,33 @@ function fileTopic(content: SubjectContent): { topics: SubjectTopic[]; topicId: 
       {
         id: "T-FILES",
         title: "Uploaded lesson files",
-        description: "Word, PowerPoint, PDF, and other prepared lesson materials"
+        description: "Word, PowerPoint, PDF, video, and other prepared lesson materials"
       }
     ],
     topicId: "T-FILES"
+  };
+}
+
+function stringFormValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function uploadTopic(content: SubjectContent, requestedTopicId: string): { topics: SubjectTopic[]; topicId: string } {
+  if (!requestedTopicId) return fileTopic(content);
+
+  const existingTopic = content.topics.find((topic) => topic.id === requestedTopicId);
+  if (existingTopic) return { topics: content.topics, topicId: existingTopic.id };
+
+  return {
+    topics: [
+      ...content.topics,
+      {
+        id: requestedTopicId,
+        title: "General topic"
+      }
+    ],
+    topicId: requestedTopicId
   };
 }
 
@@ -96,13 +119,16 @@ async function uploadFiles(req: NextRequest, subjectId: string) {
   const files = formData
     .getAll("files")
     .filter((value): value is File => value instanceof File && value.size > 0);
+  const requestedTitle = stringFormValue(formData, "title");
+  const requestedTopicId = stringFormValue(formData, "topicId");
+  const requestedDuration = stringFormValue(formData, "duration");
 
   if (files.length === 0) {
     throw new Error("No files were uploaded");
   }
 
   const content = await readSubjectContent(subjectId);
-  const { topics, topicId } = fileTopic(content);
+  const { topics, topicId } = uploadTopic(content, requestedTopicId);
   const filesDir = subjectFilesDir(subjectId);
 
   await mkdir(filesDir, { recursive: true });
@@ -117,8 +143,9 @@ async function uploadFiles(req: NextRequest, subjectId: string) {
 
     uploadedLessons.push({
       id: `L-FILE-${Date.now()}-${index + 1}`,
-      title: lessonTitleFromFile(file.name),
+      title: requestedTitle && files.length === 1 ? requestedTitle : lessonTitleFromFile(file.name),
       topicId,
+      duration: requestedDuration || undefined,
       fileName: file.name,
       fileUrl: publicSubjectFileUrl(subjectId, storedFileName),
       fileType: file.type || path.extname(file.name).replace(".", "").toUpperCase(),
