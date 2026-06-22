@@ -1,7 +1,9 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -9,9 +11,10 @@ import {
   BookOpen,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Download,
   FileUp,
-  GraduationCap,
   House,
   LogOut,
   Menu,
@@ -527,6 +530,296 @@ function StatusDropdown({
   );
 }
 
+function TopicDropdown({
+  onChange,
+  options,
+  placeholder,
+  value
+}: {
+  onChange: (value: string) => void;
+  options: { id: string; label: string }[];
+  placeholder: string;
+  value: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedOption = options.find((option) => option.id === value);
+
+  return (
+    <div
+      className={`ec-select-field${open ? " open" : ""}`}
+      onBlur={(event) => {
+        const nextTarget = event.relatedTarget;
+        if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+          setOpen(false);
+        }
+      }}
+    >
+      <button
+        aria-expanded={open}
+        className={`ec-input ec-select-trigger${selectedOption ? " selected" : ""}`}
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <span>{selectedOption ? selectedOption.label : placeholder}</span>
+        <ChevronDown aria-hidden="true" size={18} />
+      </button>
+      {open ? (
+        <div className="ec-select-menu" role="listbox">
+          {options.map((option) => {
+            const selected = option.id === value;
+
+            return (
+              <button
+                aria-selected={selected}
+                className={selected ? "selected" : ""}
+                key={option.id}
+                onClick={() => {
+                  onChange(option.id);
+                  setOpen(false);
+                }}
+                role="option"
+                type="button"
+              >
+                <span>{option.label}</span>
+                {selected ? <Check aria-hidden="true" size={16} /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AssignmentTypeDropdown({
+  language,
+  onChange,
+  value
+}: {
+  language: Language;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const options = [
+    { value: "Homework", labelEn: "Homework", labelMn: "Гэрийн даалгавар" },
+    { value: "Quiz", labelEn: "Quiz", labelMn: "Тест" },
+    { value: "Project", labelEn: "Project", labelMn: "Төсөл" },
+    { value: "Exam", labelEn: "Exam", labelMn: "Шалгалт" }
+  ];
+  const selected = options.find((option) => option.value === value);
+  const selectedLabel = selected ? (language === "mn" ? selected.labelMn : selected.labelEn) : "";
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: rect.width,
+      zIndex: 9999
+    });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(event: MouseEvent) {
+      if (triggerRef.current && !triggerRef.current.closest(".assignment-type-field")?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const menu = open ? createPortal(
+    <div className="ec-select-menu" role="listbox" style={menuStyle}>
+      {options.map((option) => {
+        const isSelected = option.value === value;
+        return (
+          <button
+            aria-selected={isSelected}
+            className={isSelected ? "selected" : ""}
+            key={option.value}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              onChange(option.value);
+              setOpen(false);
+            }}
+            role="option"
+            type="button"
+          >
+            <span>{language === "mn" ? option.labelMn : option.labelEn}</span>
+            {isSelected ? <Check aria-hidden="true" size={16} /> : null}
+          </button>
+        );
+      })}
+    </div>,
+    document.body
+  ) : null;
+
+  return (
+    <div className={`ec-select-field assignment-type-field${open ? " open" : ""}`}>
+      <button
+        aria-expanded={open}
+        className={`ec-input ec-select-trigger${value ? " selected" : ""}`}
+        onMouseDown={() => setOpen((current) => !current)}
+        ref={triggerRef}
+        type="button"
+      >
+        <span>{selectedLabel}</span>
+        <ChevronDown aria-hidden="true" size={18} />
+      </button>
+      {menu}
+    </div>
+  );
+}
+
+function DatePicker({
+  value,
+  onChange,
+  placeholder,
+  darkMode
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  darkMode?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(() => value ? parseInt(value.split("-")[0]) : new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => value ? parseInt(value.split("-")[1]) - 1 : new Date().getMonth());
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const DAYS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const popupHeight = 320;
+    setMenuStyle({
+      position: "fixed",
+      left: rect.left,
+      width: Math.max(rect.width, 280),
+      zIndex: 9999,
+      ...(spaceBelow >= popupHeight
+        ? { top: rect.bottom + 6 }
+        : { bottom: window.innerHeight - rect.top + 6 })
+    });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      const target = e.target as Node;
+      const clickedInsideTrigger = triggerRef.current?.closest(".ec-datepicker")?.contains(target);
+      const clickedInsidePopup = (target as HTMLElement).closest?.(".ec-datepicker-popup");
+      if (!clickedInsideTrigger && !clickedInsidePopup) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  function getDaysInMonth(year: number, month: number) {
+    return new Date(year, month + 1, 0).getDate();
+  }
+
+  function getFirstDayOfMonth(year: number, month: number) {
+    return new Date(year, month, 1).getDay();
+  }
+
+  function selectDate(day: number) {
+    const mm = String(viewMonth + 1).padStart(2, "0");
+    const dd = String(day).padStart(2, "0");
+    onChange(`${viewYear}-${mm}-${dd}`);
+    setOpen(false);
+  }
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  }
+
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  }
+
+  const daysInMonth = getDaysInMonth(viewYear, viewMonth);
+  const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
+  const selectedDay = value ? parseInt(value.split("-")[2]) : null;
+  const selectedMonth = value ? parseInt(value.split("-")[1]) - 1 : null;
+  const selectedYear = value ? parseInt(value.split("-")[0]) : null;
+  const today = new Date();
+
+  const displayValue = value
+    ? new Date(value + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+    : "";
+
+  const popup = open ? createPortal(
+    <div className={`ec-datepicker-popup${darkMode ? " dark" : ""}`} style={menuStyle}>
+      <div className="ec-datepicker-header">
+        <button type="button" onClick={prevMonth}><ChevronLeft size={16} /></button>
+        <span>{MONTHS[viewMonth]} {viewYear}</span>
+        <button type="button" onClick={nextMonth}><ChevronRight size={16} /></button>
+      </div>
+      <div className="ec-datepicker-grid">
+        {DAYS.map(d => <span key={d} className="ec-datepicker-dayname">{d}</span>)}
+        {Array.from({ length: firstDay }).map((_, i) => <span key={`e-${i}`} />)}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1;
+          const isSelected = day === selectedDay && viewMonth === selectedMonth && viewYear === selectedYear;
+          const isToday = day === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
+          return (
+            <button
+              key={day}
+              type="button"
+              className={`ec-datepicker-day${isSelected ? " selected" : ""}${isToday && !isSelected ? " today" : ""}`}
+              onClick={() => selectDate(day)}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
+  return (
+    <div className="ec-datepicker">
+      <button
+        ref={triggerRef}
+        type="button"
+        className={`ec-input ec-datepicker-trigger${value ? " has-value" : ""}`}
+        onClick={() => {
+          if (value) {
+            setViewYear(parseInt(value.split("-")[0]));
+            setViewMonth(parseInt(value.split("-")[1]) - 1);
+          }
+          setOpen(o => !o);
+        }}
+      >
+        <span>{displayValue || placeholder || "Select date"}</span>
+        {value && (
+          <span className="ec-datepicker-clear" onMouseDown={e => { e.stopPropagation(); onChange(""); setOpen(false); }}>
+            <X size={14} />
+          </span>
+        )}
+      </button>
+      {popup}
+    </div>
+  );
+}
+
 function AppShell() {
   const router = useRouter();
   const [activeModule, setActiveModule] = useState<NavModule>("dashboard");
@@ -840,7 +1133,7 @@ function AppShell() {
     return (
       <main className={`educore-shell auth-check${darkMode ? " dark" : ""}`}>
         <div className="auth-loading">
-          <GraduationCap size={24} />
+          <Image src="/download.png" alt="Nova Mind Academy" width={559} height={534} priority />
           <strong>{copy.app.loadingSession}</strong>
         </div>
       </main>
@@ -852,12 +1145,12 @@ function AppShell() {
       <button className={`ec-backdrop${mobileOpen ? " show" : ""}`} onClick={() => setMobileOpen(false)} type="button" />
       <aside className={`ec-sidebar${mobileOpen ? " open" : ""}`}>
         <div className="ec-brand">
-          <span>
-            <GraduationCap size={24} />
+          <span className="ec-brand-logo">
+            <Image src="/download.png" alt="Nova Mind Academy" width={559} height={534} priority style={{ mixBlendMode: "multiply" }} />
           </span>
           <div>
-            <strong>EduCore</strong>
-            <p>{copy.app.brandSubtitle}</p>
+            <strong>Nova Mind</strong>
+            <p>Academy</p>
           </div>
         </div>
         <nav>
@@ -882,13 +1175,13 @@ function AppShell() {
       </aside>
 
       <section className="ec-main">
-        <header className={`ec-topbar${activeModule === "settings" ? " settings-topbar" : ""}${notificationPageOpen ? " notifications-topbar" : ""}`}>
+        <header className={`ec-topbar${activeModule === "settings" ? " settings-topbar" : ""}${notificationPageOpen ? " notifications-topbar" : ""}`} style={activeModule === "subjects" && selectedSubjectContent ? { display: "none" } : undefined}>
           <button className="ec-icon-button mobile-only" onClick={() => setMobileOpen(true)} type="button">
             <Menu size={20} />
           </button>
           <label className="ec-search">
             <Search size={18} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={copy.app.searchPlaceholder} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={language === "mn" ? "Хайх" : "Search"} />
           </label>
           <div className={`language-segment${activeModule === "settings" ? " hide-on-settings-mobile" : ""}`} aria-label={copy.common.language}>
             {languages.map((item) => (
@@ -936,14 +1229,14 @@ function AppShell() {
           />
         ) : (
           <>
-            <motion.section className="ec-hero" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+            <motion.section className="ec-hero" data-module={activeModule} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} style={activeModule === "subjects" && selectedSubjectContent ? { display: "none" } : undefined}>
               <div>
-                <p>{copy.nav[activeNav.id].description}</p>
+                <p className="mobile-hidden">{copy.nav[activeNav.id].description}</p>
                 <h1>{activeModule === "dashboard" ? dashboard.title : copy.nav[activeNav.id].label}</h1>
-                <span>{activeModule === "dashboard" ? dashboard.subtitle : (copy.moduleSubtitle as Partial<Record<NavModule, string>>)[activeModule] ?? copy.app.defaultModuleSubtitle}</span>
+                <span className="mobile-hidden">{activeModule === "dashboard" ? dashboard.subtitle : (copy.moduleSubtitle as Partial<Record<NavModule, string>>)[activeModule] ?? copy.app.defaultModuleSubtitle}</span>
               </div>
               {activeModule !== "settings" && canManageActiveModule ? (
-                <Button onClick={openCreateModal} type="button">
+                <Button className="mobile-hidden" onClick={openCreateModal} type="button">
                   <Plus size={17} />
                   {createCopy.action}
                 </Button>
@@ -961,6 +1254,7 @@ function AppShell() {
               selectedSubjectContent ? (
                 <SubjectContentPanel
                   canManage={role === "admin" || role === "teacher"}
+                  darkMode={darkMode}
                   language={language}
                   subject={selectedSubjectContent}
                   onBack={() => setSelectedSubjectContent(null)}
@@ -1353,12 +1647,14 @@ function SubjectsModule({
 
 function SubjectContentPanel({
   canManage,
+  darkMode,
   language,
   subject,
   onBack,
   onSaved
 }: {
   canManage: boolean;
+  darkMode: boolean;
   language: Language;
   subject: Exclude<SubjectContentTarget, null>;
   onBack: () => void;
@@ -1368,10 +1664,13 @@ function SubjectContentPanel({
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [activeView, setActiveView] = useState<"overview" | "topics" | "lessons" | "videos" | "assignments">("overview");
   const [topicForm, setTopicForm] = useState({ title: "", description: "" });
   const [lessonForm, setLessonForm] = useState({ title: "", topicId: "", duration: "", objectives: "" });
   const [videoForm, setVideoForm] = useState({ title: "", topicId: "", duration: "", videoUrl: "" });
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [assignmentForm, setAssignmentForm] = useState({ title: "", dueDate: "", maxScore: "", type: "Homework", instructions: "" });
+  const [activeEditorTab, setActiveEditorTab] = useState<"file" | "topic" | "lesson" | "video" | "assignment" | null>(null);
   const videoFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const currentContent = content ?? emptySubjectContent(subject.id);
@@ -1692,15 +1991,52 @@ function SubjectContentPanel({
     setVideoForm({ title: "", topicId, duration: "", videoUrl: "" });
   }
 
+  async function addAssignment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const title = assignmentForm.title.trim();
+    if (!title) return;
+
+    const assignment = {
+      id: `A-${Date.now()}`,
+      title,
+      dueDate: assignmentForm.dueDate.trim() || undefined,
+      maxScore: assignmentForm.maxScore.trim() ? Number(assignmentForm.maxScore.trim()) : undefined,
+      type: assignmentForm.type.trim() || undefined,
+      instructions: assignmentForm.instructions.trim() || undefined
+    };
+    const nextContent = {
+      ...currentContent,
+      assignments: [...currentContent.assignments, assignment]
+    };
+
+    await persistContent(nextContent, title);
+    setAssignmentForm({ title: "", dueDate: "", maxScore: "", type: "Homework", instructions: "" });
+  }
+
   return (
     <section className="subject-content-panel">
       <div className="subject-content-header">
-        <button className="subject-back-button" onClick={onBack} type="button">
+        <button
+          className="subject-back-button"
+          onClick={() => (activeView === "overview" ? onBack() : setActiveView("overview"))}
+          type="button"
+        >
           <ArrowLeft size={17} />
           {language === "mn" ? "Буцах" : "Back"}
         </button>
         <div>
-          <p>{language === "mn" ? "Хичээлийн агуулга" : "Subject content"}</p>
+          <p>
+            {activeView === "overview"
+              ? language === "mn" ? "Хичээлийн агуулга" : "Subject content"
+              : activeView === "topics"
+              ? language === "mn" ? "Сэдвүүд" : "Topics"
+              : activeView === "lessons"
+              ? language === "mn" ? "Хичээлүүд" : "Lessons"
+              : activeView === "videos"
+              ? language === "mn" ? "Видео хичээлүүд" : "Video lessons"
+              : language === "mn" ? "Даалгаврууд" : "Assignments"}
+          </p>
           <h2>{translateValue(subject.name, language)}</h2>
         </div>
       </div>
@@ -1716,57 +2052,82 @@ function SubjectContentPanel({
       ) : (
         <>
           <div className="subject-content-stats">
-            <span>
+            <button className="subject-stat-button" onClick={() => setActiveView("topics")} type="button">
               <strong>{currentContent.topics.length}</strong>
               {language === "mn" ? "Сэдэв" : "Topics"}
-            </span>
-            <span>
+            </button>
+            <button className="subject-stat-button" onClick={() => setActiveView("lessons")} type="button">
               <strong>{currentContent.lessons.length}</strong>
               {language === "mn" ? "Хичээл" : "Lessons"}
-            </span>
-            <span>
+            </button>
+            <button className="subject-stat-button" onClick={() => setActiveView("videos")} type="button">
               <strong>{videoLessonCount}</strong>
               {language === "mn" ? "Видео" : "Videos"}
-            </span>
-            <span>
+            </button>
+            <button className="subject-stat-button" onClick={() => setActiveView("assignments")} type="button">
               <strong>{currentContent.assignments.length}</strong>
               {language === "mn" ? "Даалгавар" : "Assignments"}
-            </span>
+            </button>
           </div>
 
-          {canManage ? (
-            <div className="subject-editor-grid">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{language === "mn" ? "Файлаас нэмэх" : "Add from file"}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <label className="subject-file-import">
-                    <FileUp size={20} />
-                    <span>{language === "mn" ? "Файл сонгох" : "Choose files"}</span>
-                    <input
-                      accept=".doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx,.txt,.rtf,.mp4,.webm,.ogg,.mov,.m4v,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf,video/mp4,video/webm,video/ogg,video/quicktime"
-                      multiple
-                      onChange={(event) => {
-                        uploadLessonFiles(event.target.files);
-                        event.currentTarget.value = "";
-                      }}
-                      type="file"
-                    />
-                  </label>
-                  <p className="subject-help-text">
-                    {language === "mn"
-                      ? "Компьютер дээр бэлдсэн хичээлийн файл эсвэл video сонгоно."
-                      : "Upload prepared lesson files or videos from your computer."}
-                  </p>
-                </CardContent>
-              </Card>
+          {canManage && activeView === "overview" ? (
+  <div className="subject-accordion">
+    {(
+      [
+        { id: "file", icon: <FileUp size={18} />, labelEn: "Add from file", labelMn: "Файлаас нэмэх" },
+        { id: "topic", icon: <BookOpen size={18} />, labelEn: "Add topic", labelMn: "Сэдэв нэмэх" },
+        { id: "lesson", icon: <Plus size={18} />, labelEn: "Add lesson", labelMn: "Хичээл нэмэх" },
+        { id: "video", icon: <Video size={18} />, labelEn: "Add video lesson", labelMn: "Видео хичээл нэмэх" },
+        { id: "assignment", icon: <Plus size={18} />, labelEn: "Add assignment", labelMn: "Даалгавар нэмэх" },
+      ] as const
+    ).map((item) => {
+      const isOpen = activeEditorTab === item.id;
+      return (
+        <div className={`subject-accordion-item${isOpen ? " open" : ""}`} key={item.id}>
+          <button
+            className="subject-accordion-trigger"
+            onClick={() => setActiveEditorTab(isOpen ? null : item.id)}
+            type="button"
+            aria-expanded={isOpen}
+          >
+            <span className="subject-accordion-icon">{item.icon}</span>
+            <span>{language === "mn" ? item.labelMn : item.labelEn}</span>
+            <ChevronDown size={18} className={`subject-accordion-chevron${isOpen ? " rotated" : ""}`} />
+          </button>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>{language === "mn" ? "Сэдэв нэмэх" : "Add topic"}</CardTitle>
-                </CardHeader>
-                <CardContent>
+          {isOpen && (
+            <motion.div
+              className="subject-accordion-panel"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              <div className="subject-accordion-content">
+
+                {item.id === "file" && (
+                  <>
+                    <label className="subject-file-import">
+                      <FileUp size={20} />
+                      <span>{language === "mn" ? "Файл сонгох" : "Choose files"}</span>
+                      <input
+                        accept=".doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx,.txt,.rtf,.mp4,.webm,.ogg,.mov,.m4v,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf,video/mp4,video/webm,video/ogg,video/quicktime"
+                        multiple
+                        onChange={(event) => {
+                          uploadLessonFiles(event.target.files);
+                          event.currentTarget.value = "";
+                        }}
+                        type="file"
+                      />
+                    </label>
+                    <p className="subject-help-text">
+                      {language === "mn"
+                        ? "Компьютер дээр бэлдсэн хичээлийн файл эсвэл video сонгоно."
+                        : "Upload prepared lesson files or videos from your computer."}
+                    </p>
+                  </>
+                )}
+
+                {item.id === "topic" && (
                   <form className="subject-inline-form" onSubmit={addTopic}>
                     <Input onChange={(event) => setTopicForm((current) => ({ ...current, title: event.target.value }))} placeholder={language === "mn" ? "Сэдвийн нэр" : "Topic title"} required value={topicForm.title} />
                     <Input onChange={(event) => setTopicForm((current) => ({ ...current, description: event.target.value }))} placeholder={language === "mn" ? "Тайлбар" : "Description"} value={topicForm.description} />
@@ -1775,27 +2136,17 @@ function SubjectContentPanel({
                       {language === "mn" ? "Сэдэв нэмэх" : "Add topic"}
                     </Button>
                   </form>
-                </CardContent>
-              </Card>
+                )}
 
-              <Card className="subject-lesson-card">
-                <CardHeader>
-                  <CardTitle>{language === "mn" ? "Хичээл нэмэх" : "Add lesson"}</CardTitle>
-                </CardHeader>
-                <CardContent>
+                {item.id === "lesson" && (
                   <form className="subject-inline-form subject-lesson-form" onSubmit={addLesson}>
                     <Input onChange={(event) => setLessonForm((current) => ({ ...current, title: event.target.value }))} placeholder={language === "mn" ? "Хичээлийн нэр" : "Lesson title"} required value={lessonForm.title} />
-                    <select className="ec-input" onChange={(event) => setLessonForm((current) => ({ ...current, topicId: event.target.value }))} value={selectedTopicId}>
-                      {currentContent.topics.length > 0 ? (
-                        currentContent.topics.map((topic) => (
-                          <option key={topic.id} value={topic.id}>
-                            {translateValue(topic.title, language)}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="">{language === "mn" ? "Ерөнхий сэдэв" : "General topic"}</option>
-                      )}
-                    </select>
+                    <TopicDropdown
+                      onChange={(topicId) => setLessonForm((current) => ({ ...current, topicId }))}
+                      options={currentContent.topics.map((topic) => ({ id: topic.id, label: translateValue(topic.title, language) }))}
+                      placeholder={language === "mn" ? "Ерөнхий сэдэв" : "General topic"}
+                      value={selectedTopicId}
+                    />
                     <Input onChange={(event) => setLessonForm((current) => ({ ...current, duration: event.target.value }))} placeholder={language === "mn" ? "Үргэлжлэх хугацаа" : "Duration"} value={lessonForm.duration} />
                     <Input onChange={(event) => setLessonForm((current) => ({ ...current, objectives: event.target.value }))} placeholder={language === "mn" ? "Зорилго, таслалаар" : "Objectives, comma-separated"} value={lessonForm.objectives} />
                     <Button disabled={saving} type="submit">
@@ -1803,34 +2154,22 @@ function SubjectContentPanel({
                       {language === "mn" ? "Хичээл нэмэх" : "Add lesson"}
                     </Button>
                   </form>
-                </CardContent>
-              </Card>
+                )}
 
-              <Card className="subject-video-card">
-                <CardHeader>
-                  <CardTitle>{language === "mn" ? "Видео хичээл нэмэх" : "Add video lesson"}</CardTitle>
-                </CardHeader>
-                <CardContent>
+                {item.id === "video" && (
                   <form className="subject-inline-form subject-lesson-form" onSubmit={addVideoLesson}>
                     <Input onChange={(event) => setVideoForm((current) => ({ ...current, title: event.target.value }))} placeholder={language === "mn" ? "Видео хичээлийн нэр" : "Video lesson title"} required value={videoForm.title} />
-                    <select className="ec-input" onChange={(event) => setVideoForm((current) => ({ ...current, topicId: event.target.value }))} value={selectedVideoTopicId}>
-                      {currentContent.topics.length > 0 ? (
-                        currentContent.topics.map((topic) => (
-                          <option key={topic.id} value={topic.id}>
-                            {translateValue(topic.title, language)}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="">{language === "mn" ? "Ерөнхий сэдэв" : "General topic"}</option>
-                      )}
-                    </select>
+                    <TopicDropdown
+                      onChange={(topicId) => setVideoForm((current) => ({ ...current, topicId }))}
+                      options={currentContent.topics.map((topic) => ({ id: topic.id, label: translateValue(topic.title, language) }))}
+                      placeholder={language === "mn" ? "Ерөнхий сэдэв" : "General topic"}
+                      value={selectedVideoTopicId}
+                    />
                     <Input onChange={(event) => setVideoForm((current) => ({ ...current, duration: event.target.value }))} placeholder={language === "mn" ? "Үргэлжлэх хугацаа" : "Duration"} value={videoForm.duration} />
-                    <Input onChange={(event) => setVideoForm((current) => ({ ...current, videoUrl: event.target.value }))} placeholder={language === "mn" ? "YouTube, Vimeo эсвэл MP4 холбоос" : "YouTube, Vimeo, or MP4 link"} type="url" value={videoForm.videoUrl} />
+                    <Input onChange={(event) => setVideoForm((current) => ({ ...current, videoUrl: event.target.value }))} placeholder={language === "mn" ? "Видео холбоос оруулах" : "Enter video URL"} type="text" value={videoForm.videoUrl} />
                     <label className="subject-video-file-import">
                       <FileUp size={18} />
-                      <span>
-                        {videoFile?.name ?? (language === "mn" ? "Видео файл сонгох" : "Choose video file")}
-                      </span>
+                      <span>{videoFile?.name ?? (language === "mn" ? "Видео файл сонгох" : "Choose video file")}</span>
                       <input
                         accept=".mp4,.webm,.ogg,.mov,.m4v,video/mp4,video/webm,video/ogg,video/quicktime"
                         onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)}
@@ -1838,111 +2177,255 @@ function SubjectContentPanel({
                         type="file"
                       />
                     </label>
-                    <p className="subject-video-choice">
-                      {language === "mn" ? "URL оруулах эсвэл компьютерээсээ video file сонгоно." : "Add a URL or choose a video file from your computer."}
-                    </p>
                     <Button disabled={saving} type="submit">
                       <Video size={16} />
                       {language === "mn" ? "Видео нэмэх" : "Add video"}
                     </Button>
                   </form>
+                )}
+
+                {item.id === "assignment" && (
+                  <form className="subject-inline-form subject-lesson-form" onSubmit={addAssignment}>
+                    <Input onChange={(event) => setAssignmentForm((current) => ({ ...current, title: event.target.value }))} placeholder={language === "mn" ? "Даалгаврын нэр" : "Assignment title"} required value={assignmentForm.title} />
+                    <DatePicker
+                      darkMode={darkMode}
+                      onChange={(val) => setAssignmentForm((current) => ({ ...current, dueDate: val }))}
+                      placeholder={language === "mn" ? "Дуусах огноо" : "Due date"}
+                      value={assignmentForm.dueDate}
+                    />
+                    <Input onChange={(event) => setAssignmentForm((current) => ({ ...current, maxScore: event.target.value }))} placeholder={language === "mn" ? "Дээд оноо" : "Max score"} type="number" value={assignmentForm.maxScore} />
+                    <AssignmentTypeDropdown
+                      language={language}
+                      onChange={(type) => setAssignmentForm((current) => ({ ...current, type }))}
+                      value={assignmentForm.type}
+                    />
+                    <Input onChange={(event) => setAssignmentForm((current) => ({ ...current, instructions: event.target.value }))} placeholder={language === "mn" ? "Зааварчилгаа" : "Instructions"} value={assignmentForm.instructions} />
+                    <Button disabled={saving} type="submit">
+                      <Plus size={16} />
+                      {language === "mn" ? "Даалгавар нэмэх" : "Add assignment"}
+                    </Button>
+                  </form>
+                )}
+
+              </div>
+            </motion.div>
+          )}
+        </div>
+      );
+    })}
+  </div>
+) : null}
+          {message ? <p className="subject-content-message">{message}</p> : null}
+
+          {activeView === "topics" ? (
+            <div className="subject-content-grid">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{language === "mn" ? "Сэдвүүд" : "Topics"}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="subject-list">
+                    {currentContent.topics.length > 0 ? (
+                      currentContent.topics.map((topic) => (
+                        <article key={topic.id}>
+                          <strong>{translateValue(topic.title, language)}</strong>
+                          {topic.description ? <p>{translateValue(topic.description, language)}</p> : null}
+                        </article>
+                      ))
+                    ) : (
+                      <p className="subject-help-text">{language === "mn" ? "Сэдэв нэмэгдээгүй байна." : "No topics yet."}</p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
           ) : null}
 
-          {message ? <p className="subject-content-message">{message}</p> : null}
+          {activeView === "lessons" ? (
+            <div className="subject-content-grid">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{language === "mn" ? "Хичээлүүд" : "Lessons"}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="subject-list subject-lesson-carousel">
+                    {currentContent.lessons.length > 0 ? (
+                      currentContent.lessons.map((lesson) => {
+                        const topic = currentContent.topics.find((item) => item.id === lesson.topicId);
 
-          <div className="subject-content-grid">
-            <Card>
-              <CardHeader>
-                <CardTitle>{language === "mn" ? "Сэдвүүд" : "Topics"}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="subject-list">
-                  {currentContent.topics.length > 0 ? (
-                    currentContent.topics.map((topic) => (
-                      <article key={topic.id}>
-                        <strong>{translateValue(topic.title, language)}</strong>
-                        {topic.description ? <p>{translateValue(topic.description, language)}</p> : null}
-                      </article>
-                    ))
-                  ) : (
-                    <p className="subject-help-text">{language === "mn" ? "Сэдэв нэмэгдээгүй байна." : "No topics yet."}</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>{language === "mn" ? "Хичээлүүд" : "Lessons"}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="subject-list">
-                  {currentContent.lessons.length > 0 ? (
-                    currentContent.lessons.map((lesson) => {
-                      const topic = currentContent.topics.find((item) => item.id === lesson.topicId);
-                      const lessonVideoUrl = lesson.videoUrl || (isVideoFile(lesson) ? lesson.fileUrl : "");
-                      const lessonVideoEmbedUrl = videoEmbedUrl(lessonVideoUrl);
-                      const showDirectVideo = Boolean(lessonVideoUrl && !lessonVideoEmbedUrl && (isVideoFile(lesson) || isDirectVideoUrl(lessonVideoUrl)));
-
-                      return (
-                        <article key={lesson.id}>
-                          <strong>{lesson.title}</strong>
-                          <p>
-                            {topic?.title ? translateValue(topic.title, language) : lesson.topicId}
-                            {lesson.duration ? ` - ${lesson.duration}` : ""}
-                          </p>
-                          {lessonVideoUrl ? (
-                            <div className="subject-video-preview">
-                              {lessonVideoEmbedUrl ? (
-                                <iframe
-                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                  allowFullScreen
-                                  src={lessonVideoEmbedUrl}
-                                  title={lesson.title}
-                                />
-                              ) : showDirectVideo ? (
-                                <video controls preload="metadata" src={lessonVideoUrl} />
-                              ) : (
-                                <a className="subject-video-link" href={lessonVideoUrl} target="_blank" rel="noreferrer">
-                                  <Video size={15} />
-                                  <span>{language === "mn" ? "Видео нээх" : "Open video"}</span>
+                        return (
+                          <article key={lesson.id}>
+                            <strong>{lesson.title}</strong>
+                            <p>
+                              {topic?.title ? translateValue(topic.title, language) : lesson.topicId}
+                              {lesson.duration ? ` - ${lesson.duration}` : ""}
+                            </p>
+                            {lesson.fileUrl ? (
+                              <div className="subject-file-actions">
+                                <a className="subject-file-link" href={lesson.fileUrl} target="_blank" rel="noreferrer">
+                                  <Download size={15} />
+                                  <span>{lesson.fileName ?? (language === "mn" ? "Файл нээх" : "Open file")}</span>
+                                  {lesson.fileSize ? <small>{formatFileSize(lesson.fileSize)}</small> : null}
                                 </a>
-                              )}
-                            </div>
+                                <button className="subject-file-print" onClick={() => printLessonFile(lesson, topic?.title ? translateValue(topic.title, language) : lesson.topicId)} type="button">
+                                  <Printer size={15} />
+                                  <span>{language === "mn" ? "PDF-р хэвлэх" : "Print PDF"}</span>
+                                </button>
+                              </div>
+                            ) : null}
+                            {lesson.objectives?.length ? (
+                              <ul>
+                                {lesson.objectives.map((objective) => (
+                                  <li key={objective}>{objective}</li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </article>
+                        );
+                      })
+                    ) : (
+                      <p className="subject-help-text">{language === "mn" ? "Хичээл нэмэгдээгүй байна." : "No lessons yet."}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {videoLessonCount > 0 ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{language === "mn" ? "Видео хичээлүүд" : "Video lessons"}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="subject-list subject-video-list subject-video-carousel">
+                      {currentContent.lessons
+                        .filter((lesson) => lesson.videoUrl || isVideoFile(lesson))
+                        .map((lesson) => {
+                          const topic = currentContent.topics.find((item) => item.id === lesson.topicId);
+                          const lessonVideoUrl = lesson.videoUrl || (isVideoFile(lesson) ? lesson.fileUrl : "");
+                          const lessonVideoEmbedUrl = videoEmbedUrl(lessonVideoUrl);
+                          const showDirectVideo = Boolean(lessonVideoUrl && !lessonVideoEmbedUrl && (isVideoFile(lesson) || isDirectVideoUrl(lessonVideoUrl)));
+
+                          return (
+                            <article key={lesson.id}>
+                              <strong>{lesson.title}</strong>
+                              <p>
+                                {topic?.title ? translateValue(topic.title, language) : lesson.topicId}
+                                {lesson.duration ? ` - ${lesson.duration}` : ""}
+                              </p>
+                              <div className="subject-video-preview">
+                                {lessonVideoEmbedUrl ? (
+                                  <iframe
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allowFullScreen
+                                    src={lessonVideoEmbedUrl}
+                                    title={lesson.title}
+                                  />
+                                ) : showDirectVideo ? (
+                                  <video controls preload="metadata" src={lessonVideoUrl} />
+                                ) : (
+                                  <a className="subject-video-link" href={lessonVideoUrl} target="_blank" rel="noreferrer">
+                                    <Video size={15} />
+                                    <span>{language === "mn" ? "Видео нээх" : "Open video"}</span>
+                                  </a>
+                                )}
+                              </div>
+                            </article>
+                          );
+                        })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </div>
+          ) : null}
+
+          {activeView === "videos" ? (
+            <div className="subject-content-grid subject-videos-grid">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{language === "mn" ? "Видео хичээлүүд" : "Video lessons"}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="subject-list subject-video-list subject-video-carousel">
+                    {videoLessonCount > 0 ? (
+                      currentContent.lessons
+                        .filter((lesson) => lesson.videoUrl || isVideoFile(lesson))
+                        .map((lesson) => {
+                          const topic = currentContent.topics.find((item) => item.id === lesson.topicId);
+                          const lessonVideoUrl = lesson.videoUrl || (isVideoFile(lesson) ? lesson.fileUrl : "");
+                          const lessonVideoEmbedUrl = videoEmbedUrl(lessonVideoUrl);
+                          const showDirectVideo = Boolean(lessonVideoUrl && !lessonVideoEmbedUrl && (isVideoFile(lesson) || isDirectVideoUrl(lessonVideoUrl)));
+
+                          return (
+                            <article key={lesson.id}>
+                              <strong>{lesson.title}</strong>
+                              <p>
+                                {topic?.title ? translateValue(topic.title, language) : lesson.topicId}
+                                {lesson.duration ? ` - ${lesson.duration}` : ""}
+                              </p>
+                              {lessonVideoUrl ? (
+                                <div className="subject-video-preview">
+                                  {lessonVideoEmbedUrl ? (
+                                    <iframe
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                      allowFullScreen
+                                      src={lessonVideoEmbedUrl}
+                                      title={lesson.title}
+                                    />
+                                  ) : showDirectVideo ? (
+                                    <video controls preload="metadata" src={lessonVideoUrl} />
+                                  ) : (
+                                    <a className="subject-video-link" href={lessonVideoUrl} target="_blank" rel="noreferrer">
+                                      <Video size={15} />
+                                      <span>{language === "mn" ? "Видео нээх" : "Open video"}</span>
+                                    </a>
+                                  )}
+                                </div>
+                              ) : null}
+                            </article>
+                          );
+                        })
+                    ) : (
+                      <p className="subject-help-text">{language === "mn" ? "Видео хичээл нэмэгдээгүй байна." : "No video lessons yet."}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {activeView === "assignments" ? (
+            <div className="subject-content-grid">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{language === "mn" ? "Даалгаврууд" : "Assignments"}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="subject-list">
+                    {currentContent.assignments.length > 0 ? (
+                      currentContent.assignments.map((assignment: any, index: number) => (
+                        <article key={assignment.id ?? index}>
+                          <strong>{assignment.title ?? (language === "mn" ? "Гарчиггүй даалгавар" : "Untitled assignment")}</strong>
+                          {(assignment.type || assignment.dueDate || assignment.maxScore) ? (
+                            <p>
+                              {[
+                                assignment.type,
+                                assignment.dueDate ? (language === "mn" ? `Огноо: ${assignment.dueDate}` : `Due: ${assignment.dueDate}`) : null,
+                                assignment.maxScore ? (language === "mn" ? `Дээд оноо: ${assignment.maxScore}` : `Max score: ${assignment.maxScore}`) : null
+                              ].filter(Boolean).join(" · ")}
+                            </p>
                           ) : null}
-                          {lesson.fileUrl ? (
-                            <div className="subject-file-actions">
-                              <a className="subject-file-link" href={lesson.fileUrl} target="_blank" rel="noreferrer">
-                                <Download size={15} />
-                                <span>{lesson.fileName ?? (language === "mn" ? "Файл нээх" : "Open file")}</span>
-                                {lesson.fileSize ? <small>{formatFileSize(lesson.fileSize)}</small> : null}
-                              </a>
-                              <button className="subject-file-print" onClick={() => printLessonFile(lesson, topic?.title ? translateValue(topic.title, language) : lesson.topicId)} type="button">
-                                <Printer size={15} />
-                                <span>{language === "mn" ? "PDF-р хэвлэх" : "Print PDF"}</span>
-                              </button>
-                            </div>
-                          ) : null}
-                          {lesson.objectives?.length ? (
-                            <ul>
-                              {lesson.objectives.map((objective) => (
-                                <li key={objective}>{objective}</li>
-                              ))}
-                            </ul>
-                          ) : null}
+                          {assignment.instructions ? <p>{assignment.instructions}</p> : null}
                         </article>
-                      );
-                    })
-                  ) : (
-                    <p className="subject-help-text">{language === "mn" ? "Хичээл нэмэгдээгүй байна." : "No lessons yet."}</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                      ))
+                    ) : (
+                      <p className="subject-help-text">{language === "mn" ? "Даалгавар нэмэгдээгүй байна." : "No assignments yet."}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
         </>
       )}
     </section>

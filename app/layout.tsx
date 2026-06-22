@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "EduCore School Management",
-  description: "Premium full-stack school management system",
+  title: "Nova Mind Academy",
+  description: "School management system for Nova Mind Academy",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "EduCore",
+    title: "Nova Mind",
     statusBarStyle: "default"
   }
 };

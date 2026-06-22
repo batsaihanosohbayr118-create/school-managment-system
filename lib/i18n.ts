@@ -127,7 +127,7 @@ export const translations = {
         changeEmail: "Change email"
       },
       modes: {
-        login: { title: "Welcome back", subtitle: "Sign in to EduCore", button: "Login" },
+        login: { title: "Welcome back", subtitle: "Sign in to Nova Mind Academy", button: "Login" },
         register: { title: "Create account", subtitle: "Register a new school user", button: "Register" },
         forgot: { title: "Reset password", subtitle: "Receive a reset link by email", button: "Send reset link" }
       }
@@ -354,7 +354,7 @@ export const translations = {
         changeEmail: "Имэйл солих"
       },
       modes: {
-        login: { title: "Тавтай морил", subtitle: "EduCore-д нэвтрэх", button: "Нэвтрэх" },
+        login: { title: "Тавтай морил", subtitle: "Nova Mind Academy-д нэвтрэх", button: "Нэвтрэх" },
         register: { title: "Бүртгэл үүсгэх", subtitle: "Шинэ сургуулийн хэрэглэгч бүртгэх", button: "Бүртгүүлэх" },
         forgot: { title: "Нууц үг сэргээх", subtitle: "Имэйлээр сэргээх холбоос авах", button: "Сэргээх холбоос илгээх" }
       }

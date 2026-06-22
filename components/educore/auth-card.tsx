@@ -1,8 +1,9 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Check, ChevronDown, Eye, EyeOff, GraduationCap, KeyRound, LockKeyhole, Mail, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { Check, ChevronDown, Eye, EyeOff, KeyRound, LockKeyhole, Mail, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { authService, getAuthRedirectUrl, isSupabaseConfigured } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -114,12 +115,12 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
       <Card className="auth-card">
         <div className="auth-brand-row">
           <div className="auth-brand">
-            <span>
-              <GraduationCap size={24} />
+            <span className="auth-brand-logo">
+              <Image src="/download.png" alt="Nova Mind Academy" width={559} height={534} priority />
             </span>
             <div>
-              <strong>EduCore</strong>
-              <p>School OS</p>
+              <strong>Nova Mind</strong>
+              <p>Academy</p>
             </div>
           </div>
           <span className="auth-chip">
