@@ -2624,7 +2624,7 @@ a {
   .ec-hero[data-module="payments"]   { background: linear-gradient(135deg, #059669, #0891b2); box-shadow: 0 12px 32px rgba(5,150,105,0.22); }
   .ec-hero[data-module="timetable"]  { background: linear-gradient(135deg, #8b5cf6, #3b82f6); box-shadow: 0 12px 32px rgba(139,92,246,0.22); }
   .ec-hero[data-module="announcements"] { background: linear-gradient(135deg, #f97316, #ef4444); box-shadow: 0 12px 32px rgba(249,115,22,0.22); }
-  .ec-hero[data-module="settings"]   { background: linear-gradient(135deg, #475569, #334155); box-shadow: 0 12px 32px rgba(71,85,105,0.22); }
+  .ec-hero[data-module="settings"]   { background: linear-gradient(135deg, #0d9488, #3b82f6); box-shadow: 0 12px 32px rgba(107,114,128,0.22); }
 
   .ec-card {
     overflow: hidden;
