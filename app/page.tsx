@@ -46,17 +46,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  announcements,
-  attendance,
   chartData,
-  classes,
-  grades,
   navItems,
-  payments,
-  subjects,
-  students,
-  teachers,
-  timetable
+  subjects
 } from "@/lib/demo-data";
 import {
   type AppCopy,
@@ -352,14 +344,14 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
     case "students":
       return {
         columns: ["Name", "Class", "Attendance", "GPA", "Payment", "Parent Email"],
-        ids: students.map((item) => item.id),
-        rows: students.map((item) => [item.fullName, item.className, `${item.attendance}%`, item.gpa.toString(), item.paymentStatus, item.parentEmail])
+        ids: [],
+        rows: []
       };
     case "teachers":
       return {
         columns: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"],
-        ids: teachers.map((item) => item.id),
-        rows: teachers.map((item) => [item.name, item.subject, item.email, item.experience, item.salary, item.contact, item.classes.join(", ")])
+        ids: [],
+        rows: []
       };
     case "subjects":
       return {
@@ -370,38 +362,38 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
     case "classes":
       return {
         columns: ["Class", "Section", "Teacher", "Students", "Schedule"],
-        ids: classes.map((item) => item.id),
-        rows: classes.map((item) => [item.name, item.section, item.teacher, item.students.toString(), item.schedule])
+        ids: [],
+        rows: []
       };
     case "attendance":
       return {
         columns: ["Student", "Class", "Date", "Status"],
-        ids: attendance.map((item) => item.id),
-        rows: attendance.map((item) => [item.student, item.className, item.date, item.status])
+        ids: [],
+        rows: []
       };
     case "grades":
       return {
         columns: ["Student", "Subject", "Score", "Semester", "Student Email"],
-        ids: grades.map((item) => item.id),
-        rows: grades.map((item) => [item.student, item.subject, `${item.score}%`, item.semester, ""])
+        ids: [],
+        rows: []
       };
     case "payments":
       return {
         columns: ["Student", "Amount", "Status", "Due Date"],
-        ids: payments.map((item) => item.id),
-        rows: payments.map((item) => [item.student, item.amount, item.status, item.dueDate])
+        ids: [],
+        rows: []
       };
     case "timetable":
       return {
         columns: ["Day", "Time", "Subject", "Teacher", "Class"],
-        ids: timetable.map((item, index) => `TT-${index + 1}`),
-        rows: timetable.map((item) => [item.day, item.time, item.subject, item.teacher, item.className])
+        ids: [],
+        rows: []
       };
     case "announcements":
       return {
         columns: ["Title", "Content", "Audience", "Date"],
-        ids: announcements.map((item) => item.id),
-        rows: announcements.map((item) => [item.title, item.content, item.audience, item.date])
+        ids: [],
+        rows: []
       };
   }
 }
@@ -838,6 +830,8 @@ function AppShell() {
   const [resourceLoading, setResourceLoading] = useState(false);
   const [resourceError, setResourceError] = useState("");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
+  const [currentUserName, setCurrentUserName] = useState("");
+  const [currentUserAvatar, setCurrentUserAvatar] = useState("");
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [notificationPageOpen, setNotificationPageOpen] = useState(false);
   const [activityNotifications, setActivityNotifications] = useState<ActivityNotification[]>([]);
@@ -861,6 +855,35 @@ function AppShell() {
     window.sessionStorage.removeItem(demoSessionKey);
     await authService.signOut();
     router.push("/login");
+  }
+
+  async function saveProfile({ name, email, avatarUrl }: { name: string; email: string; avatarUrl: string }) {
+    if (isSupabaseConfigured) {
+      const { error } = await authService.updateProfile({ name, email, avatarUrl });
+
+      if (error) {
+        setToast(language === "mn" ? "Профайл хадгалахад алдаа гарлаа" : "Could not save profile");
+        return false;
+      }
+    } else {
+      try {
+        const demoSession = window.sessionStorage.getItem(demoSessionKey);
+        const parsedSession = demoSession ? (JSON.parse(demoSession) as Record<string, unknown>) : {};
+
+        window.sessionStorage.setItem(
+          demoSessionKey,
+          JSON.stringify({ ...parsedSession, email, name, avatarUrl })
+        );
+      } catch {
+        // Ignore demo session persistence errors; local state below still updates.
+      }
+    }
+
+    setCurrentUserEmail(email);
+    setCurrentUserName(name);
+    setCurrentUserAvatar(avatarUrl);
+    setToast(language === "mn" ? "Профайл шинэчлэгдсэн" : "Profile updated");
+    return true;
   }
 
   function openModule(module: NavModule) {
@@ -1009,10 +1032,7 @@ function AppShell() {
   const searchableRows = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const rows = [
-      ...students.map((item) => ({ type: "Student", title: item.fullName, meta: item.className, status: item.paymentStatus })),
-      ...teachers.map((item) => ({ type: "Teacher", title: item.name, meta: item.subject, status: item.experience })),
-      ...classes.map((item) => ({ type: "Class", title: `${item.name}${item.section}`, meta: item.teacher, status: `${item.students} students` })),
-      ...announcements.map((item) => ({ type: "Announcement", title: item.title, meta: item.audience, status: item.date }))
+
     ];
 
     if (!normalized) return rows.slice(0, 5);
@@ -1038,6 +1058,8 @@ function AppShell() {
           const sessionRole = data.session.user.user_metadata?.role;
           const nextRole = isRole(sessionRole) ? sessionRole : "student";
           setCurrentUserEmail(data.session.user.email ?? "");
+          setCurrentUserName(typeof data.session.user.user_metadata?.name === "string" ? data.session.user.user_metadata.name : "");
+          setCurrentUserAvatar(typeof data.session.user.user_metadata?.avatar_url === "string" ? data.session.user.user_metadata.avatar_url : "");
           setRole(nextRole);
           setActiveModule((currentModule) => (visibleModulesByRole[nextRole].includes(currentModule) ? currentModule : "dashboard"));
 
@@ -1059,14 +1081,18 @@ function AppShell() {
         }
 
         try {
-          const parsedSession = JSON.parse(demoSession) as { email?: unknown; role?: unknown };
+          const parsedSession = JSON.parse(demoSession) as { email?: unknown; role?: unknown; name?: unknown; avatarUrl?: unknown };
           const nextRole = isRole(parsedSession.role) ? parsedSession.role : "student";
           setCurrentUserEmail(typeof parsedSession.email === "string" ? parsedSession.email : "");
+          setCurrentUserName(typeof parsedSession.name === "string" ? parsedSession.name : "");
+          setCurrentUserAvatar(typeof parsedSession.avatarUrl === "string" ? parsedSession.avatarUrl : "");
           setRole(nextRole);
           setActiveModule((currentModule) => (visibleModulesByRole[nextRole].includes(currentModule) ? currentModule : "dashboard"));
         } catch {
           setRole("student");
           setCurrentUserEmail("");
+          setCurrentUserName("");
+          setCurrentUserAvatar("");
           setActiveModule((currentModule) => (visibleModulesByRole.student.includes(currentModule) ? currentModule : "dashboard"));
         }
 
@@ -1133,7 +1159,7 @@ function AppShell() {
     return (
       <main className={`educore-shell auth-check${darkMode ? " dark" : ""}`}>
         <div className="auth-loading">
-          <Image src="/download.png" alt="Nova Mind Academy" width={559} height={534} priority />
+          <Image className="ec-loading-logo" src="/data/subjects/download.png" alt="Nova Mind Academy" width={559} height={534} priority />
           <strong>{copy.app.loadingSession}</strong>
         </div>
       </main>
@@ -1146,7 +1172,7 @@ function AppShell() {
       <aside className={`ec-sidebar${mobileOpen ? " open" : ""}`}>
         <div className="ec-brand">
           <span className="ec-brand-logo">
-            <Image src="/download.png" alt="Nova Mind Academy" width={559} height={534} priority style={{ mixBlendMode: "multiply" }} />
+            <Image src="/data/subjects/download.png" alt="Nova Mind Academy" width={559} height={534} priority />
           </span>
           <div>
             <strong>Nova Mind</strong>
@@ -1243,7 +1269,7 @@ function AppShell() {
               ) : null}
             </motion.section>
 
-            {activeModule === "dashboard" ? <Dashboard copy={copy} language={language} role={role} /> : null}
+            {activeModule === "dashboard" ? <Dashboard copy={copy} currentUserEmail={currentUserEmail} language={language} role={role} /> : null}
             {activeModule === "students" ? (
               <StudentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
@@ -1296,7 +1322,21 @@ function AppShell() {
             {activeModule === "announcements" ? (
               <AnnouncementsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
-            {activeModule === "settings" ? <SettingsModule copy={copy} darkMode={darkMode} language={language} logout={logout} role={role} setDarkMode={setDarkMode} setLanguage={setLanguage} /> : null}
+            {activeModule === "settings" ? (
+              <SettingsModule
+                copy={copy}
+                currentUserAvatar={currentUserAvatar}
+                currentUserEmail={currentUserEmail}
+                currentUserName={currentUserName}
+                darkMode={darkMode}
+                language={language}
+                logout={logout}
+                onSaveProfile={saveProfile}
+                role={role}
+                setDarkMode={setDarkMode}
+                setLanguage={setLanguage}
+              />
+            ) : null}
 
             {activeModule !== "settings" && query.trim() ? (
               <Card className="search-panel">
@@ -1525,14 +1565,127 @@ function NotificationsPage({
   );
 }
 
-function Dashboard({ copy, language, role }: { copy: AppCopy; language: Language; role: Role }) {
+function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; currentUserEmail: string; language: Language; role: Role }) {
   const dashboard = copy.dashboards[role];
   const localizedPieData = pieData.map((entry) => ({ ...entry, name: translateValue(entry.name, language) }));
+  const [liveStats, setLiveStats] = useState<string[][] | null>(null);
+
+  useEffect(() => {
+    async function fetchCounts() {
+      try {
+        const s = dashboard.stats;
+
+        if (role === "admin") {
+          const [studentData, teacherData, paymentData, attendanceData] = await Promise.all([
+            loadResourceData("students"),
+            loadResourceData("teachers"),
+            loadResourceData("payments"),
+            loadResourceData("attendance")
+          ]);
+          const studentCount = studentData.data.rows.length;
+          const teacherCount = teacherData.data.rows.length;
+          const paidCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "status");
+          const amountCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "amount");
+          const revenue = paymentData.data.rows
+            .filter((row) => row[paidCol]?.toLowerCase() === "paid")
+            .reduce((sum, row) => sum + (parseFloat((row[amountCol] ?? "").replace(/[^\d.]/g, "")) || 0), 0);
+          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
+          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
+          const totalAtt = attendanceData.data.rows.length;
+          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
+          setLiveStats([
+            [s[0]?.[0] ?? "", studentCount.toString(), s[0]?.[2] ?? ""],
+            [s[1]?.[0] ?? "", teacherCount.toString(), s[1]?.[2] ?? ""],
+            [s[2]?.[0] ?? "", `$${revenue.toLocaleString()}`, s[2]?.[2] ?? ""],
+            [s[3]?.[0] ?? "", `${attPct}%`, s[3]?.[2] ?? ""]
+          ]);
+        }
+
+        if (role === "teacher") {
+          const [attendanceData, gradesData] = await Promise.all([
+            loadResourceData("attendance"),
+            loadResourceData("grades")
+          ]);
+          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
+          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
+          const totalAtt = attendanceData.data.rows.length;
+          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
+          const scoreCol = gradesData.data.columns.findIndex((c) => c.toLowerCase() === "score");
+          const scores = gradesData.data.rows.map((row) => parseFloat((row[scoreCol] ?? "").replace(/[^\d.]/g, ""))).filter((v) => !isNaN(v));
+          const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+          setLiveStats([
+            [s[0]?.[0] ?? "", s[0]?.[1] ?? "", s[0]?.[2] ?? ""],
+            [s[1]?.[0] ?? "", `${attPct}%`, s[1]?.[2] ?? ""],
+            [s[2]?.[0] ?? "", gradesData.data.rows.length.toString(), s[2]?.[2] ?? ""],
+            [s[3]?.[0] ?? "", `${avgScore}%`, s[3]?.[2] ?? ""]
+          ]);
+        }
+
+        if (role === "student") {
+          const [gradesData, attendanceData, paymentData] = await Promise.all([
+            loadResourceData("grades"),
+            loadResourceData("attendance"),
+            loadResourceData("payments")
+          ]);
+          const scoreCol = gradesData.data.columns.findIndex((c) => c.toLowerCase() === "score");
+          const scores = gradesData.data.rows.map((row) => parseFloat((row[scoreCol] ?? "").replace(/[^\d.]/g, ""))).filter((v) => !isNaN(v));
+          const avgGpa = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length / 25).toFixed(1) : "0.0";
+          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
+          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
+          const totalAtt = attendanceData.data.rows.length;
+          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
+          const statusCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "status");
+          const unpaidCount = paymentData.data.rows.filter((row) => row[statusCol]?.toLowerCase() === "unpaid").length;
+          const payStatus = unpaidCount === 0
+            ? (language === "mn" ? "Төлсөн" : "Paid")
+            : (language === "mn" ? `${unpaidCount} төлөөгүй` : `${unpaidCount} unpaid`);
+          setLiveStats([
+            [s[0]?.[0] ?? "", avgGpa, s[0]?.[2] ?? ""],
+            [s[1]?.[0] ?? "", `${attPct}%`, s[1]?.[2] ?? ""],
+            [s[2]?.[0] ?? "", s[2]?.[1] ?? "", s[2]?.[2] ?? ""],
+            [s[3]?.[0] ?? "", payStatus, s[3]?.[2] ?? ""]
+          ]);
+        }
+
+        if (role === "parent") {
+          const [attendanceData, gradesData, paymentData, announcementData] = await Promise.all([
+            loadResourceData("attendance"),
+            loadResourceData("grades"),
+            loadResourceData("payments"),
+            loadResourceData("announcements")
+          ]);
+          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
+          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
+          const totalAtt = attendanceData.data.rows.length;
+          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
+          const scoreCol = gradesData.data.columns.findIndex((c) => c.toLowerCase() === "score");
+          const scores = gradesData.data.rows.map((row) => parseFloat((row[scoreCol] ?? "").replace(/[^\d.]/g, ""))).filter((v) => !isNaN(v));
+          const avgGpa = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length / 25).toFixed(1) : "0.0";
+          const statusCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "status");
+          const amountCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "amount");
+          const openPayments = paymentData.data.rows
+            .filter((row) => row[statusCol]?.toLowerCase() === "unpaid")
+            .reduce((sum, row) => sum + (parseFloat((row[amountCol] ?? "").replace(/[^\d.]/g, "")) || 0), 0);
+          setLiveStats([
+            [s[0]?.[0] ?? "", `${attPct}%`, s[0]?.[2] ?? ""],
+            [s[1]?.[0] ?? "", avgGpa, s[1]?.[2] ?? ""],
+            [s[2]?.[0] ?? "", `$${openPayments.toLocaleString()}`, s[2]?.[2] ?? ""],
+            [s[3]?.[0] ?? "", announcementData.data.rows.length.toString(), s[3]?.[2] ?? ""]
+          ]);
+        }
+      } catch {
+        // fallback to i18n hardcoded values
+      }
+    }
+    fetchCounts();
+  }, [role, language, dashboard.stats]);
+
+  const displayStats = liveStats ?? dashboard.stats;
 
   return (
     <>
       <section className="metric-grid">
-        {dashboard.stats.map(([label, value, helper]) => (
+        {displayStats.map(([label, value, helper]) => (
           <Card className="metric-card" key={label}>
             <p>{label}</p>
             <strong>{value}</strong>
@@ -1597,7 +1750,7 @@ function StudentsModule({ apiData, copy, error, language, loading, ...controls }
       loading={loading}
       title={copy.tables.students}
       columns={["Name", "Class", "Attendance", "GPA", "Payment"]}
-      rows={students.map((item) => [item.fullName, item.className, `${item.attendance}%`, item.gpa.toString(), item.paymentStatus])}
+      rows={[]}
       {...controls}
     />
   );
@@ -1613,7 +1766,7 @@ function TeachersModule({ apiData, copy, error, language, loading, ...controls }
       loading={loading}
       title={copy.tables.teachers}
       columns={["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"]}
-      rows={teachers.map((item) => [item.name, item.subject, item.email, item.experience, item.salary, item.contact, item.classes.join(", ")])}
+      rows={[]}
       {...controls}
     />
   );
@@ -2442,7 +2595,7 @@ function ClassesModule({ apiData, copy, error, language, loading, ...controls }:
       loading={loading}
       title={copy.tables.classes}
       columns={["Class", "Section", "Teacher", "Students", "Schedule"]}
-      rows={classes.map((item) => [item.name, item.section, item.teacher, item.students.toString(), item.schedule])}
+      rows={[]}
       {...controls}
     />
   );
@@ -2458,7 +2611,7 @@ function AttendanceModule({ apiData, copy, error, language, loading, ...controls
       loading={loading}
       title={copy.tables.attendance}
       columns={["Student", "Class", "Date", "Status"]}
-      rows={attendance.map((item) => [item.student, item.className, item.date, item.status])}
+      rows={[]}
       {...controls}
     />
   );
@@ -2474,7 +2627,7 @@ function GradesModule({ apiData, copy, error, language, loading, ...controls }: 
       loading={loading}
       title={copy.tables.grades}
       columns={["Student", "Subject", "Score", "Semester"]}
-      rows={grades.map((item) => [item.student, item.subject, `${item.score}%`, item.semester])}
+      rows={[]}
       {...controls}
     />
   );
@@ -2490,7 +2643,7 @@ function PaymentsModule({ apiData, copy, error, language, loading, ...controls }
       loading={loading}
       title={copy.tables.payments}
       columns={["Student", "Amount", "Status", "Due Date"]}
-      rows={payments.map((item) => [item.student, item.amount, item.status, item.dueDate])}
+      rows={[]}
       {...controls}
     />
   );
@@ -2506,7 +2659,7 @@ function TimetableModule({ apiData, copy, error, language, loading, ...controls 
       loading={loading}
       title={copy.tables.timetable}
       columns={["Day", "Time", "Subject", "Teacher", "Class"]}
-      rows={timetable.map((item) => [item.day, item.time, item.subject, item.teacher, item.className])}
+      rows={[]}
       {...controls}
     />
   );
@@ -2522,7 +2675,7 @@ function AnnouncementsModule({ apiData, copy, error, language, loading, ...contr
       loading={loading}
       title={copy.tables.announcements}
       columns={["Title", "Content", "Audience", "Date"]}
-      rows={announcements.map((item) => [item.title, item.content, item.audience, item.date])}
+      rows={[]}
       {...controls}
     />
   );
@@ -2530,27 +2683,120 @@ function AnnouncementsModule({ apiData, copy, error, language, loading, ...contr
 
 function SettingsModule({
   copy,
+  currentUserAvatar,
+  currentUserEmail,
+  currentUserName,
   darkMode,
   language,
   logout,
+  onSaveProfile,
   role,
   setDarkMode,
   setLanguage
 }: {
   copy: AppCopy;
+  currentUserAvatar: string;
+  currentUserEmail: string;
+  currentUserName: string;
   darkMode: boolean;
   language: Language;
   logout: () => void;
+  onSaveProfile: (values: { name: string; email: string; avatarUrl: string }) => Promise<boolean>;
   role: Role;
   setDarkMode: (value: boolean) => void;
   setLanguage: (value: Language) => void;
 }) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileName, setProfileName] = useState(currentUserName);
+  const [profileEmail, setProfileEmail] = useState(currentUserEmail);
+  const [profileAvatar, setProfileAvatar] = useState(currentUserAvatar);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const initials = (currentUserName || currentUserEmail || "?").trim().charAt(0).toUpperCase();
+
+  function openProfile() {
+    setProfileName(currentUserName);
+    setProfileEmail(currentUserEmail);
+    setProfileAvatar(currentUserAvatar);
+    setProfileOpen(true);
+  }
+
+  function onAvatarSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setProfileAvatar(reader.result);
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  }
+
+  async function handleSaveProfile() {
+    setSavingProfile(true);
+    const success = await onSaveProfile({ name: profileName.trim(), email: profileEmail.trim(), avatarUrl: profileAvatar });
+    setSavingProfile(false);
+    if (success) setProfileOpen(false);
+  }
 
   return (
     <section className="settings-grid">
-      {accountOpen ? (
+      {profileOpen ? (
+        <div className="mobile-account-page">
+          <button className="mobile-account-back" onClick={() => setProfileOpen(false)} type="button">
+            {language === "mn" ? "Буцах" : "Back"}
+          </button>
+          <div className="mobile-account-card">
+            <div className="mobile-account-header">
+              <span>{language === "mn" ? "Профайл" : "Profile"}</span>
+            </div>
+
+            <div className="mobile-profile-avatar-row">
+              <div className="mobile-profile-avatar">
+                {profileAvatar ? <img alt="" src={profileAvatar} /> : <span>{initials}</span>}
+                <button
+                  aria-label={language === "mn" ? "Зураг солих" : "Change photo"}
+                  className="mobile-profile-avatar-edit"
+                  onClick={() => avatarInputRef.current?.click()}
+                  type="button"
+                >
+                  <Pencil size={14} />
+                </button>
+              </div>
+              <input accept="image/*" hidden onChange={onAvatarSelected} ref={avatarInputRef} type="file" />
+            </div>
+
+            <label className="mobile-profile-field">
+              <span>{language === "mn" ? "Нэр" : "Name"}</span>
+              <input
+                className="ec-input"
+                onChange={(event) => setProfileName(event.target.value)}
+                placeholder={language === "mn" ? "Нэрээ оруулна уу" : "Enter your name"}
+                value={profileName}
+              />
+            </label>
+
+            <label className="mobile-profile-field">
+              <span>{language === "mn" ? "Имэйл" : "Email"}</span>
+              <input
+                className="ec-input"
+                onChange={(event) => setProfileEmail(event.target.value)}
+                placeholder="you@example.com"
+                type="email"
+                value={profileEmail}
+              />
+            </label>
+
+            <button className="mobile-profile-save" disabled={savingProfile} onClick={handleSaveProfile} type="button">
+              {savingProfile ? (language === "mn" ? "Хадгалж байна..." : "Saving...") : language === "mn" ? "Хадгалах" : "Save"}
+            </button>
+          </div>
+        </div>
+      ) : accountOpen ? (
         <div className="mobile-account-page">
           <button className="mobile-account-back" onClick={() => setAccountOpen(false)} type="button">
             {language === "mn" ? "Буцах" : "Back"}
@@ -2574,6 +2820,19 @@ function SettingsModule({
       ) : (
         <>
           <div className="mobile-settings-list">
+            <button className="mobile-setting-row mobile-setting-row-profile" onClick={openProfile} type="button">
+              <span className="mobile-profile-row-info">
+                <span className="mobile-profile-row-avatar">
+                  {currentUserAvatar ? <img alt="" src={currentUserAvatar} /> : <span>{initials}</span>}
+                </span>
+                <span className="mobile-profile-row-text">
+                  <strong>{currentUserName || (language === "mn" ? "Профайл" : "Profile")}</strong>
+                  {currentUserEmail ? <small>{currentUserEmail}</small> : null}
+                </span>
+              </span>
+              <ChevronRight size={18} />
+            </button>
+
             <button className="mobile-setting-row" onClick={() => setDarkMode(!darkMode)} type="button">
               <span>
                 {darkMode

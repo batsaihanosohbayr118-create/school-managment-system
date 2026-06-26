@@ -104,6 +104,21 @@ export const authService = {
     }
 
     return supabase.auth.signOut();
+  },
+  async updateProfile({ name, avatarUrl, email }: { name?: string; avatarUrl?: string; email?: string }) {
+    if (!supabase) {
+      return { data: { user: null }, error: null, demo: true };
+    }
+
+    const metadata: Record<string, unknown> = {};
+    if (typeof name === "string") metadata.name = name;
+    if (typeof avatarUrl === "string") metadata.avatar_url = avatarUrl;
+
+    const payload: { email?: string; data?: Record<string, unknown> } = {};
+    if (email) payload.email = email;
+    if (Object.keys(metadata).length > 0) payload.data = metadata;
+
+    return supabase.auth.updateUser(payload);
   }
 };
 

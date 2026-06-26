@@ -88,62 +88,6 @@ CREATE TABLE IF NOT EXISTS announcements (
 ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_email TEXT;
 ALTER TABLE grade_records ADD COLUMN IF NOT EXISTS student_email TEXT NOT NULL DEFAULT '';
 
-INSERT INTO students (id, full_name, email, phone, gender, birth_date, address, parent_name, parent_email, class_name, roll_number, attendance, gpa, payment_status)
-VALUES
-  ('ST-1001', 'Anand Bayarsaikhan', 'anand@educore.mn', '+976 9911 2030', 'Male', '2010-03-12', 'Ulaanbaatar, Khan-Uul', 'Bayarsaikhan', 'parent@educore.mn', 'Grade 8A', '08A-01', 96, 3.8, 'Paid'),
-  ('ST-1002', 'Saruul Enkhjin', 'saruul@educore.mn', '+976 8800 4412', 'Female', '2011-07-08', 'Ulaanbaatar, Bayanzurkh', 'Enkhjin', 'parent2@educore.mn', 'Grade 7B', '07B-09', 89, 3.5, 'Partial'),
-  ('ST-1003', 'Temuulen Ganbat', 'temuulen@educore.mn', '+976 9505 1177', 'Male', '2009-11-21', 'Ulaanbaatar, Sukhbaatar', 'Ganbat', 'parent3@educore.mn', 'Grade 9A', '09A-12', 78, 3.1, 'Unpaid')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO teachers (id, name, subject, email, experience, salary, contact, classes)
-VALUES
-  ('TC-201', 'Ms. Saraa', 'Mathematics', 'saraa@educore.mn', '8 years', '$1,450', '+976 9919 8000', 'Grade 8A, Grade 9A'),
-  ('TC-202', 'Mr. Bold', 'Physics', 'bold@educore.mn', '6 years', '$1,320', '+976 8808 5500', 'Grade 9A'),
-  ('TC-203', 'Ms. Nomin', 'English', 'nomin@educore.mn', '5 years', '$1,280', '+976 9900 8080', 'Grade 7B, Grade 8A')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO class_rooms (id, name, section, teacher, students, schedule)
-VALUES
-  ('CL-8A', 'Grade 8', 'A', 'Ms. Saraa', 32, 'Mon-Fri'),
-  ('CL-7B', 'Grade 7', 'B', 'Ms. Nomin', 29, 'Mon-Fri'),
-  ('CL-9A', 'Grade 9', 'A', 'Mr. Bold', 34, 'Mon-Fri')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO attendance_records (id, student, class_name, date, status)
-VALUES
-  ('AT-1', 'Anand Bayarsaikhan', 'Grade 8A', '2026-05-18', 'Present'),
-  ('AT-2', 'Saruul Enkhjin', 'Grade 7B', '2026-05-18', 'Late'),
-  ('AT-3', 'Temuulen Ganbat', 'Grade 9A', '2026-05-18', 'Absent')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO grade_records (id, student, student_email, subject, score, semester)
-VALUES
-  ('GR-1', 'Anand Bayarsaikhan', 'anand@educore.mn', 'Mathematics', 94, 'Spring 2026'),
-  ('GR-2', 'Saruul Enkhjin', 'saruul@educore.mn', 'English', 88, 'Spring 2026'),
-  ('GR-3', 'Temuulen Ganbat', 'temuulen@educore.mn', 'Physics', 81, 'Spring 2026')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO payment_records (id, student, amount, status, due_date)
-VALUES
-  ('PY-1', 'Anand Bayarsaikhan', '$450', 'Paid', '2026-05-01'),
-  ('PY-2', 'Saruul Enkhjin', '$450', 'Partial', '2026-05-10'),
-  ('PY-3', 'Temuulen Ganbat', '$450', 'Unpaid', '2026-05-15')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO timetable_slots (id, day, time, subject, teacher, class_name)
-VALUES
-  ('TT-1', 'Monday', '09:00', 'Mathematics', 'Ms. Saraa', 'Grade 8A'),
-  ('TT-2', 'Tuesday', '10:30', 'Physics', 'Mr. Bold', 'Grade 9A'),
-  ('TT-3', 'Wednesday', '11:30', 'English', 'Ms. Nomin', 'Grade 7B')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO announcements (id, title, content, audience, date)
-VALUES
-  ('AN-1', 'Midterm timetable published', 'Students can now view upcoming midterm schedules.', 'All', '2026-05-18'),
-  ('AN-2', 'Teacher workshop', 'Professional development workshop starts Friday.', 'Teachers', '2026-05-17'),
-  ('AN-3', 'Payment reminder', 'May tuition invoices are due this week.', 'Students', '2026-05-16')
-ON CONFLICT (id) DO NOTHING;
-
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teachers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE class_rooms ENABLE ROW LEVEL SECURITY;

@@ -112,14 +112,15 @@ a {
 .ec-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 8px 18px;
+  gap: 4px;
+  padding: 0 0 4px;
 }
 
 .ec-brand-logo {
   display: grid;
-  width: 58px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
   place-items: center;
   overflow: hidden;
   background: transparent;
@@ -130,21 +131,35 @@ a {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  mix-blend-mode: multiply;
 }
 
-.educore-shell.dark .ec-brand-logo img {
-  mix-blend-mode: normal;
-  filter: brightness(0) invert(1);
+.ec-loading-logo {
+  width: 72px !important;
+  height: 72px !important;
+  object-fit: contain;
 }
 
 .ec-brand strong {
   display: block;
   font-size: 23px;
-  line-height: 1;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg, var(--primary), #06b6d4);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.ec-brand p,
+.ec-brand p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .ec-hero p,
 .table-subtitle,
 .auth-subtitle {
@@ -1566,13 +1581,10 @@ a {
   justify-items: center;
   padding: 28px;
   color: var(--ink);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(238, 242, 255, 0.74)),
-    rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: transparent;
+  border: none;
   border-radius: 20px;
   text-align: center;
-  backdrop-filter: blur(18px);
 }
 
 .notification-empty > span {
@@ -1616,10 +1628,8 @@ a {
 
 .educore-shell.dark .notification-empty {
   color: #f8fafc;
-  background:
-    linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.82)),
-    rgba(15, 23, 42, 0.88);
-  border-color: rgba(148, 163, 184, 0.16);
+  background: transparent;
+  border-color: transparent;
 }
 
 .table-empty {
@@ -1842,14 +1852,23 @@ a {
   height: 36px;
   place-items: center;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--line);
+  background: transparent;
+  border: none;
   border-radius: 12px;
+  transition: background 150ms ease;
+}
+
+.modal-header button:hover {
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .educore-shell.dark .modal-header button {
   color: #f8fafc;
-  background: rgba(30, 41, 59, 0.82);
+  background: transparent;
+}
+
+.educore-shell.dark .modal-header button:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .record-modal label,
@@ -2020,17 +2039,16 @@ a {
 .auth-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
 }
 
 .auth-brand-logo {
   display: grid;
-  width: 62px;
-  height: 60px;
+  width: 120px;
+  height: 100px;
+  flex-shrink: 0;
   place-items: center;
   overflow: hidden;
-  background: transparent;
-  border-radius: 14px;
 }
 
 .auth-brand-logo img {
@@ -2041,15 +2059,23 @@ a {
 
 .auth-brand strong {
   display: block;
-  font-size: 21px;
-  line-height: 1;
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg, var(--primary), #06b6d4);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .auth-brand p {
-  margin: 5px 0 0;
+  margin: 3px 0 0;
   color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .auth-chip {
@@ -2915,11 +2941,11 @@ a {
     display: grid;
     gap: 10px;
     padding: 12px;
-    background: rgba(255, 255, 255, 0.84);
-    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: transparent;
+    border: none;
     border-radius: 18px;
-    box-shadow: 0 12px 30px rgba(36, 48, 77, 0.08);
-    backdrop-filter: blur(18px);
+    box-shadow: none;
+    backdrop-filter: none;
   }
 
   .mobile-account-header {
@@ -2947,41 +2973,62 @@ a {
     justify-content: space-between;
     gap: 12px;
     width: 100%;
-    min-height: 46px;
-    padding: 0 14px;
+    min-height: 50px;
+    padding: 0 16px;
     color: var(--ink);
-    background: rgba(248, 250, 252, 0.86);
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 15px;
+    background: rgba(248, 250, 252, 0.72);
+    border: none;
+    border-radius: 14px;
     font-size: 15px;
-    font-weight: 850;
+    font-weight: 700;
     text-align: left;
+    transition: background 150ms ease, transform 120ms ease;
   }
 
   .mobile-role-current {
-    color: #1d4ed8;
-    background: rgba(79, 70, 229, 0.1);
-    border-color: rgba(79, 70, 229, 0.16);
+    color: #4f46e5;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(37, 99, 235, 0.08));
+    border-color: transparent;
+    font-weight: 800;
   }
 
   .mobile-role-list button.active {
-    color: #1d4ed8;
-    background: rgba(79, 70, 229, 0.1);
-    border-color: rgba(79, 70, 229, 0.16);
+    color: #4f46e5;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(37, 99, 235, 0.08));
+    border-color: rgba(79, 70, 229, 0.22);
   }
 
   .mobile-account-logout {
-    justify-content: flex-start;
-    color: #ef4444;
+    justify-content: center;
+    gap: 8px;
+    color: #fff;
+    background: #ef4444;
+    border-color: transparent;
+    font-weight: 700;
+    border-radius: 14px;
+    margin-top: 4px;
+    transition: background 150ms ease, transform 120ms ease;
+  }
+
+  .mobile-account-logout:hover {
+    background: #dc2626;
+  }
+
+  .mobile-account-logout:active {
+    background: #b91c1c;
+    transform: scale(0.98);
   }
 
   .educore-shell.dark .mobile-account-back,
-  .educore-shell.dark .mobile-account-card,
-  .educore-shell.dark .mobile-role-current,
-  .educore-shell.dark .mobile-role-list button,
-  .educore-shell.dark .mobile-account-logout {
-    background: rgba(15, 23, 42, 0.88);
-    border-color: rgba(148, 163, 184, 0.16);
+  .educore-shell.dark .mobile-account-card {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .educore-shell.dark .mobile-role-list button {
+    background: rgba(30, 41, 59, 0.72);
+    border-color: rgba(148, 163, 184, 0.14);
+    color: #f8fafc;
   }
 
   .educore-shell.dark .mobile-account-header,
@@ -2991,17 +3038,20 @@ a {
   }
 
   .educore-shell.dark .mobile-role-current {
-    color: #bfdbfe;
-    background: rgba(59, 130, 246, 0.18);
+    color: #a5b4fc;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(59, 130, 246, 0.14));
+    border-color: transparent;
   }
 
   .educore-shell.dark .mobile-role-list button.active {
-    color: #bfdbfe;
-    background: rgba(59, 130, 246, 0.18);
+    color: #a5b4fc;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(59, 130, 246, 0.14));
   }
 
   .educore-shell.dark .mobile-account-logout {
-    color: #fca5a5;
+    background: #dc2626;
+    border-color: transparent;
+    color: #fff;
   }
 
   .mobile-permission-panel {
@@ -3037,6 +3087,145 @@ a {
     color: #f8fafc;
     background: rgba(16, 185, 129, 0.16);
     border-color: rgba(52, 211, 153, 0.14);
+  }
+
+  .mobile-setting-row-profile {
+    align-items: center;
+  }
+
+  .mobile-profile-row-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .mobile-profile-row-avatar,
+  .mobile-profile-avatar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    overflow: visible;
+    border-radius: 999px;
+    background: rgba(79, 70, 229, 0.12);
+    color: #4f46e5;
+    font-weight: 800;
+  }
+
+  .mobile-profile-row-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+    overflow: hidden;
+  }
+
+  .mobile-profile-row-avatar img,
+  .mobile-profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 999px;
+  }
+
+  .mobile-profile-row-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .mobile-profile-row-text strong {
+    font-size: 14px;
+    font-weight: 850;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+  }
+
+  .mobile-profile-row-text small {
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+  }
+
+  .mobile-profile-avatar-row {
+    display: flex;
+    justify-content: center;
+    padding: 6px 0 4px;
+  }
+
+  .mobile-profile-avatar {
+    width: 72px;
+    height: 72px;
+    font-size: 24px;
+  }
+
+  .mobile-profile-avatar-edit {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    color: #fff;
+    background: #4f46e5;
+    border: none;
+    border-radius: 999px;
+  }
+
+  .mobile-profile-field {
+    display: grid;
+    gap: 6px;
+    padding: 0 2px;
+  }
+
+  .mobile-profile-field span {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--muted);
+  }
+
+  .mobile-profile-field .ec-input {
+    width: 100%;
+  }
+
+  .mobile-profile-save {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    margin-top: 4px;
+    color: #fff;
+    background: linear-gradient(120deg, #4f46e5, #2563eb);
+    border: none;
+    border-radius: 15px;
+    font-size: 15px;
+    font-weight: 850;
+  }
+
+  .mobile-profile-save:disabled {
+    opacity: 0.7;
+  }
+
+  .educore-shell.dark .mobile-profile-row-text strong,
+  .educore-shell.dark .mobile-profile-field span {
+    color: #f8fafc;
+  }
+
+  .educore-shell.dark .mobile-profile-avatar,
+  .educore-shell.dark .mobile-profile-row-avatar {
+    background: rgba(59, 130, 246, 0.18);
+    color: #bfdbfe;
   }
 
   .metric-grid {

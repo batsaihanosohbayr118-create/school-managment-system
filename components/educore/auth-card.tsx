@@ -116,7 +116,7 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
         <div className="auth-brand-row">
           <div className="auth-brand">
             <span className="auth-brand-logo">
-              <Image src="/download.png" alt="Nova Mind Academy" width={559} height={534} priority />
+              <Image src="/data/subjects/download.png" alt="Nova Mind Academy" width={559} height={534} priority />
             </span>
             <div>
               <strong>Nova Mind</strong>
