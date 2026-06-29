@@ -1031,7 +1031,7 @@ function AppShell() {
 
   const searchableRows = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const rows = [
+    const rows: { type: string; title: string; meta: string; status: string }[] = [
 
     ];
 
