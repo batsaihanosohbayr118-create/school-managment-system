@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Интернет байхгүй</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: #f8fafc;
+    }
+    .container {
+      text-align: center;
+      padding: 2rem;
+    }
+    .icon {
+      width: 80px;
+      height: 80px;
+      background: #fee2e2;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+    }
+    h1 { font-size: 1.5rem; color: #1e293b; margin-bottom: 0.75rem; }
+    p { color: #64748b; margin-bottom: 1.5rem; }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 0.75rem 2rem;
+      border-radius: 9999px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">
+      <svg width="40" height="40" fill="none" stroke="#ef4444" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 5.636a9 9 0 010 12.728M15.536 8.464a5 5 0 010 7.072M12 12h.01M8.464 15.536a5 5 0 010-7.072M5.636 18.364a9 9 0 010-12.728"/>
+      </svg>
+    </div>
+    <h1>Интернет байхгүй байна</h1>
+    <p>Интернет холболтоо шалгаад дахин оролдоно уу.</p>
+    <button onclick="window.location.reload()">Дахин оролдох</button>
+  </div>
+</body>
+</html>
