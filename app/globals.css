@@ -1344,6 +1344,53 @@ a {
   margin-top: 10px;
 }
 
+.subject-item-edit,
+.subject-item-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 38px;
+  max-width: 100%;
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.subject-item-edit {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.subject-item-delete {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.subject-form-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.subject-form-actions .ec-button {
+  flex: 1;
+}
+
+.educore-shell.dark .subject-item-edit {
+  color: #bfdbfe;
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.educore-shell.dark .subject-item-delete {
+  color: #fecaca;
+  background: rgba(220, 38, 38, 0.2);
+}
+
 .subject-video-preview {
   display: grid;
   gap: 8px;

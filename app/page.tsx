@@ -1822,8 +1822,15 @@ function SubjectContentPanel({
   const [lessonForm, setLessonForm] = useState({ title: "", topicId: "", duration: "", objectives: "" });
   const [videoForm, setVideoForm] = useState({ title: "", topicId: "", duration: "", videoUrl: "" });
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [assignmentForm, setAssignmentForm] = useState({ title: "", dueDate: "", maxScore: "", type: "Homework", instructions: "" });
+  const [assignmentForm, setAssignmentForm] = useState({ title: "", dueDate: "", maxScore: "", type: "Homework", description: "" });
   const [activeEditorTab, setActiveEditorTab] = useState<"file" | "topic" | "lesson" | "video" | "assignment" | null>(null);
+  const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
+  const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
+  const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
+  const [deleteLessonTarget, setDeleteLessonTarget] = useState<{ id: string; label: string } | null>(null);
+  const [deleteTopicTarget, setDeleteTopicTarget] = useState<{ id: string; label: string } | null>(null);
+  const [deleteAssignmentTarget, setDeleteAssignmentTarget] = useState<{ id: string; label: string } | null>(null);
   const videoFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const currentContent = content ?? emptySubjectContent(subject.id);
@@ -2042,10 +2049,26 @@ function SubjectContentPanel({
     const title = topicForm.title.trim();
     if (!title) return;
 
+    const description = topicForm.description.trim() || undefined;
+
+    if (editingTopicId) {
+      const nextContent = {
+        ...currentContent,
+        topics: currentContent.topics.map((topic) =>
+          topic.id === editingTopicId ? { ...topic, title, description } : topic
+        )
+      };
+
+      await persistContent(nextContent, title);
+      setTopicForm({ title: "", description: "" });
+      setEditingTopicId(null);
+      return;
+    }
+
     const topic = {
       id: `T-${Date.now()}`,
       title,
-      description: topicForm.description.trim() || undefined
+      description
     };
     const nextContent = {
       ...currentContent,
@@ -2058,6 +2081,44 @@ function SubjectContentPanel({
     setVideoForm((current) => ({ ...current, topicId: current.topicId || topic.id }));
   }
 
+  function startEditTopic(topic: { id: string; title: string; description?: string }) {
+    setEditingTopicId(topic.id);
+    setTopicForm({
+      title: topic.title,
+      description: topic.description ?? ""
+    });
+    setActiveView("overview");
+    setActiveEditorTab("topic");
+    requestAnimationFrame(() => {
+      document.getElementById("subject-editor-accordion")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function requestDeleteTopic(topic: { id: string; title: string }) {
+    setDeleteTopicTarget({ id: topic.id, label: topic.title });
+  }
+
+  async function deleteTopic() {
+    if (!deleteTopicTarget) return;
+
+    const topicId = deleteTopicTarget.id;
+    const label = deleteTopicTarget.label;
+    const nextContent = {
+      ...currentContent,
+      topics: currentContent.topics.filter((topic) => topic.id !== topicId),
+      lessons: currentContent.lessons.filter((lesson) => lesson.topicId !== topicId)
+    };
+
+    setDeleteTopicTarget(null);
+    if (editingTopicId === topicId) {
+      setEditingTopicId(null);
+      setTopicForm({ title: "", description: "" });
+    }
+
+    await persistContent(nextContent, label);
+    setMessage(language === "mn" ? "Сэдэв болон холбогдох хичээлүүд устгагдлаа." : "Topic and its lessons were deleted.");
+  }
+
   async function addLesson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -2068,26 +2129,97 @@ function SubjectContentPanel({
     const topics = currentContent.topics.length > 0
       ? currentContent.topics
       : [{ id: topicId, title: language === "mn" ? "Ерөнхий сэдэв" : "General topic" }];
-    const nextContent = {
-      ...currentContent,
-      topics,
-      lessons: [
-        ...currentContent.lessons,
-        {
-          id: `L-${Date.now()}`,
-          title,
-          topicId,
-          duration: lessonForm.duration.trim() || undefined,
-          objectives: lessonForm.objectives
-            .split(/\r?\n|,/)
-            .map((item) => item.trim())
-            .filter(Boolean)
+    const objectives = lessonForm.objectives
+      .split(/\r?\n|,/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    const nextContent = editingLessonId
+      ? {
+          ...currentContent,
+          topics,
+          lessons: currentContent.lessons.map((lesson) =>
+            lesson.id === editingLessonId
+              ? { ...lesson, title, topicId, duration: lessonForm.duration.trim() || undefined, objectives }
+              : lesson
+          )
         }
-      ]
-    };
+      : {
+          ...currentContent,
+          topics,
+          lessons: [
+            ...currentContent.lessons,
+            {
+              id: `L-${Date.now()}`,
+              title,
+              topicId,
+              duration: lessonForm.duration.trim() || undefined,
+              objectives
+            }
+          ]
+        };
 
     await persistContent(nextContent, title);
     setLessonForm({ title: "", topicId, duration: "", objectives: "" });
+    setEditingLessonId(null);
+  }
+
+  function startEditLesson(lesson: SubjectLesson) {
+    setEditingLessonId(lesson.id);
+    setLessonForm({
+      title: lesson.title,
+      topicId: lesson.topicId,
+      duration: lesson.duration ?? "",
+      objectives: lesson.objectives?.join("\n") ?? ""
+    });
+    setActiveView("overview");
+    setActiveEditorTab("lesson");
+    requestAnimationFrame(() => {
+      document.getElementById("subject-editor-accordion")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function startEditVideoLesson(lesson: SubjectLesson) {
+    setEditingVideoId(lesson.id);
+    setVideoForm({
+      title: lesson.title,
+      topicId: lesson.topicId,
+      duration: lesson.duration ?? "",
+      videoUrl: lesson.videoUrl ?? ""
+    });
+    setActiveView("overview");
+    setActiveEditorTab("video");
+    requestAnimationFrame(() => {
+      document.getElementById("subject-editor-accordion")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function requestDeleteLesson(lesson: SubjectLesson) {
+    setDeleteLessonTarget({ id: lesson.id, label: lesson.title });
+  }
+
+  async function deleteLesson() {
+    if (!deleteLessonTarget) return;
+
+    const lessonId = deleteLessonTarget.id;
+    const label = deleteLessonTarget.label;
+    const nextContent = {
+      ...currentContent,
+      lessons: currentContent.lessons.filter((lesson) => lesson.id !== lessonId)
+    };
+
+    setDeleteLessonTarget(null);
+    if (editingLessonId === lessonId) {
+      setEditingLessonId(null);
+      setLessonForm({ title: "", topicId: selectedTopicId, duration: "", objectives: "" });
+    }
+    if (editingVideoId === lessonId) {
+      setEditingVideoId(null);
+      setVideoForm({ title: "", topicId: selectedVideoTopicId, duration: "", videoUrl: "" });
+    }
+
+    await persistContent(nextContent, label);
+    setMessage(language === "mn" ? "Хичээл устгагдлаа." : "Lesson deleted.");
   }
 
   async function addVideoLesson(event: FormEvent<HTMLFormElement>) {
@@ -2113,6 +2245,7 @@ function SubjectContentPanel({
         setMessage(language === "mn" ? "Видео файл амжилттай нэмэгдлээ." : "Video file uploaded successfully.");
         setVideoForm({ title: "", topicId, duration: "", videoUrl: "" });
         setVideoFile(null);
+        setEditingVideoId(null);
         if (videoFileInputRef.current) videoFileInputRef.current.value = "";
       } catch {
         setMessage(language === "mn" ? "Видео файл upload хийж чадсангүй." : "The video file could not be uploaded.");
@@ -2125,23 +2258,35 @@ function SubjectContentPanel({
     const topics = currentContent.topics.length > 0
       ? currentContent.topics
       : [{ id: topicId, title: language === "mn" ? "Ерөнхий сэдэв" : "General topic" }];
-    const nextContent = {
-      ...currentContent,
-      topics,
-      lessons: [
-        ...currentContent.lessons,
-        {
-          id: `L-VIDEO-${Date.now()}`,
-          title,
-          topicId,
-          duration: videoForm.duration.trim() || undefined,
-          videoUrl
+
+    const nextContent = editingVideoId
+      ? {
+          ...currentContent,
+          topics,
+          lessons: currentContent.lessons.map((lesson) =>
+            lesson.id === editingVideoId
+              ? { ...lesson, title, topicId, duration: videoForm.duration.trim() || undefined, videoUrl }
+              : lesson
+          )
         }
-      ]
-    };
+      : {
+          ...currentContent,
+          topics,
+          lessons: [
+            ...currentContent.lessons,
+            {
+              id: `L-VIDEO-${Date.now()}`,
+              title,
+              topicId,
+              duration: videoForm.duration.trim() || undefined,
+              videoUrl
+            }
+          ]
+        };
 
     await persistContent(nextContent, title);
     setVideoForm({ title: "", topicId, duration: "", videoUrl: "" });
+    setEditingVideoId(null);
   }
 
   async function addAssignment(event: FormEvent<HTMLFormElement>) {
@@ -2150,13 +2295,34 @@ function SubjectContentPanel({
     const title = assignmentForm.title.trim();
     if (!title) return;
 
+    const dueDate = assignmentForm.dueDate.trim() || undefined;
+    const maxScore = assignmentForm.maxScore.trim() ? Number(assignmentForm.maxScore.trim()) : undefined;
+    const type = assignmentForm.type.trim() || undefined;
+    const description = assignmentForm.description.trim() || undefined;
+
+    if (editingAssignmentId) {
+      const nextContent = {
+        ...currentContent,
+        assignments: currentContent.assignments.map((assignment: any) =>
+          assignment.id === editingAssignmentId
+            ? { ...assignment, title, dueDate, maxScore, type, description }
+            : assignment
+        )
+      };
+
+      await persistContent(nextContent, title);
+      setAssignmentForm({ title: "", dueDate: "", maxScore: "", type: "Homework", description: "" });
+      setEditingAssignmentId(null);
+      return;
+    }
+
     const assignment = {
       id: `A-${Date.now()}`,
       title,
-      dueDate: assignmentForm.dueDate.trim() || undefined,
-      maxScore: assignmentForm.maxScore.trim() ? Number(assignmentForm.maxScore.trim()) : undefined,
-      type: assignmentForm.type.trim() || undefined,
-      instructions: assignmentForm.instructions.trim() || undefined
+      dueDate,
+      maxScore,
+      type,
+      description
     };
     const nextContent = {
       ...currentContent,
@@ -2164,7 +2330,50 @@ function SubjectContentPanel({
     };
 
     await persistContent(nextContent, title);
-    setAssignmentForm({ title: "", dueDate: "", maxScore: "", type: "Homework", instructions: "" });
+    setAssignmentForm({ title: "", dueDate: "", maxScore: "", type: "Homework", description: "" });
+  }
+
+  function startEditAssignment(assignment: any) {
+    setEditingAssignmentId(assignment.id);
+    setAssignmentForm({
+      title: assignment.title ?? "",
+      dueDate: assignment.dueDate ?? "",
+      maxScore: assignment.maxScore != null ? String(assignment.maxScore) : "",
+      type: assignment.type ?? "Homework",
+      description: assignment.description ?? ""
+    });
+    setActiveView("overview");
+    setActiveEditorTab("assignment");
+    requestAnimationFrame(() => {
+      document.getElementById("subject-editor-accordion")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function requestDeleteAssignment(assignment: any, index: number) {
+    setDeleteAssignmentTarget({
+      id: assignment.id ?? String(index),
+      label: assignment.title ?? (language === "mn" ? "Гарчиггүй даалгавар" : "Untitled assignment")
+    });
+  }
+
+  async function deleteAssignment() {
+    if (!deleteAssignmentTarget) return;
+
+    const assignmentId = deleteAssignmentTarget.id;
+    const label = deleteAssignmentTarget.label;
+    const nextContent = {
+      ...currentContent,
+      assignments: currentContent.assignments.filter((assignment: any, index: number) => (assignment.id ?? String(index)) !== assignmentId)
+    };
+
+    setDeleteAssignmentTarget(null);
+    if (editingAssignmentId === assignmentId) {
+      setEditingAssignmentId(null);
+      setAssignmentForm({ title: "", dueDate: "", maxScore: "", type: "Homework", description: "" });
+    }
+
+    await persistContent(nextContent, label);
+    setMessage(language === "mn" ? "Даалгавар устгагдлаа." : "Assignment deleted.");
   }
 
   return (
@@ -2224,7 +2433,7 @@ function SubjectContentPanel({
           </div>
 
           {canManage && activeView === "overview" ? (
-  <div className="subject-accordion">
+  <div className="subject-accordion" id="subject-editor-accordion">
     {(
       [
         { id: "file", icon: <FileUp size={18} />, labelEn: "Add from file", labelMn: "Файлаас нэмэх" },
@@ -2284,10 +2493,26 @@ function SubjectContentPanel({
                   <form className="subject-inline-form" onSubmit={addTopic}>
                     <Input onChange={(event) => setTopicForm((current) => ({ ...current, title: event.target.value }))} placeholder={language === "mn" ? "Сэдвийн нэр" : "Topic title"} required value={topicForm.title} />
                     <Input onChange={(event) => setTopicForm((current) => ({ ...current, description: event.target.value }))} placeholder={language === "mn" ? "Тайлбар" : "Description"} value={topicForm.description} />
-                    <Button disabled={saving} type="submit">
-                      <Plus size={16} />
-                      {language === "mn" ? "Сэдэв нэмэх" : "Add topic"}
-                    </Button>
+                    <div className="subject-form-actions">
+                      <Button disabled={saving} type="submit">
+                        {editingTopicId ? <Check size={16} /> : <Plus size={16} />}
+                        {editingTopicId
+                          ? (language === "mn" ? "Хадгалах" : "Save changes")
+                          : (language === "mn" ? "Сэдэв нэмэх" : "Add topic")}
+                      </Button>
+                      {editingTopicId ? (
+                        <Button
+                          onClick={() => {
+                            setEditingTopicId(null);
+                            setTopicForm({ title: "", description: "" });
+                          }}
+                          type="button"
+                          variant="ghost"
+                        >
+                          {language === "mn" ? "Цуцлах" : "Cancel"}
+                        </Button>
+                      ) : null}
+                    </div>
                   </form>
                 )}
 
@@ -2302,10 +2527,26 @@ function SubjectContentPanel({
                     />
                     <Input onChange={(event) => setLessonForm((current) => ({ ...current, duration: event.target.value }))} placeholder={language === "mn" ? "Үргэлжлэх хугацаа" : "Duration"} value={lessonForm.duration} />
                     <Input onChange={(event) => setLessonForm((current) => ({ ...current, objectives: event.target.value }))} placeholder={language === "mn" ? "Зорилго, таслалаар" : "Objectives, comma-separated"} value={lessonForm.objectives} />
-                    <Button disabled={saving} type="submit">
-                      <Plus size={16} />
-                      {language === "mn" ? "Хичээл нэмэх" : "Add lesson"}
-                    </Button>
+                    <div className="subject-form-actions">
+                      <Button disabled={saving} type="submit">
+                        {editingLessonId ? <Check size={16} /> : <Plus size={16} />}
+                        {editingLessonId
+                          ? (language === "mn" ? "Хадгалах" : "Save changes")
+                          : (language === "mn" ? "Хичээл нэмэх" : "Add lesson")}
+                      </Button>
+                      {editingLessonId ? (
+                        <Button
+                          onClick={() => {
+                            setEditingLessonId(null);
+                            setLessonForm({ title: "", topicId: selectedTopicId, duration: "", objectives: "" });
+                          }}
+                          type="button"
+                          variant="ghost"
+                        >
+                          {language === "mn" ? "Цуцлах" : "Cancel"}
+                        </Button>
+                      ) : null}
+                    </div>
                   </form>
                 )}
 
@@ -2320,20 +2561,38 @@ function SubjectContentPanel({
                     />
                     <Input onChange={(event) => setVideoForm((current) => ({ ...current, duration: event.target.value }))} placeholder={language === "mn" ? "Үргэлжлэх хугацаа" : "Duration"} value={videoForm.duration} />
                     <Input onChange={(event) => setVideoForm((current) => ({ ...current, videoUrl: event.target.value }))} placeholder={language === "mn" ? "Видео холбоос оруулах" : "Enter video URL"} type="text" value={videoForm.videoUrl} />
-                    <label className="subject-video-file-import">
-                      <FileUp size={18} />
-                      <span>{videoFile?.name ?? (language === "mn" ? "Видео файл сонгох" : "Choose video file")}</span>
-                      <input
-                        accept=".mp4,.webm,.ogg,.mov,.m4v,video/mp4,video/webm,video/ogg,video/quicktime"
-                        onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)}
-                        ref={videoFileInputRef}
-                        type="file"
-                      />
-                    </label>
-                    <Button disabled={saving} type="submit">
-                      <Video size={16} />
-                      {language === "mn" ? "Видео нэмэх" : "Add video"}
-                    </Button>
+                    {!editingVideoId ? (
+                      <label className="subject-video-file-import">
+                        <FileUp size={18} />
+                        <span>{videoFile?.name ?? (language === "mn" ? "Видео файл сонгох" : "Choose video file")}</span>
+                        <input
+                          accept=".mp4,.webm,.ogg,.mov,.m4v,video/mp4,video/webm,video/ogg,video/quicktime"
+                          onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)}
+                          ref={videoFileInputRef}
+                          type="file"
+                        />
+                      </label>
+                    ) : null}
+                    <div className="subject-form-actions">
+                      <Button disabled={saving} type="submit">
+                        {editingVideoId ? <Check size={16} /> : <Video size={16} />}
+                        {editingVideoId
+                          ? (language === "mn" ? "Хадгалах" : "Save changes")
+                          : (language === "mn" ? "Видео нэмэх" : "Add video")}
+                      </Button>
+                      {editingVideoId ? (
+                        <Button
+                          onClick={() => {
+                            setEditingVideoId(null);
+                            setVideoForm({ title: "", topicId: selectedVideoTopicId, duration: "", videoUrl: "" });
+                          }}
+                          type="button"
+                          variant="ghost"
+                        >
+                          {language === "mn" ? "Цуцлах" : "Cancel"}
+                        </Button>
+                      ) : null}
+                    </div>
                   </form>
                 )}
 
@@ -2352,11 +2611,27 @@ function SubjectContentPanel({
                       onChange={(type) => setAssignmentForm((current) => ({ ...current, type }))}
                       value={assignmentForm.type}
                     />
-                    <Input onChange={(event) => setAssignmentForm((current) => ({ ...current, instructions: event.target.value }))} placeholder={language === "mn" ? "Зааварчилгаа" : "Instructions"} value={assignmentForm.instructions} />
-                    <Button disabled={saving} type="submit">
-                      <Plus size={16} />
-                      {language === "mn" ? "Даалгавар нэмэх" : "Add assignment"}
-                    </Button>
+                    <Input onChange={(event) => setAssignmentForm((current) => ({ ...current, description: event.target.value }))} placeholder={language === "mn" ? "Зааварчилгаа" : "Instructions"} value={assignmentForm.description} />
+                    <div className="subject-form-actions">
+                      <Button disabled={saving} type="submit">
+                        {editingAssignmentId ? <Check size={16} /> : <Plus size={16} />}
+                        {editingAssignmentId
+                          ? (language === "mn" ? "Хадгалах" : "Save changes")
+                          : (language === "mn" ? "Даалгавар нэмэх" : "Add assignment")}
+                      </Button>
+                      {editingAssignmentId ? (
+                        <Button
+                          onClick={() => {
+                            setEditingAssignmentId(null);
+                            setAssignmentForm({ title: "", dueDate: "", maxScore: "", type: "Homework", description: "" });
+                          }}
+                          type="button"
+                          variant="ghost"
+                        >
+                          {language === "mn" ? "Цуцлах" : "Cancel"}
+                        </Button>
+                      ) : null}
+                    </div>
                   </form>
                 )}
 
@@ -2383,6 +2658,16 @@ function SubjectContentPanel({
                         <article key={topic.id}>
                           <strong>{translateValue(topic.title, language)}</strong>
                           {topic.description ? <p>{translateValue(topic.description, language)}</p> : null}
+                          {canManage ? (
+                            <div className="subject-file-actions">
+                              <button className="subject-item-edit" aria-label={language === "mn" ? "Засах" : "Edit"} onClick={() => startEditTopic(topic)} title={language === "mn" ? "Засах" : "Edit"} type="button">
+                                <Pencil size={15} />
+                              </button>
+                              <button className="subject-item-delete" aria-label={language === "mn" ? "Устгах" : "Delete"} onClick={() => requestDeleteTopic(topic)} title={language === "mn" ? "Устгах" : "Delete"} type="button">
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          ) : null}
                         </article>
                       ))
                     ) : (
@@ -2413,17 +2698,31 @@ function SubjectContentPanel({
                               {topic?.title ? translateValue(topic.title, language) : lesson.topicId}
                               {lesson.duration ? ` - ${lesson.duration}` : ""}
                             </p>
-                            {lesson.fileUrl ? (
+                            {(lesson.fileUrl || canManage) ? (
                               <div className="subject-file-actions">
-                                <a className="subject-file-link" href={lesson.fileUrl} target="_blank" rel="noreferrer">
-                                  <Download size={15} />
-                                  <span>{lesson.fileName ?? (language === "mn" ? "Файл нээх" : "Open file")}</span>
-                                  {lesson.fileSize ? <small>{formatFileSize(lesson.fileSize)}</small> : null}
-                                </a>
-                                <button className="subject-file-print" onClick={() => printLessonFile(lesson, topic?.title ? translateValue(topic.title, language) : lesson.topicId)} type="button">
-                                  <Printer size={15} />
-                                  <span>{language === "mn" ? "PDF-р хэвлэх" : "Print PDF"}</span>
-                                </button>
+                                {lesson.fileUrl ? (
+                                  <>
+                                    <a className="subject-file-link" href={lesson.fileUrl} target="_blank" rel="noreferrer">
+                                      <Download size={15} />
+                                      <span>{lesson.fileName ?? (language === "mn" ? "Файл нээх" : "Open file")}</span>
+                                      {lesson.fileSize ? <small>{formatFileSize(lesson.fileSize)}</small> : null}
+                                    </a>
+                                    <button className="subject-file-print" onClick={() => printLessonFile(lesson, topic?.title ? translateValue(topic.title, language) : lesson.topicId)} type="button">
+                                      <Printer size={15} />
+                                      <span>{language === "mn" ? "PDF-р хэвлэх" : "Print PDF"}</span>
+                                    </button>
+                                  </>
+                                ) : null}
+                                {canManage ? (
+                                  <>
+                                    <button className="subject-item-edit" aria-label={language === "mn" ? "Засах" : "Edit"} onClick={() => startEditLesson(lesson)} title={language === "mn" ? "Засах" : "Edit"} type="button">
+                                      <Pencil size={15} />
+                                    </button>
+                                    <button className="subject-item-delete" aria-label={language === "mn" ? "Устгах" : "Delete"} onClick={() => requestDeleteLesson(lesson)} title={language === "mn" ? "Устгах" : "Delete"} type="button">
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </>
+                                ) : null}
                               </div>
                             ) : null}
                             {lesson.objectives?.length ? (
@@ -2482,6 +2781,16 @@ function SubjectContentPanel({
                                   </a>
                                 )}
                               </div>
+                              {canManage ? (
+                                <div className="subject-file-actions">
+                                  <button className="subject-item-edit" aria-label={language === "mn" ? "Засах" : "Edit"} onClick={() => startEditVideoLesson(lesson)} title={language === "mn" ? "Засах" : "Edit"} type="button">
+                                    <Pencil size={15} />
+                                  </button>
+                                  <button className="subject-item-delete" aria-label={language === "mn" ? "Устгах" : "Delete"} onClick={() => requestDeleteLesson(lesson)} title={language === "mn" ? "Устгах" : "Delete"} type="button">
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              ) : null}
                             </article>
                           );
                         })}
@@ -2535,6 +2844,16 @@ function SubjectContentPanel({
                                   )}
                                 </div>
                               ) : null}
+                              {canManage ? (
+                                <div className="subject-file-actions">
+                                  <button className="subject-item-edit" aria-label={language === "mn" ? "Засах" : "Edit"} onClick={() => startEditVideoLesson(lesson)} title={language === "mn" ? "Засах" : "Edit"} type="button">
+                                    <Pencil size={15} />
+                                  </button>
+                                  <button className="subject-item-delete" aria-label={language === "mn" ? "Устгах" : "Delete"} onClick={() => requestDeleteLesson(lesson)} title={language === "mn" ? "Устгах" : "Delete"} type="button">
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              ) : null}
                             </article>
                           );
                         })
@@ -2568,7 +2887,17 @@ function SubjectContentPanel({
                               ].filter(Boolean).join(" · ")}
                             </p>
                           ) : null}
-                          {assignment.instructions ? <p>{assignment.instructions}</p> : null}
+                          {assignment.description ? <p>{assignment.description}</p> : null}
+                          {canManage ? (
+                            <div className="subject-file-actions">
+                              <button className="subject-item-edit" aria-label={language === "mn" ? "Засах" : "Edit"} onClick={() => startEditAssignment(assignment)} title={language === "mn" ? "Засах" : "Edit"} type="button">
+                                <Pencil size={15} />
+                              </button>
+                              <button className="subject-item-delete" aria-label={language === "mn" ? "Устгах" : "Delete"} onClick={() => requestDeleteAssignment(assignment, index)} title={language === "mn" ? "Устгах" : "Delete"} type="button">
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          ) : null}
                         </article>
                       ))
                     ) : (
@@ -2581,6 +2910,95 @@ function SubjectContentPanel({
           ) : null}
         </>
       )}
+
+      {deleteLessonTarget ? (
+        <div className="modal-layer">
+          <div className="delete-modal" role="dialog" aria-modal="true" aria-labelledby="lesson-delete-title">
+            <div className="delete-icon">
+              <Trash2 size={20} />
+            </div>
+            <div>
+              <strong id="lesson-delete-title">{language === "mn" ? "Хичээл устгах" : "Delete lesson"}</strong>
+              <p>
+                {language === "mn"
+                  ? `"${deleteLessonTarget.label}"-ыг устгахдаа итгэлтэй байна уу?`
+                  : `Are you sure you want to delete "${deleteLessonTarget.label}"?`}
+              </p>
+            </div>
+            <div className="delete-actions">
+              <Button onClick={() => setDeleteLessonTarget(null)} type="button" variant="ghost">
+                {language === "mn" ? "Цуцлах" : "Cancel"}
+              </Button>
+              <Button onClick={() => deleteLesson()} type="button" variant="danger">
+                <Trash2 size={16} />
+                {language === "mn" ? "Устгах" : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteTopicTarget ? (
+        <div className="modal-layer">
+          <div className="delete-modal" role="dialog" aria-modal="true" aria-labelledby="topic-delete-title">
+            <div className="delete-icon">
+              <Trash2 size={20} />
+            </div>
+            <div>
+              <strong id="topic-delete-title">{language === "mn" ? "Сэдэв устгах" : "Delete topic"}</strong>
+              <p>
+                {(() => {
+                  const lessonCount = currentContent.lessons.filter((lesson) => lesson.topicId === deleteTopicTarget.id).length;
+                  if (language === "mn") {
+                    return lessonCount > 0
+                      ? `"${deleteTopicTarget.label}" сэдвийг устгахад дотор нь байгаа ${lessonCount} хичээл/видео хамт устгагдана. Үргэлжлүүлэх үү?`
+                      : `"${deleteTopicTarget.label}"-ыг устгахдаа итгэлтэй байна уу?`;
+                  }
+                  return lessonCount > 0
+                    ? `Deleting "${deleteTopicTarget.label}" will also delete ${lessonCount} lesson(s)/video(s) inside it. Continue?`
+                    : `Are you sure you want to delete "${deleteTopicTarget.label}"?`;
+                })()}
+              </p>
+            </div>
+            <div className="delete-actions">
+              <Button onClick={() => setDeleteTopicTarget(null)} type="button" variant="ghost">
+                {language === "mn" ? "Цуцлах" : "Cancel"}
+              </Button>
+              <Button onClick={() => deleteTopic()} type="button" variant="danger">
+                <Trash2 size={16} />
+                {language === "mn" ? "Устгах" : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteAssignmentTarget ? (
+        <div className="modal-layer">
+          <div className="delete-modal" role="dialog" aria-modal="true" aria-labelledby="assignment-delete-title">
+            <div className="delete-icon">
+              <Trash2 size={20} />
+            </div>
+            <div>
+              <strong id="assignment-delete-title">{language === "mn" ? "Даалгавар устгах" : "Delete assignment"}</strong>
+              <p>
+                {language === "mn"
+                  ? `"${deleteAssignmentTarget.label}"-ыг устгахдаа итгэлтэй байна уу?`
+                  : `Are you sure you want to delete "${deleteAssignmentTarget.label}"?`}
+              </p>
+            </div>
+            <div className="delete-actions">
+              <Button onClick={() => setDeleteAssignmentTarget(null)} type="button" variant="ghost">
+                {language === "mn" ? "Цуцлах" : "Cancel"}
+              </Button>
+              <Button onClick={() => deleteAssignment()} type="button" variant="danger">
+                <Trash2 size={16} />
+                {language === "mn" ? "Устгах" : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

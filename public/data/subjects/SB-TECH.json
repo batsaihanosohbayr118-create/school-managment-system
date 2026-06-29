@@ -1,41 +1,6 @@
 {
   "subjectId": "SB-TECH",
-  "topics": [
-    {
-      "id": "T-FILES",
-      "title": "Uploaded lesson files",
-      "description": "Word, PowerPoint, PDF, and other prepared lesson materials"
-    }
-  ],
-  "lessons": [
-    {
-      "id": "L-FILE-1781759338390-1",
-      "title": "Capstone Project Report",
-      "topicId": "T-FILES",
-      "fileName": "Capstone Project Report.pdf",
-      "fileUrl": "/data/subjects/SB-TECH/files/1781759338383-1-Capstone-Project-Report.pdf",
-      "fileType": "application/pdf",
-      "fileSize": 29842,
-      "uploadedAt": "2026-06-18T05:08:58.391Z"
-    },
-    {
-      "id": "L-VIDEO-1781771702524",
-      "title": "Шугаман зураг",
-      "topicId": "T-FILES",
-      "duration": "5 мин",
-      "videoUrl": "https://youtu.be/8ba8rQ_SJdc?list=RD8ba8rQ_SJdc"
-    },
-    {
-      "id": "L-FILE-1781772161581-1",
-      "title": "Дуу",
-      "topicId": "T-FILES",
-      "duration": "3 мин",
-      "fileName": "20251112_052033000_iOS.MOV",
-      "fileUrl": "/data/subjects/SB-TECH/files/1781772161562-1-20251112_052033000_iOS.MOV",
-      "fileType": "video/quicktime",
-      "fileSize": 5379797,
-      "uploadedAt": "2026-06-18T08:42:41.581Z"
-    }
-  ],
+  "topics": [],
+  "lessons": [],
   "assignments": []
 }

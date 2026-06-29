@@ -85,6 +85,7 @@ export type SubjectAssignment = {
   lessonId?: string;
   dueDate?: string;
   maxScore?: number;
+  type?: string;
   description?: string;
 };
 
