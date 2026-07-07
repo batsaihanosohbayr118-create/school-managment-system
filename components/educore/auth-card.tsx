@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, Eye, EyeOff, KeyRound, LockKeyhole, Mail, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { authService, getAuthRedirectUrl, isSupabaseConfigured } from "@/lib/supabase";
+import { passwordStrengthLabel, validatePasswordStrength } from "@/lib/password-validation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,9 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
   const [name, setName] = useState(isSupabaseConfigured ? "" : "Admin User");
   const [selectedRole, setSelectedRole] = useState<Role | "">("");
   const [roleOpen, setRoleOpen] = useState(false);
+  const [adminCode, setAdminCode] = useState("");
+  const passwordCheck = validatePasswordStrength(password);
+  const strength = passwordStrengthLabel(passwordCheck.score);
   const copy = translations[language];
   const [message, setMessage] = useState("");
   const registeredMessage = searchParams.get("registered") ? copy.auth.messages.registered : "";
@@ -185,6 +189,11 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
                 return;
               }
 
+              if (!passwordCheck.isValid) {
+                setMessage(passwordCheck.errors[0]);
+                return;
+              }
+
               const result = await authService.updatePassword(password);
 
               if ("error" in result && result.error) {
@@ -200,6 +209,38 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
             if (mode === "register" && !registrationRole) {
               setMessage(language === "mn" ? "Role сонгоод бүртгүүлнэ үү." : "Choose a role before registering.");
               return;
+            }
+
+            // Password strength is mandatory for every new account, no exceptions.
+            if (mode === "register" && !passwordCheck.isValid) {
+              setMessage(passwordCheck.errors[0]);
+              return;
+            }
+
+            // Extra gate: registering as "admin" requires a valid invite code,
+            // verified server-side so the real code never ships to the client.
+            if (mode === "register" && registrationRole === "admin") {
+              if (!adminCode.trim()) {
+                setMessage(language === "mn" ? "Admin эрхээр бүртгүүлэхэд урилгын код шаардлагатай." : "An invite code is required to register as admin.");
+                return;
+              }
+
+              try {
+                const verifyResponse = await fetch("/api/admin/verify-invite", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ code: adminCode.trim() })
+                });
+                const verifyResult = await verifyResponse.json();
+
+                if (!verifyResult.valid) {
+                  setMessage(verifyResult.message ?? (language === "mn" ? "Admin код буруу байна." : "Invalid admin code."));
+                  return;
+                }
+              } catch {
+                setMessage(language === "mn" ? "Admin кодыг шалгах үед алдаа гарлаа." : "Could not verify the admin code.");
+                return;
+              }
             }
 
             if (!isSupabaseConfigured && mode === "register") {
@@ -312,6 +353,15 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
               </div>
             </label>
           ) : null}
+          {mode === "register" && selectedRole === "admin" ? (
+            <label>
+              {language === "mn" ? "Admin урилгын код" : "Admin invite code"}
+              <span className="auth-field">
+                <ShieldCheck size={18} />
+                <Input value={adminCode} onChange={(event) => setAdminCode(event.target.value)} />
+              </span>
+            </label>
+          ) : null}
           <label>
             {copy.auth.fields.email}
             <span className="auth-field">
@@ -343,6 +393,37 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
                   {passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </span>
+              {mode === "register" || (mode === "forgot" && resetStep === "password") ? (
+                <div className="auth-password-strength" style={{ marginTop: 6 }}>
+                  <div
+                    style={{
+                      height: 4,
+                      borderRadius: 4,
+                      background: "#e5e7eb",
+                      overflow: "hidden"
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${(passwordCheck.score / 4) * 100}%`,
+                        background: strength.color,
+                        transition: "width 150ms ease"
+                      }}
+                    />
+                  </div>
+                  <p style={{ fontSize: 12, color: strength.color, margin: "4px 0 0" }}>
+                    {password ? strength.label : ""}
+                  </p>
+                  {password && !passwordCheck.isValid ? (
+                    <ul style={{ fontSize: 12, color: "#6b7280", margin: "4px 0 0", paddingLeft: 16 }}>
+                      {passwordCheck.errors.map((err) => (
+                        <li key={err}>{err}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
             </label>
           ) : null}
           {mode === "forgot" && resetStep !== "email" ? (
@@ -358,7 +439,13 @@ export function AuthCard({ mode }: { mode: AuthMode }) {
               {copy.auth.reset.changeEmail}
             </button>
           ) : null}
-          <Button type="submit">
+          <Button
+            type="submit"
+            disabled={
+              (mode === "register" && !passwordCheck.isValid) ||
+              (mode === "forgot" && resetStep === "password" && !passwordCheck.isValid)
+            }
+          >
             {mode === "forgot" ? <Mail size={17} /> : <ShieldCheck size={17} />}
             {resetButtonLabel}
           </Button>
