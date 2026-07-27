@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ResourceTable } from "@/lib/school-db";
-import { toAttendanceEntries, toGradeEntries, toTimetableSlots } from "@/lib/mobile/projections";
+import {
+  toAnnouncementEntries,
+  toAttendanceEntries,
+  toGradeEntries,
+  toPaymentEntries,
+  toTimetableSlots
+} from "@/lib/mobile/projections";
 
 const timetable: ResourceTable = {
   columns: ["Subject", "Day", "Time", "Teacher", "Class"],
@@ -95,5 +101,53 @@ describe("toAttendanceEntries", () => {
 
   it("returns an empty array for no rows", () => {
     expect(toAttendanceEntries({ ...attendance, ids: [], rows: [] })).toEqual([]);
+  });
+});
+
+const payments: ResourceTable = {
+  columns: ["Student", "Amount", "Status", "Due Date"],
+  ids: ["PA-1", "PA-2"],
+  rows: [
+    ["Бат", "$2,840", "Unpaid", "2026-06-01"],
+    ["Бат", "Waived", "Paid", "2026-05-01"]
+  ]
+};
+
+describe("toPaymentEntries", () => {
+  it("parses a formatted amount while keeping the label", () => {
+    const [first] = toPaymentEntries(payments);
+    expect(first.id).toBe("PA-1");
+    expect(first.amount).toBe(2840);
+    expect(first.amountLabel).toBe("$2,840");
+    expect(first.status).toBe("Unpaid");
+    expect(first.dueDate).toBe("2026-06-01");
+  });
+
+  it("nulls the number for a non-numeric amount", () => {
+    const [, second] = toPaymentEntries(payments);
+    expect(second.amount).toBeNull();
+    expect(second.amountLabel).toBe("Waived");
+  });
+
+  it("resolves the two-word Due Date column", () => {
+    expect(() => toPaymentEntries(payments)).not.toThrow();
+  });
+});
+
+const announcements: ResourceTable = {
+  columns: ["Title", "Content", "Audience", "Date"],
+  ids: ["AN-1"],
+  rows: [["Амралт", "Даваа гарагт хичээл болохгүй", "All", "2026-05-18"]]
+};
+
+describe("toAnnouncementEntries", () => {
+  it("maps the row", () => {
+    expect(toAnnouncementEntries(announcements)[0]).toEqual({
+      id: "AN-1",
+      title: "Амралт",
+      content: "Даваа гарагт хичээл болохгүй",
+      audience: "All",
+      date: "2026-05-18"
+    });
   });
 });
