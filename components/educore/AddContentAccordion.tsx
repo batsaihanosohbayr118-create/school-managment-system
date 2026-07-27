@@ -13,6 +13,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { SubjectContent, SubjectLesson, SubjectTopic } from "@/lib/types";
+import { getClientSchoolHeaders } from "@/lib/school-session";
 
 type SectionId = "file" | "topic" | "lesson" | "video";
 
@@ -25,15 +26,17 @@ function emptyContent(subjectId: string): SubjectContent {
 }
 
 async function fetchContent(subjectId: string): Promise<SubjectContent> {
-  const res = await fetch(`/api/subjects/${subjectId}/content`);
+  const headers = await getClientSchoolHeaders();
+  const res = await fetch(`/api/subjects/${subjectId}/content`, { headers });
   const data = await res.json().catch(() => null);
   return (data as SubjectContent | null) ?? emptyContent(subjectId);
 }
 
 async function saveContent(subjectId: string, content: SubjectContent) {
+  const headers = await getClientSchoolHeaders();
   const res = await fetch(`/api/subjects/${subjectId}/content`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(content),
   });
   const data = await res.json().catch(() => null);
@@ -42,8 +45,10 @@ async function saveContent(subjectId: string, content: SubjectContent) {
 }
 
 async function uploadFiles(subjectId: string, formData: FormData): Promise<SubjectContent> {
+  const headers = await getClientSchoolHeaders();
   const res = await fetch(`/api/subjects/${subjectId}/content`, {
     method: "POST",
+    headers,
     body: formData,
   });
   const data = await res.json().catch(() => null);
@@ -158,7 +163,6 @@ export default function AddContentAccordion({ subjectId }: Props) {
 
   useEffect(() => {
     let active = true;
-    setLoadingContent(true);
     fetchContent(subjectId).then((data) => {
       if (active) setContent(data);
       setLoadingContent(false);
@@ -352,7 +356,7 @@ export default function AddContentAccordion({ subjectId }: Props) {
     if (!hasTopics) {
       return (
         <div className="px-4 pb-5 pt-1 text-[13px] text-slate-400">
-          Эхлээд "Add topic" хэсгээс нэг сэдэв үүсгэнэ үү.
+          Эхлээд `Add topic` хэсгээс нэг сэдэв үүсгэнэ үү.
         </div>
       );
     }
@@ -427,7 +431,7 @@ export default function AddContentAccordion({ subjectId }: Props) {
     if (!hasTopics) {
       return (
         <div className="px-4 pb-5 pt-1 text-[13px] text-slate-400">
-          Эхлээд "Add topic" хэсгээс нэг сэдэв үүсгэнэ үү.
+          Эхлээд `Add topic` хэсгээс нэг сэдэв үүсгэнэ үү.
         </div>
       );
     }
@@ -455,7 +459,7 @@ export default function AddContentAccordion({ subjectId }: Props) {
         <SubmitButton loading={videoLoading}>Add video lesson</SubmitButton>
         <StatusLine status={videoStatus} />
         <p className="text-[12px] text-slate-400">
-          Видео файлыг шууд оруулах бол "Add from file" хэсгийг ашиглана уу.
+          Видео файлыг шууд оруулах бол `Add from file` хэсгийг ашиглана уу.
         </p>
       </form>
     );

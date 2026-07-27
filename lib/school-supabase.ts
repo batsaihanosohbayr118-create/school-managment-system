@@ -19,7 +19,10 @@ type SupabaseError = {
 const resourceColumns: Record<SchoolResource, string[]> = {
   students: ["Name", "Class", "Attendance", "GPA", "Payment", "Parent Email"],
   teachers: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"],
+  parents: ["Name", "Email", "Student", "Phone", "Occupation"],
   subjects: ["Name", "Category", "Grade Levels"],
+  assignments: ["Subject", "Title", "Type", "Due Date", "Max Score", "Description"],
+  materials: ["Subject", "Title", "File Type", "Uploaded By"],
   classes: ["Class", "Section", "Teacher", "Students", "Schedule"],
   attendance: ["Student", "Class", "Date", "Status"],
   grades: ["Student", "Subject", "Score", "Semester", "Student Email"],
@@ -31,7 +34,10 @@ const resourceColumns: Record<SchoolResource, string[]> = {
 const tableNames: Record<SchoolResource, string> = {
   students: "students",
   teachers: "teachers",
+  parents: "parents",
   subjects: "subjects",
+  assignments: "assignments",
+  materials: "learning_materials",
   classes: "class_rooms",
   attendance: "attendance_records",
   grades: "grade_records",
@@ -111,6 +117,12 @@ function rowToArray(resource: SchoolResource, row: SupabaseRow) {
       return [row.day, row.time, row.subject, row.teacher, row.class_name].map(stringValue);
     case "announcements":
       return [row.title, row.content, row.audience, row.date].map(stringValue);
+    case "parents":
+      return [row.name, row.email, row.student, row.phone, row.occupation].map(stringValue);
+    case "assignments":
+      return [row.subject, row.title, row.type, row.due_date, row.max_score, row.description].map(stringValue);
+    case "materials":
+      return [row.subject, row.title, row.file_type, row.uploaded_by].map(stringValue);
   }
 }
 

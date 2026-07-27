@@ -1,161 +1,241 @@
-create extension if not exists pgcrypto;
+-- ============================================================================
+-- Nova Mind Academy — Normalized School Management Schema (PostgreSQL)
+-- ============================================================================
+-- Clean, normalized target schema for the four-role system:
+--   Admin · Teacher · Student · Parent
+--
+-- Design notes:
+--   * `users` is the single identity table; `role` drives authorization.
+--   * `students`, `teachers`, and `parents` are role profiles (1-1 with users).
+--   * A parent can have many children and a child many guardians -> the
+--     `parent_student` junction table normalizes that many-to-many link.
+--   * Academic data (attendance, grades, assignments, schedule, payments,
+--     feedback) references the profile tables, not free-text names.
+--
+-- Accounts are created by administrators only — there is no public sign-up.
+-- ============================================================================
 
-do $$
-begin
-  create type user_role as enum ('admin', 'teacher', 'student');
-exception
-  when duplicate_object then null;
-end $$;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-do $$
-begin
-  create type attendance_status as enum ('Present', 'Absent', 'Late');
-exception
-  when duplicate_object then null;
-end $$;
+-- ---------------------------------------------------------------------------
+-- Enums
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+  CREATE TYPE user_role AS ENUM ('admin', 'teacher', 'student', 'parent');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-do $$
-begin
-  create type payment_status as enum ('Paid', 'Unpaid', 'Partial');
-exception
-  when duplicate_object then null;
-end $$;
+DO $$ BEGIN
+  CREATE TYPE attendance_status AS ENUM ('Present', 'Absent', 'Late');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-create table if not exists users (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  email text unique not null,
-  password text,
-  role user_role not null default 'student',
-  created_at timestamptz not null default now()
+DO $$ BEGIN
+  CREATE TYPE payment_status AS ENUM ('Paid', 'Unpaid', 'Partial');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE assignment_type AS ENUM ('Homework', 'Quiz', 'Project', 'Exam');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE submission_status AS ENUM ('Assigned', 'Submitted', 'Graded', 'Late', 'Missing');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- Identity
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS users (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  full_name     text NOT NULL,
+  username      text UNIQUE,
+  email         text UNIQUE NOT NULL,
+  password_hash text,                         -- null when auth is delegated to Supabase Auth
+  role          user_role NOT NULL DEFAULT 'student',
+  avatar_url    text,
+  is_active     boolean NOT NULL DEFAULT true,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS users_role_idx ON users (role);
+
+-- ---------------------------------------------------------------------------
+-- Academic structure
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS classes (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        text NOT NULL,
+  section     text NOT NULL DEFAULT '',
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (name, section)
 );
 
-create table if not exists classes (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  section text not null,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists students (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references users(id) on delete cascade,
-  class_id uuid references classes(id),
-  parent_name text,
-  phone text,
-  gender text,
-  birth_date date,
-  address text,
-  roll_number text,
-  profile_image text,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists teachers (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references users(id) on delete cascade,
-  subject text not null,
-  experience text,
-  salary numeric,
+CREATE TABLE IF NOT EXISTS teachers (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  employee_no  text UNIQUE,
+  main_subject text,
+  experience   text,
+  salary       numeric(12, 2),
   contact_info text,
-  created_at timestamptz not null default now()
+  created_at   timestamptz NOT NULL DEFAULT now()
 );
 
-create table if not exists subjects (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  teacher_id uuid references teachers(id),
-  created_at timestamptz not null default now()
+CREATE TABLE IF NOT EXISTS parents (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  phone        text,
+  occupation   text,
+  created_at   timestamptz NOT NULL DEFAULT now()
 );
 
-create table if not exists attendance (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid references students(id) on delete cascade,
-  date date not null,
-  status attendance_status not null,
-  created_at timestamptz not null default now()
+CREATE TABLE IF NOT EXISTS students (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  class_id      uuid REFERENCES classes(id) ON DELETE SET NULL,
+  roll_number   text,
+  gender        text,
+  birth_date    date,
+  address       text,
+  phone         text,
+  payment_status payment_status NOT NULL DEFAULT 'Unpaid',
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS students_class_idx ON students (class_id);
+
+-- Many-to-many: a parent may guard several students; a student may have several guardians.
+CREATE TABLE IF NOT EXISTS parent_student (
+  parent_id   uuid NOT NULL REFERENCES parents(id) ON DELETE CASCADE,
+  student_id  uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  relationship text NOT NULL DEFAULT 'Guardian',
+  PRIMARY KEY (parent_id, student_id)
 );
 
-create table if not exists grades (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid references students(id) on delete cascade,
-  subject_id uuid references subjects(id),
-  score numeric not null check (score >= 0 and score <= 100),
-  semester text,
-  created_at timestamptz not null default now()
+CREATE TABLE IF NOT EXISTS subjects (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code          text UNIQUE,
+  name          text NOT NULL,
+  category      text NOT NULL DEFAULT '',
+  grade_levels  text NOT NULL DEFAULT '',
+  teacher_id    uuid REFERENCES teachers(id) ON DELETE SET NULL,
+  created_at    timestamptz NOT NULL DEFAULT now()
 );
 
-create table if not exists payments (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid references students(id) on delete cascade,
-  amount numeric not null,
-  status payment_status not null default 'Unpaid',
-  due_date date,
-  created_at timestamptz not null default now()
+-- ---------------------------------------------------------------------------
+-- Attendance
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS attendance (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id  uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  class_id    uuid REFERENCES classes(id) ON DELETE SET NULL,
+  date        date NOT NULL,
+  status      attendance_status NOT NULL DEFAULT 'Present',
+  recorded_by uuid REFERENCES teachers(id) ON DELETE SET NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (student_id, date)
+);
+CREATE INDEX IF NOT EXISTS attendance_student_date_idx ON attendance (student_id, date DESC);
+
+-- ---------------------------------------------------------------------------
+-- Grades
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS grades (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id  uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  subject_id  uuid NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  score       numeric(5, 2) NOT NULL CHECK (score >= 0 AND score <= 100),
+  semester    text NOT NULL DEFAULT '',
+  entered_by  uuid REFERENCES teachers(id) ON DELETE SET NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS grades_student_idx ON grades (student_id);
+
+-- ---------------------------------------------------------------------------
+-- Assignments  (+ per-student submission tracking)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS assignments (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  subject_id  uuid NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  teacher_id  uuid REFERENCES teachers(id) ON DELETE SET NULL,
+  title       text NOT NULL,
+  description text NOT NULL DEFAULT '',
+  type        assignment_type NOT NULL DEFAULT 'Homework',
+  max_score   numeric(5, 2) NOT NULL DEFAULT 100,
+  due_date    date,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS assignments_subject_idx ON assignments (subject_id);
+
+CREATE TABLE IF NOT EXISTS assignment_submissions (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  assignment_id uuid NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+  student_id    uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  status        submission_status NOT NULL DEFAULT 'Assigned',
+  score         numeric(5, 2),
+  submitted_at  timestamptz,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (assignment_id, student_id)
 );
 
-create table if not exists announcements (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  content text not null,
-  audience text not null default 'All',
-  created_at timestamptz not null default now()
+-- ---------------------------------------------------------------------------
+-- Learning materials
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS learning_materials (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  subject_id  uuid NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  uploaded_by uuid REFERENCES teachers(id) ON DELETE SET NULL,
+  title       text NOT NULL,
+  file_url    text,
+  file_type   text,
+  created_at  timestamptz NOT NULL DEFAULT now()
 );
 
-create table if not exists timetable (
-  id uuid primary key default gen_random_uuid(),
-  class_id uuid references classes(id),
-  subject_id uuid references subjects(id),
-  teacher_id uuid references teachers(id),
-  day text not null,
-  start_time time not null,
-  end_time time not null,
-  created_at timestamptz not null default now()
+-- ---------------------------------------------------------------------------
+-- Schedule / timetable
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS schedule (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id    uuid REFERENCES classes(id) ON DELETE CASCADE,
+  subject_id  uuid REFERENCES subjects(id) ON DELETE SET NULL,
+  teacher_id  uuid REFERENCES teachers(id) ON DELETE SET NULL,
+  day_of_week text NOT NULL,
+  start_time  time NOT NULL,
+  end_time    time NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS schedule_class_idx ON schedule (class_id);
+
+-- ---------------------------------------------------------------------------
+-- Payments (tuition)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS payments (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id  uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  amount      numeric(12, 2) NOT NULL DEFAULT 0,
+  status      payment_status NOT NULL DEFAULT 'Unpaid',
+  due_date    date,
+  paid_at     timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS payments_student_idx ON payments (student_id);
+
+-- ---------------------------------------------------------------------------
+-- Feedback / suggestions (submitted by students)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS feedback (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id  uuid REFERENCES students(id) ON DELETE SET NULL,
+  subject_id  uuid REFERENCES subjects(id) ON DELETE SET NULL,
+  message     text NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
 );
 
-create table if not exists class_rooms (
-  id text primary key,
-  name text not null,
-  section text not null,
-  teacher text not null,
-  students integer not null default 0,
-  schedule text not null,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists attendance_records (
-  id text primary key,
-  student text not null,
-  class_name text not null,
-  date text not null,
-  status text not null,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists grade_records (
-  id text primary key,
-  student text not null,
-  subject text not null,
-  score integer not null default 0,
-  semester text not null,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists payment_records (
-  id text primary key,
-  student text not null,
-  amount text not null,
-  status text not null,
-  due_date text not null,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists timetable_slots (
-  id text primary key,
-  day text not null,
-  time text not null,
-  subject text not null,
-  teacher text not null,
-  class_name text not null,
-  created_at timestamptz not null default now()
+-- ---------------------------------------------------------------------------
+-- Announcements
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS announcements (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title       text NOT NULL,
+  content     text NOT NULL DEFAULT '',
+  audience    text NOT NULL DEFAULT 'All',
+  created_by  uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
 );

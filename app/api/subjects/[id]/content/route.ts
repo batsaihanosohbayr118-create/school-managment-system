@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import type { SubjectContent, SubjectLesson, SubjectTopic } from "@/lib/types";
+import { resolveRequestSession } from "@/lib/school-session";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -146,6 +147,11 @@ async function uploadFiles(req: NextRequest, subjectId: string) {
 
 export async function GET(_: NextRequest, context: RouteContext) {
   try {
+    const session = await resolveRequestSession(_);
+    if (!session) {
+      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+    }
+
     const subjectId = await safeSubjectId(context);
     const content = await readSubjectContent(subjectId);
     return NextResponse.json(
@@ -160,6 +166,11 @@ export async function GET(_: NextRequest, context: RouteContext) {
 
 export async function POST(req: NextRequest, context: RouteContext) {
   try {
+    const session = await resolveRequestSession(req);
+    if (!session) {
+      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+    }
+
     const subjectId = await safeSubjectId(context);
     const contentType = req.headers.get("content-type") ?? "";
 

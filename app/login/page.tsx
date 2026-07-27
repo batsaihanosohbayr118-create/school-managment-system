@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { AuthCard } from "@/components/educore/auth-card";
+import { LoginView } from "@/components/auth/LoginView";
 
 export default function LoginPage() {
   return (
     <Suspense>
-      <AuthCard mode="login" />
+      <LoginView />
     </Suspense>
   );
 }

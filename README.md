@@ -2,15 +2,51 @@
 
 Premium modern school management system built with Next.js, React, TypeScript, PostgreSQL, Supabase helpers, Framer Motion, Recharts, and reusable UI components.
 
+## Navigation flow
+
+```
+Landing Page (/)  ->  Login (/login)  ->  Authentication  ->  Role dashboard
+```
+
+After login each user is redirected to their own dashboard:
+
+| Role    | Dashboard route        |
+| ------- | ---------------------- |
+| Admin   | `/admin/dashboard`     |
+| Teacher | `/teacher/dashboard`   |
+| Student | `/student/dashboard`   |
+| Parent  | `/parent/dashboard`    |
+
+There is **no public registration** — accounts are created by an administrator
+from **`/admin/users`** (Create / Edit / Delete / Reset password / Search / Filter).
+
+Route protection: a signed-in user may only open the dashboard matching their
+role; anyone else is redirected to their own. The guard lives in
+`components/dashboard/DashboardApp.tsx`, with `middleware.ts` normalizing routes
+and applying security headers.
+
 ## Modules
 
-- Authentication pages: login, register, forgot password
-- Role-aware dashboard: Admin, Teacher, Student
+- Public landing page + login-only authentication (forgot-password supported)
+- Role-based dashboards: Admin, Teacher, Student, Parent
+- Admin user management (`/admin/users`)
 - Students, teachers, classes
 - Attendance, grades, payments
 - Timetable, announcements, settings
 - Responsive glassmorphism UI with dark/light mode
 - Production PostgreSQL APIs for school resources
+
+## Demo mode (no Supabase)
+
+If `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` are not set, the
+app runs a fully client-side demo with four seeded accounts:
+
+| Role    | Username | Password     |
+| ------- | -------- | ------------ |
+| Admin   | admin    | `Admin@123`  |
+| Teacher | teacher  | `Teacher@123`|
+| Student | student  | `Student@123`|
+| Parent  | parent   | `Parent@123` |
 
 ## Supabase
 
@@ -20,9 +56,16 @@ Add these to `.env.local` for Supabase Auth:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_SITE_URL=
+# Server-only. Enables admin user provisioning at /admin/users.
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 Run the SQL in `database/supabase-schema.sql` inside Supabase SQL Editor.
+The normalized target schema lives in `database/schema.sql`.
+
+Each Supabase user must carry `role` in `user_metadata`
+(`admin` | `teacher` | `student` | `parent`) — that is what drives the
+post-login redirect and dashboard access.
 
 For Google login, use the Supabase dashboard values exactly:
 

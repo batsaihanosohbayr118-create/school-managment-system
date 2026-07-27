@@ -1,4 +1,5 @@
 import type { SubjectContent } from "@/lib/types";
+import { getClientSchoolHeaders } from "./school-session";
 
 type UploadSubjectFilesOptions = {
   title?: string;
@@ -8,7 +9,8 @@ type UploadSubjectFilesOptions = {
 
 export async function loadSubjectContent(subjectId: string): Promise<SubjectContent | null> {
   try {
-    const res = await fetch(`/api/subjects/${subjectId}/content`);
+    const headers = await getClientSchoolHeaders();
+    const res = await fetch(`/api/subjects/${subjectId}/content`, { headers });
     if (!res.ok) return null;
     return await res.json() as SubjectContent;
   } catch {
@@ -20,9 +22,10 @@ export async function saveSubjectContent(
   subjectId: string,
   content: SubjectContent
 ): Promise<void> {
+  const headers = await getClientSchoolHeaders();
   const res = await fetch(`/api/subjects/${subjectId}/content`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(content),
   });
 
@@ -47,8 +50,10 @@ export async function uploadSubjectFiles(
   if (options.topicId) formData.append("topicId", options.topicId);
   if (options.duration) formData.append("duration", options.duration);
 
+  const headers = await getClientSchoolHeaders();
   const res = await fetch(`/api/subjects/${subjectId}/content`, {
     method: "POST",
+    headers,
     body: formData,
   });
 

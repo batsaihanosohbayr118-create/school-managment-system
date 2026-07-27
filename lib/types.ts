@@ -6,7 +6,10 @@ export type NavModule =
   | "dashboard"
   | "students"
   | "teachers"
+  | "parents"
   | "subjects"
+  | "assignments"
+  | "materials"
   | "classes"
   | "attendance"
   | "grades"
@@ -37,17 +40,28 @@ export type Student = {
   attendance: number;
   gpa: number;
   paymentStatus: "Paid" | "Unpaid" | "Partial";
+  subjects?: string[];
 };
 
 export type Teacher = {
   id: string;
   name: string;
   subject: string;
+  subjectId?: string;
   email: string;
   experience: string;
   salary: string;
   contact: string;
   classes: string[];
+};
+
+export type Parent = {
+  id: string;
+  name: string;
+  email: string;
+  student: string;
+  phone: string;
+  occupation: string;
 };
 
 export type ClassRoom = {
@@ -98,7 +112,10 @@ export type SubjectContent = {
 
 export type Subject = {
   id: string;
+  code: string;
   name: string;
+  description: string;
+  teacherId?: string | null;
   category: string;
   gradeLevels: string;
   content?: SubjectContent;
@@ -107,6 +124,7 @@ export type Subject = {
 export type AttendanceRecord = {
   id: string;
   student: string;
+  subject: string;
   className: string;
   date: string;
   status: "Present" | "Absent" | "Late";
@@ -118,6 +136,25 @@ export type GradeRecord = {
   subject: string;
   score: number;
   semester: string;
+};
+
+export type AssignmentRecord = {
+  id: string;
+  subject: string;
+  title: string;
+  type: string;
+  dueDate: string;
+  maxScore: number;
+  description: string;
+  status?: string;
+};
+
+export type LearningMaterialRecord = {
+  id: string;
+  subject: string;
+  title: string;
+  fileType: string;
+  uploadedBy: string;
 };
 
 export type PaymentRecord = {
@@ -134,6 +171,7 @@ export type TimetableSlot = {
   subject: string;
   teacher: string;
   className: string;
+  subjectId?: string;
 };
 
 export type Announcement = {
