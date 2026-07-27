@@ -7,6 +7,8 @@
     "build": "node scripts/run-next.mjs build --webpack",
     "start": "node scripts/run-next.mjs start",
     "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down"
   },
@@ -34,6 +36,7 @@
     "@types/react-dom": "latest",
     "eslint": "latest",
     "eslint-config-next": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "vitest": "^3.2.7"
   }
 }
