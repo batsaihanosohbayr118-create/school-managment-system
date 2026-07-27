@@ -1,5 +1,23 @@
 # iOS App Store Phase 1 Implementation Plan
 
+> **SUPERSEDED 2026-07-27 — do not execute.** The Capacitor wrap approach was
+> abandoned before any task ran, in favour of a scoped Expo app. See the
+> superseded banner on
+> `docs/superpowers/specs/2026-07-27-ios-app-store-phase1-design.md`.
+>
+> **Three pieces of this plan survive the pivot** and were folded into the
+> replacement, because a native client is also a cross-origin client:
+>
+> - **Task 6 — CORS for the four route handlers.** Still required; the allowed
+>   origin changes from `capacitor://localhost` to the Expo client's origin.
+> - **Task 7 — typed API failures** (`lib/api-error.ts`). Still required
+>   unchanged.
+> - **Task 11 Step 3 — set `NEXT_PUBLIC_SITE_URL`.** Still required.
+>
+> Tasks 1-5 and 8-10 (Vitest, static-export build target, Capacitor project,
+> API base URL, Keychain storage, Face ID gate, offline cache) are specific to
+> the wrap approach and do not carry over.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Package the existing Next.js school management app as a Capacitor iOS app that bundles the web UI, keeps users signed in across restarts behind Face ID, talks to the Vercel API over CORS, and opens usefully with no network.

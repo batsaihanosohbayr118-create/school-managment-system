@@ -1,8 +1,20 @@
 # iOS App Store — Phase 1: Native Shell & Session Foundation
 
+> **SUPERSEDED 2026-07-27.** This design was abandoned before implementation in
+> favour of a scoped Expo app. The deciding argument came from this document
+> itself: phases 1-4 end with a webview *plus* Capacitor plugins *plus* two
+> Swift targets, which pays the native cost while keeping the Guideline 4.2
+> exposure. Because all role-scoping is server-side in `lib/school-db.ts` and
+> `/api/school/[resource]` already returns a generic table shape, a native
+> client is a UI-only rewrite, not a backend rewrite.
+>
+> Kept for the constraints it records, which remain true and are cited by the
+> replacement spec: the `output: 'export'` failure, the `sessionStorage` session
+> defect, the missing CORS headers, and the `/favicon.ico` offline probe bug.
+
 **Date:** 2026-07-27
-**Status:** Approved for planning
-**Phase:** 1 of 4
+**Status:** Superseded — not implemented
+**Phase:** 1 of 4 (abandoned)
 
 ## Context
 
