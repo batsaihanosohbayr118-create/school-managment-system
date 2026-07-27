@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createRecord, getModulePrefix, listRecords } from "@/lib/db";
+import { preflight, withCors } from "@/lib/cors";
 
 export const runtime = "nodejs";
+
+const METHODS = ["GET", "POST"];
+
+export const OPTIONS = preflight(METHODS);
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -18,11 +23,19 @@ export async function GET(request: Request) {
   const moduleName = clean(searchParams.get("module")) || "School Overview";
 
   try {
-    return NextResponse.json({
-      records: await listRecords(moduleName)
-    });
+    return withCors(
+      NextResponse.json({
+        records: await listRecords(moduleName)
+      }),
+      request,
+      METHODS
+    );
   } catch (error) {
-    return NextResponse.json({ message: databaseErrorMessage(error) }, { status: 500 });
+    return withCors(
+      NextResponse.json({ message: databaseErrorMessage(error) }, { status: 500 }),
+      request,
+      METHODS
+    );
   }
 }
 
@@ -35,7 +48,7 @@ export async function POST(request: Request) {
   const amount = clean(body?.amount) || "-";
 
   if (!moduleName || !name) {
-    return NextResponse.json({ message: "Module and name are required." }, { status: 400 });
+    return withCors(NextResponse.json({ message: "Module and name are required." }, { status: 400 }), request, METHODS);
   }
 
   const prefix = getModulePrefix(moduleName);
@@ -50,8 +63,12 @@ export async function POST(request: Request) {
       amount
     });
 
-    return NextResponse.json({ record }, { status: 201 });
+    return withCors(NextResponse.json({ record }, { status: 201 }), request, METHODS);
   } catch (error) {
-    return NextResponse.json({ message: databaseErrorMessage(error) }, { status: 500 });
+    return withCors(
+      NextResponse.json({ message: databaseErrorMessage(error) }, { status: 500 }),
+      request,
+      METHODS
+    );
   }
 }

@@ -8,8 +8,13 @@ import {
   type SchoolRequestContext
 } from "@/lib/school-db";
 import { resolveRequestSession } from "@/lib/school-session";
+import { preflight, withCors } from "@/lib/cors";
 
 export const runtime = "nodejs";
+
+const METHODS = ["GET", "POST", "PATCH", "DELETE"];
+
+export const OPTIONS = preflight(METHODS);
 
 type RouteContext = {
   params: Promise<{
@@ -50,18 +55,22 @@ export async function GET(_request: Request, context: RouteContext) {
   const { resource } = await context.params;
 
   if (!isSchoolResource(resource)) {
-    return NextResponse.json({ message: "Unknown resource." }, { status: 404 });
+    return withCors(NextResponse.json({ message: "Unknown resource." }, { status: 404 }), _request, METHODS);
   }
 
   try {
     const resolved = await requestContext(_request);
     if (!resolved) {
-      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+      return withCors(NextResponse.json({ message: "Unauthorized." }, { status: 401 }), _request, METHODS);
     }
 
-    return NextResponse.json(await listResource(resource, resolved));
+    return withCors(NextResponse.json(await listResource(resource, resolved)), _request, METHODS);
   } catch (error) {
-    return NextResponse.json({ message: errorMessage(error) }, { status: errorStatus(error) });
+    return withCors(
+      NextResponse.json({ message: errorMessage(error) }, { status: errorStatus(error) }),
+      _request,
+      METHODS
+    );
   }
 }
 
@@ -69,7 +78,7 @@ export async function POST(request: Request, context: RouteContext) {
   const { resource } = await context.params;
 
   if (!isSchoolResource(resource)) {
-    return NextResponse.json({ message: "Unknown resource." }, { status: 404 });
+    return withCors(NextResponse.json({ message: "Unknown resource." }, { status: 404 }), request, METHODS);
   }
 
   const body = (await request.json().catch(() => null)) as { values?: Record<string, string> } | null;
@@ -77,12 +86,20 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const resolved = await requestContext(request);
     if (!resolved) {
-      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+      return withCors(NextResponse.json({ message: "Unauthorized." }, { status: 401 }), request, METHODS);
     }
 
-    return NextResponse.json(await createResource(resource, body?.values ?? {}, resolved), { status: 201 });
+    return withCors(
+      NextResponse.json(await createResource(resource, body?.values ?? {}, resolved), { status: 201 }),
+      request,
+      METHODS
+    );
   } catch (error) {
-    return NextResponse.json({ message: errorMessage(error) }, { status: errorStatus(error) });
+    return withCors(
+      NextResponse.json({ message: errorMessage(error) }, { status: errorStatus(error) }),
+      request,
+      METHODS
+    );
   }
 }
 
@@ -91,22 +108,30 @@ export async function PATCH(request: Request, context: RouteContext) {
   const body = (await request.json().catch(() => null)) as { id?: string; values?: Record<string, string> } | null;
 
   if (!isSchoolResource(resource)) {
-    return NextResponse.json({ message: "Unknown resource." }, { status: 404 });
+    return withCors(NextResponse.json({ message: "Unknown resource." }, { status: 404 }), request, METHODS);
   }
 
   if (!body?.id) {
-    return NextResponse.json({ message: "id is required." }, { status: 400 });
+    return withCors(NextResponse.json({ message: "id is required." }, { status: 400 }), request, METHODS);
   }
 
   try {
     const resolved = await requestContext(request);
     if (!resolved) {
-      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+      return withCors(NextResponse.json({ message: "Unauthorized." }, { status: 401 }), request, METHODS);
     }
 
-    return NextResponse.json(await updateResource(resource, body.id, body.values ?? {}, resolved));
+    return withCors(
+      NextResponse.json(await updateResource(resource, body.id, body.values ?? {}, resolved)),
+      request,
+      METHODS
+    );
   } catch (error) {
-    return NextResponse.json({ message: errorMessage(error) }, { status: errorStatus(error) });
+    return withCors(
+      NextResponse.json({ message: errorMessage(error) }, { status: errorStatus(error) }),
+      request,
+      METHODS
+    );
   }
 }
 
@@ -116,21 +141,25 @@ export async function DELETE(request: Request, context: RouteContext) {
   const id = searchParams.get("id");
 
   if (!isSchoolResource(resource)) {
-    return NextResponse.json({ message: "Unknown resource." }, { status: 404 });
+    return withCors(NextResponse.json({ message: "Unknown resource." }, { status: 404 }), request, METHODS);
   }
 
   if (!id) {
-    return NextResponse.json({ message: "id is required." }, { status: 400 });
+    return withCors(NextResponse.json({ message: "id is required." }, { status: 400 }), request, METHODS);
   }
 
   try {
     const resolved = await requestContext(request);
     if (!resolved) {
-      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+      return withCors(NextResponse.json({ message: "Unauthorized." }, { status: 401 }), request, METHODS);
     }
 
-    return NextResponse.json(await deleteResource(resource, id, resolved));
+    return withCors(NextResponse.json(await deleteResource(resource, id, resolved)), request, METHODS);
   } catch (error) {
-    return NextResponse.json({ message: errorMessage(error) }, { status: errorStatus(error) });
+    return withCors(
+      NextResponse.json({ message: errorMessage(error) }, { status: errorStatus(error) }),
+      request,
+      METHODS
+    );
   }
 }

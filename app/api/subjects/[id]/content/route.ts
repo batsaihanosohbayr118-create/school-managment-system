@@ -3,11 +3,16 @@ import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import type { SubjectContent, SubjectLesson, SubjectTopic } from "@/lib/types";
 import { resolveRequestSession } from "@/lib/school-session";
+import { preflight, withCors } from "@/lib/cors";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+const METHODS = ["GET", "POST"];
+
+export const OPTIONS = preflight(METHODS);
 
 const BUCKET = "subjects";
 
@@ -149,18 +154,22 @@ export async function GET(_: NextRequest, context: RouteContext) {
   try {
     const session = await resolveRequestSession(_);
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+      return withCors(NextResponse.json({ message: "Unauthorized." }, { status: 401 }), _, METHODS);
     }
 
     const subjectId = await safeSubjectId(context);
     const content = await readSubjectContent(subjectId);
-    return NextResponse.json(
-      content.lessons.length || content.topics.length || content.assignments.length
-        ? content
-        : null
+    return withCors(
+      NextResponse.json(
+        content.lessons.length || content.topics.length || content.assignments.length
+          ? content
+          : null
+      ),
+      _,
+      METHODS
     );
   } catch {
-    return NextResponse.json(null);
+    return withCors(NextResponse.json(null), _, METHODS);
   }
 }
 
@@ -168,23 +177,27 @@ export async function POST(req: NextRequest, context: RouteContext) {
   try {
     const session = await resolveRequestSession(req);
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+      return withCors(NextResponse.json({ message: "Unauthorized." }, { status: 401 }), req, METHODS);
     }
 
     const subjectId = await safeSubjectId(context);
     const contentType = req.headers.get("content-type") ?? "";
 
     if (contentType.includes("multipart/form-data")) {
-      return NextResponse.json(await uploadFiles(req, subjectId));
+      return withCors(NextResponse.json(await uploadFiles(req, subjectId)), req, METHODS);
     }
 
     const content: SubjectContent = await req.json();
     await writeSubjectContent(subjectId, { ...content, subjectId });
-    return NextResponse.json({ success: true });
+    return withCors(NextResponse.json({ success: true }), req, METHODS);
   } catch (error) {
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Subject content could not be saved" },
-      { status: 400 }
+    return withCors(
+      NextResponse.json(
+        { message: error instanceof Error ? error.message : "Subject content could not be saved" },
+        { status: 400 }
+      ),
+      req,
+      METHODS
     );
   }
 }

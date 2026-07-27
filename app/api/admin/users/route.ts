@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Role } from "@/lib/types";
+import { preflight, withCors } from "@/lib/cors";
 
 export const runtime = "nodejs";
+
+const METHODS = ["GET", "POST", "PATCH", "DELETE"];
+
+export const OPTIONS = preflight(METHODS);
 
 /**
  * Admin-only user provisioning API.
@@ -42,28 +47,36 @@ async function requireAdmin(request: Request): Promise<Guarded> {
   const admin = getAdminClient();
   if (!admin) {
     return {
-      response: NextResponse.json(
-        {
-          message:
-            "User provisioning is not configured. Set SUPABASE_SERVICE_ROLE_KEY in the server environment to enable admin user management.",
-          code: "not-configured"
-        },
-        { status: 501 }
+      response: withCors(
+        NextResponse.json(
+          {
+            message:
+              "User provisioning is not configured. Set SUPABASE_SERVICE_ROLE_KEY in the server environment to enable admin user management.",
+            code: "not-configured"
+          },
+          { status: 501 }
+        ),
+        request,
+        METHODS
       )
     };
   }
 
   const token = bearerToken(request);
   if (!token) {
-    return { response: NextResponse.json({ message: "Missing authorization token." }, { status: 401 }) };
+    return {
+      response: withCors(NextResponse.json({ message: "Missing authorization token." }, { status: 401 }), request, METHODS)
+    };
   }
 
   const { data, error } = await admin.auth.getUser(token);
   if (error || !data.user) {
-    return { response: NextResponse.json({ message: "Invalid session." }, { status: 401 }) };
+    return { response: withCors(NextResponse.json({ message: "Invalid session." }, { status: 401 }), request, METHODS) };
   }
   if (!isRole(data.user.user_metadata?.role) || data.user.user_metadata.role !== "admin") {
-    return { response: NextResponse.json({ message: "Admin access required." }, { status: 403 }) };
+    return {
+      response: withCors(NextResponse.json({ message: "Admin access required." }, { status: 403 }), request, METHODS)
+    };
   }
 
   return { admin };
@@ -103,9 +116,13 @@ export async function GET(request: Request) {
     const { data, error } = await guard.admin.auth.admin.listUsers({ page: 1, perPage: 200 });
     if (error) throw error;
     const users = data.users.map(mapUser).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    return NextResponse.json({ users });
+    return withCors(NextResponse.json({ users }), request, METHODS);
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "Failed to list users." }, { status: 500 });
+    return withCors(
+      NextResponse.json({ message: error instanceof Error ? error.message : "Failed to list users." }, { status: 500 }),
+      request,
+      METHODS
+    );
   }
 }
 
@@ -122,7 +139,11 @@ export async function POST(request: Request) {
   } | null;
 
   if (!body?.email || !body.password || !isRole(body.role)) {
-    return NextResponse.json({ message: "email, password, and a valid role are required." }, { status: 400 });
+    return withCors(
+      NextResponse.json({ message: "email, password, and a valid role are required." }, { status: 400 }),
+      request,
+      METHODS
+    );
   }
 
   try {
@@ -133,9 +154,13 @@ export async function POST(request: Request) {
       user_metadata: { name: body.name?.trim() ?? "", username: body.username?.trim() ?? "", role: body.role }
     });
     if (error) throw error;
-    return NextResponse.json({ user: mapUser(data.user) }, { status: 201 });
+    return withCors(NextResponse.json({ user: mapUser(data.user) }, { status: 201 }), request, METHODS);
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "Failed to create user." }, { status: 500 });
+    return withCors(
+      NextResponse.json({ message: error instanceof Error ? error.message : "Failed to create user." }, { status: 500 }),
+      request,
+      METHODS
+    );
   }
 }
 
@@ -153,7 +178,7 @@ export async function PATCH(request: Request) {
   } | null;
 
   if (!body?.id) {
-    return NextResponse.json({ message: "id is required." }, { status: 400 });
+    return withCors(NextResponse.json({ message: "id is required." }, { status: 400 }), request, METHODS);
   }
 
   const attributes: {
@@ -174,9 +199,13 @@ export async function PATCH(request: Request) {
   try {
     const { data, error } = await guard.admin.auth.admin.updateUserById(body.id, attributes);
     if (error) throw error;
-    return NextResponse.json({ user: mapUser(data.user) });
+    return withCors(NextResponse.json({ user: mapUser(data.user) }), request, METHODS);
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "Failed to update user." }, { status: 500 });
+    return withCors(
+      NextResponse.json({ message: error instanceof Error ? error.message : "Failed to update user." }, { status: 500 }),
+      request,
+      METHODS
+    );
   }
 }
 
@@ -187,14 +216,18 @@ export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   if (!id) {
-    return NextResponse.json({ message: "id is required." }, { status: 400 });
+    return withCors(NextResponse.json({ message: "id is required." }, { status: 400 }), request, METHODS);
   }
 
   try {
     const { error } = await guard.admin.auth.admin.deleteUser(id);
     if (error) throw error;
-    return NextResponse.json({ ok: true });
+    return withCors(NextResponse.json({ ok: true }), request, METHODS);
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "Failed to delete user." }, { status: 500 });
+    return withCors(
+      NextResponse.json({ message: error instanceof Error ? error.message : "Failed to delete user." }, { status: 500 }),
+      request,
+      METHODS
+    );
   }
 }
