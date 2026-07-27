@@ -1013,13 +1013,17 @@ async function ensureTeacherSubject(pool: Pool, context: SchoolRequestContext | 
 }
 
 export async function createResource(resource: SchoolResource, values: Record<string, string>, context?: SchoolRequestContext) {
+  // Deliberately outside the try block below: that block's catch treats every
+  // failure as "Postgres is unreachable, fall back to the local store" and
+  // still returns success. A permission denial must never be caught by that
+  // path, or any role could write by tripping the fallback.
+  requireManageAccess(resource, context?.session.role ?? "admin");
+
   try {
     await ensureSchoolDatabase();
 
     const pool = getPool();
     const id = `${resource.slice(0, 2).toUpperCase()}-${Date.now().toString().slice(-6)}`;
-    const role = context?.session.role ?? "admin";
-    requireManageAccess(resource, role);
 
     switch (resource) {
       case "students": {
@@ -1174,10 +1178,10 @@ export async function createResource(resource: SchoolResource, values: Record<st
 }
 
 export async function deleteResource(resource: SchoolResource, id: string, context?: SchoolRequestContext) {
+  requireManageAccess(resource, context?.session.role ?? "admin");
+
   try {
     await ensureSchoolDatabase();
-    const role = context?.session.role ?? "admin";
-    requireManageAccess(resource, role);
     await getPool().query(`DELETE FROM ${tableName(resource)} WHERE id = $1`, [id]);
     return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "demo" }, mode: "summary" });
   } catch (error) {
@@ -1187,11 +1191,11 @@ export async function deleteResource(resource: SchoolResource, id: string, conte
 }
 
 export async function updateResource(resource: SchoolResource, id: string, values: Record<string, string>, context?: SchoolRequestContext) {
+  requireManageAccess(resource, context?.session.role ?? "admin");
+
   try {
     await ensureSchoolDatabase();
     const pool = getPool();
-    const role = context?.session.role ?? "admin";
-    requireManageAccess(resource, role);
 
     switch (resource) {
       case "students": {
