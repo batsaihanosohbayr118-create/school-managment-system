@@ -9,6 +9,8 @@ npm run dev          # dev server (http://localhost:3000)
 npm run build        # production build
 npm run start        # serve the build
 npm run lint         # eslint .
+npm test             # vitest run
+npm run test:watch   # vitest
 npm run db:up        # docker compose up -d postgres
 npm run db:down      # docker compose down
 ```
@@ -17,12 +19,27 @@ npm run db:down      # docker compose down
 `NEXT_TEST_WASM_DIR` pointed at `@next/swc-wasm-nodejs` (the native SWC binary is not used here).
 Running `npx next dev` directly is **not** equivalent — always use the npm scripts.
 
-**There is no test framework in this repo.** The verification loop is:
+**Test coverage is partial and deliberate.** Vitest covers pure logic only —
+`shared/` and `lib/mobile/`, matched by `vitest.config.ts`. React components,
+route handlers, and anything touching Postgres have no tests. Do not assume a
+passing suite exercised a change to `DashboardApp.tsx` or `lib/school-db.ts`.
+
+The verification loop:
 
 ```bash
 npm run lint
+npm test
 npx tsc --noEmit     # tsconfig already sets noEmit
 npm run build
+```
+
+A build rewrites three committed artifacts — `public/sw.js`, `next-env.d.ts`,
+and `public/fallback-<hash>.js`, whose hash changes every run. Restore them
+before committing so they stay out of the diff:
+
+```bash
+rm -f public/fallback-*.js
+git checkout -- next-env.d.ts public/sw.js public/fallback-kMQV8Yz_Vmd_J9x02OIFG.js
 ```
 
 ## Local database
@@ -36,6 +53,34 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5433/school_management
 ```
 
 Tables are created on the first API request by `initializeSchoolDatabase()` in `lib/school-db.ts`.
+
+## Mobile app — work in progress
+
+A native iOS app is being built with Expo. It is **not** a wrapper around this
+web app; that approach was designed, then abandoned. The web app here is
+unchanged by it apart from new `/api/mobile/*` routes, CORS, and a `shared/`
+directory.
+
+Start here before touching anything mobile-related:
+
+| Document | Purpose |
+| --- | --- |
+| `docs/superpowers/2026-07-27-status-and-next-steps.md` | Current state, what is verified, what is next |
+| `docs/mobile-app-brief.md` | Non-technical summary (Mongolian) for the team |
+| `docs/superpowers/specs/2026-07-27-expo-mobile-app-design.md` | The design |
+| `docs/superpowers/plans/2026-07-27-expo-plan-a-mobile-api.md` | Plan A, task by task |
+
+Two documents in `docs/superpowers/` carry a **SUPERSEDED** banner (the
+Capacitor spec and its plan). They are kept for the constraints they record.
+Do not execute them.
+
+**The rule that governs the mobile API:** `/api/mobile/*` route handlers call
+the existing `listResource` / `createResource` and project the result. They
+never write their own SQL and never re-implement a role check. Duplicating that
+logic is how a student ends up able to read another student's grades.
+
+`@shared/*` resolves to `shared/` — configured in both `tsconfig.json` and
+`vitest.config.ts`, so keep the two in sync.
 
 ## Architecture
 
