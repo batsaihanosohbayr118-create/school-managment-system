@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import type { SubjectContent, SubjectLesson, SubjectTopic } from "@/lib/types";
-import { resolveRequestSession } from "@/lib/school-session";
+import { resolveRequestSession } from "@/lib/school-session-server";
+import {
+  readSubjectContent,
+  storeSubjectFile,
+  writeSubjectContent
+} from "@/lib/subject-storage";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-const BUCKET = "subjects";
+export const runtime = "nodejs";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -20,33 +19,6 @@ async function safeSubjectId(context: RouteContext) {
   const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "");
   if (!safeId) throw new Error("Invalid subject id");
   return safeId;
-}
-
-function emptySubjectContent(subjectId: string): SubjectContent {
-  return { subjectId, topics: [], lessons: [], assignments: [] };
-}
-
-async function readSubjectContent(subjectId: string) {
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .download(`${subjectId}/content.json`);
-
-  if (error || !data) return emptySubjectContent(subjectId);
-
-  const text = await data.text();
-  return JSON.parse(text) as SubjectContent;
-}
-
-async function writeSubjectContent(subjectId: string, content: SubjectContent) {
-  const blob = new Blob([JSON.stringify(content, null, 2)], {
-    type: "application/json",
-  });
-
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(`${subjectId}/content.json`, blob, { upsert: true });
-
-  if (error) throw new Error("Could not save content: " + error.message);
 }
 
 function safeFileName(fileName: string, index: number) {
@@ -109,17 +81,12 @@ async function uploadFiles(req: NextRequest, subjectId: string) {
   const uploadedLessons: SubjectLesson[] = [];
 
   for (const [index, file] of files.entries()) {
-    const storedFileName = safeFileName(file.name, index);
-    const filePath = `${subjectId}/files/${storedFileName}`;
-    const buffer = await file.arrayBuffer();
-
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, buffer, { contentType: file.type, upsert: true });
-
-    if (error) throw new Error("File upload failed: " + error.message);
-
-    const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+    const stored = await storeSubjectFile({
+      subjectId,
+      fileName: safeFileName(file.name, index),
+      contentType: file.type,
+      data: Buffer.from(await file.arrayBuffer())
+    });
 
     uploadedLessons.push({
       id: `L-FILE-${Date.now()}-${index + 1}`,
@@ -127,7 +94,7 @@ async function uploadFiles(req: NextRequest, subjectId: string) {
       topicId,
       duration: requestedDuration || undefined,
       fileName: file.name,
-      fileUrl: urlData.publicUrl,
+      fileUrl: stored.url,
       fileType: file.type || path.extname(file.name).replace(".", "").toUpperCase(),
       fileSize: file.size,
       uploadedAt: new Date().toISOString(),

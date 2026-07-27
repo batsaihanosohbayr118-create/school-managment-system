@@ -1120,7 +1120,7 @@ export async function createResource(resource: SchoolResource, values: Record<st
         break;
     }
 
-    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "demo" }, mode: "summary" });
+    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "neon" }, mode: "summary" });
   } catch (error) {
     logDatabaseFallback(error);
     return createLocalResource(resource, values);
@@ -1133,7 +1133,7 @@ export async function deleteResource(resource: SchoolResource, id: string, conte
     const role = context?.session.role ?? "admin";
     requireManageAccess(resource, role);
     await getPool().query(`DELETE FROM ${tableName(resource)} WHERE id = $1`, [id]);
-    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "demo" }, mode: "summary" });
+    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "neon" }, mode: "summary" });
   } catch (error) {
     logDatabaseFallback(error);
     return deleteLocalResource(resource, id);
@@ -1303,7 +1303,7 @@ export async function updateResource(resource: SchoolResource, id: string, value
         break;
     }
 
-    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "demo" }, mode: "summary" });
+    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "neon" }, mode: "summary" });
   } catch (error) {
     logDatabaseFallback(error);
     return updateLocalResource(resource, id, values);

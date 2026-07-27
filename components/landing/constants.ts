@@ -16,7 +16,10 @@ export const COLORS = {
 export const BRAND = {
   name: "Nova Mind",
   suffix: "Academy",
-  logo: "/data/subjects/download.png",
+  /** Trimmed mark — the source PNG had ~65% transparent padding around the art. */
+  logo: "/logo-mark.png",
+  logoWidth: 544,
+  logoHeight: 420,
   heroImage: "/hero-students.jpg"
 } as const;
 

@@ -4,15 +4,14 @@ export type Language = "en" | "mn";
 
 export const languageStorageKey = "educore_language";
 
+/**
+ * Mongolian is the school's working language, so it is the default for
+ * everyone. Browser locale is deliberately ignored — English-locale Windows is
+ * common here and would otherwise flip Mongolian users to English. Only an
+ * explicit choice, saved from the language switcher, overrides it.
+ */
 export function getInitialLanguage(): Language {
-  if (typeof window !== "undefined") {
-    const stored = getStoredLanguage();
-    if (stored) return stored;
-
-    const browserLang = navigator.language.split("-")[0];
-    if (browserLang === "mn") return "mn";
-  }
-  return "en";
+  return getStoredLanguage() ?? "mn";
 }
 
 export function getStoredLanguage(): Language | null {
@@ -22,8 +21,8 @@ export function getStoredLanguage(): Language | null {
 }
 
 export const languages: { id: Language; label: string; name: string }[] = [
-  { id: "en", label: "EN", name: "English" },
-  { id: "mn", label: "MN", name: "Монгол" }
+  { id: "mn", label: "MN", name: "Монгол" },
+  { id: "en", label: "EN", name: "English" }
 ];
 
 const valueTranslations: Record<string, string> = {
@@ -264,8 +263,8 @@ export const translations = {
       cancel: "Cancel",
       clear: "Clear",
       closeModal: "Close modal",
-      databaseOffline: "Supabase tables are not ready. Run database/supabase-schema.sql in Supabase SQL Editor.",
-      databaseSaveFailed: "Save failed. Check Supabase tables and RLS policies.",
+      databaseOffline: "Could not reach the database. Check DATABASE_URL and that Neon is available.",
+      databaseSaveFailed: "Save failed. Check the database connection and try again.",
       delete: "Delete",
       deleteFailed: "Delete failed. Check database connection.",
       deleteRecord: "Delete record?",
@@ -503,8 +502,8 @@ export const translations = {
       cancel: "Болих",
       clear: "Цэвэрлэх",
       closeModal: "Цонх хаах",
-      databaseOffline: "Supabase table бэлэн биш байна. database/supabase-schema.sql файлыг Supabase SQL Editor дээр ажиллуулна уу.",
-      databaseSaveFailed: "Хадгалж чадсангүй. Supabase table болон RLS policy-оо шалгана уу.",
+      databaseOffline: "Мэдээллийн сантай холбогдож чадсангүй. DATABASE_URL болон Neon-оо шалгана уу.",
+      databaseSaveFailed: "Хадгалж чадсангүй. Мэдээллийн сангийн холболтоо шалгаад дахин оролдоно уу.",
       delete: "Устгах",
       deleteFailed: "Устгаж чадсангүй. Database холболтоо шалгана уу.",
       deleteRecord: "Бүртгэл устгах уу?",

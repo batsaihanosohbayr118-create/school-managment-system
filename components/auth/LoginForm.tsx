@@ -5,17 +5,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
-import { authService, isSupabaseConfigured } from "@/lib/supabase";
-import { dashboardPathForRole, isRole, resolveActiveSession } from "@/lib/auth-flow";
-import { authenticateDemoUser, seedDemoUsers, startDemoSession } from "@/lib/demo-auth";
-import type { Role } from "@/lib/types";
+import { authService } from "@/lib/auth-client";
+import { dashboardPathForRole, resolveActiveSession } from "@/lib/auth-flow";
 
 const REMEMBER_KEY = "nm_remember_email";
 
 /**
- * Login form. The authentication logic (Supabase sign-in + demo fallback +
- * role-based redirect + already-signed-in auto-forward) is UNCHANGED from the
- * previous implementation — only the presentation is redesigned.
+ * Login form. Credentials are checked against the app's own Neon-backed
+ * endpoint, which returns a signed session token and the caller's role.
  */
 export function LoginForm() {
   const router = useRouter();
@@ -29,11 +26,9 @@ export function LoginForm() {
 
   const resetComplete = searchParams.get("reset");
 
-  // Seed demo accounts (demo mode only), restore the remembered email, and
-  // auto-forward users who already have a session.
+  // Restore the remembered email and auto-forward users who already have a
+  // session.
   useEffect(() => {
-    if (!isSupabaseConfigured) seedDemoUsers();
-
     try {
       const remembered = window.localStorage.getItem(REMEMBER_KEY);
       if (remembered && !searchParams.get("email")) {
@@ -53,12 +48,6 @@ export function LoginForm() {
     };
   }, [router, searchParams]);
 
-  async function redirectToRoleDashboard(fallbackRole: Role | null) {
-    const session = await resolveActiveSession();
-    const role = session?.role ?? fallbackRole ?? "student";
-    router.replace(dashboardPathForRole(role));
-  }
-
   async function handleLogin() {
     const cleanIdentifier = identifier.trim();
     if (!cleanIdentifier || !password) {
@@ -73,30 +62,18 @@ export function LoginForm() {
       // ignore storage errors
     }
 
-    if (!isSupabaseConfigured) {
-      const result = authenticateDemoUser(cleanIdentifier, password);
-      if ("error" in result) {
-        setMessage("Имэйл эсвэл нууц үг буруу байна.");
-        return;
-      }
-      startDemoSession(result.user);
-      router.replace(dashboardPathForRole(result.user.role));
-      return;
-    }
-
     const result = await authService.signIn(cleanIdentifier, password);
-    if ("error" in result && result.error) {
+
+    if ("error" in result) {
       setMessage(
-        result.error.message === "Invalid login credentials"
+        result.error === "invalid-credentials"
           ? "Имэйл эсвэл нууц үг буруу байна."
-          : result.error.message
+          : "Нэвтрэхэд алдаа гарлаа. Дахин оролдоно уу."
       );
       return;
     }
 
-    const metadataRole =
-      "data" in result && result.data?.user?.user_metadata?.role ? result.data.user.user_metadata.role : null;
-    await redirectToRoleDashboard(isRole(metadataRole) ? metadataRole : null);
+    router.replace(dashboardPathForRole(result.user.role));
   }
 
   async function onSubmit(event: React.FormEvent) {
@@ -187,9 +164,6 @@ export function LoginForm() {
         </p>
       ) : null}
 
-      {!isSupabaseConfigured ? (
-        <p className="text-center text-[12px] text-slate-500">Жишээ: admin / Admin@123</p>
-      ) : null}
     </form>
   );
 }

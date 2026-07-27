@@ -32,7 +32,7 @@ import { subjectCatalog } from "@/lib/subjects";
 // - students/teachers/classes/subjects/attendance/grades/payments/timetable/
 //   announcements/chartData are used as a FALLBACK data source in
 //   app/page.tsx (demoResourceData / fetchFallbackResource) whenever
-//   Supabase AND the local /api/school API are both unreachable, and by
+//   the local /api/school API is unreachable, and by
 //   the top-bar global search (searchableRows), which reads these arrays
 //   directly. Do not remove these exports without also updating
 //   app/page.tsx, or the app will crash or lose its offline fallback.

@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -18,13 +18,10 @@ import {
   House,
   LogOut,
   Menu,
-  Moon,
   Pencil,
   Plus,
   Printer,
   Search,
-  Settings as SettingsIcon,
-  Sun,
   Trash2,
   UserCog,
   Video,
@@ -66,13 +63,14 @@ import {
   createSchoolResource,
   deleteSchoolResource,
   listSchoolResource,
-  updateSchoolResource
+  updateSchoolResource,
+  type SchoolResourceRequestOptions
 } from "@/lib/school-api";
-import { authService, isSupabaseConfigured } from "@/lib/supabase";
-import { dashboardPathForRole, isRole } from "@/lib/auth-flow";
+import { authService } from "@/lib/auth-client";
+import { dashboardPathForRole } from "@/lib/auth-flow";
 import { subjectOptions } from "@/lib/subjects";
 import type { NavModule, Role, SubjectAssignment, SubjectContent, SubjectLesson } from "@/lib/types";
-import type { SchoolResource } from "@/lib/school-supabase";
+import type { SchoolResource } from "@/lib/school-db";
 
 type ResourceTableData = {
   columns: string[];
@@ -127,13 +125,12 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
 };
 
 const visibleModulesByRole: Record<Role, NavModule[]> = {
-  admin: ["dashboard", "students", "teachers", "parents", "subjects", "assignments", "materials", "payments", "timetable", "announcements", "settings"],
-  teacher: ["dashboard", "students", "subjects", "assignments", "materials", "classes", "attendance", "grades", "timetable", "announcements", "settings"],
-  student: ["dashboard", "subjects", "assignments", "materials", "attendance", "grades", "payments", "timetable", "announcements", "settings"],
-  parent: ["dashboard", "subjects", "assignments", "materials", "attendance", "grades", "payments", "timetable", "announcements", "settings"]
+  admin: ["dashboard", "students", "teachers", "parents", "subjects", "assignments", "materials", "payments", "timetable", "announcements"],
+  teacher: ["dashboard", "students", "subjects", "assignments", "materials", "classes", "attendance", "timetable", "announcements"],
+  student: ["dashboard", "subjects", "assignments", "materials", "attendance", "payments", "timetable", "announcements"],
+  parent: ["dashboard", "subjects", "assignments", "materials", "attendance", "payments", "timetable", "announcements"]
 };
 
-const demoSessionKey = "educore_session";
 const notificationStorageKey = "educore_activity_notifications";
 const parentScopedResources = new Set<SchoolResource>(["attendance", "grades", "payments", "assignments", "materials", "timetable"]);
 
@@ -433,9 +430,17 @@ async function fetchFallbackResource(resource: SchoolResource) {
   }
 }
 
-async function loadResourceData(resource: SchoolResource) {
+type SubjectScopeOption = { id: string; name: string };
+
+/** Resources a student or parent may only read one subject at a time. */
+const subjectScopedResources = new Set<SchoolResource>(["assignments", "materials"]);
+
+async function loadResourceData(resource: SchoolResource, options?: SchoolResourceRequestOptions) {
   try {
-    return { data: await listSchoolResource(resource, { mode: "summary" }), needsLocalParentFilter: false };
+    return {
+      data: await listSchoolResource(resource, options ?? { mode: "summary" }),
+      needsLocalParentFilter: false
+    };
   } catch (error) {
     console.warn("School resource unavailable; using local school data fallback.", error);
   }
@@ -693,13 +698,11 @@ function AssignmentTypeDropdown({
 function DatePicker({
   value,
   onChange,
-  placeholder,
-  darkMode
+  placeholder
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  darkMode?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(() => value ? parseInt(value.split("-")[0]) : new Date().getFullYear());
@@ -777,7 +780,7 @@ function DatePicker({
     : "";
 
   const popup = open ? createPortal(
-    <div className={`ec-datepicker-popup${darkMode ? " dark" : ""}`} style={menuStyle}>
+    <div className="ec-datepicker-popup dark" style={menuStyle}>
       <div className="ec-datepicker-header">
         <button type="button" onClick={prevMonth}><ChevronLeft size={16} /></button>
         <span>{MONTHS[viewMonth]} {viewYear}</span>
@@ -836,9 +839,8 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const router = useRouter();
   const [activeModule, setActiveModule] = useState<NavModule>("dashboard");
   const [role, setRole] = useState<Role>(lockedRole);
-  const [language, setLanguage] = useState<Language>("en");
+  const [language, setLanguage] = useState<Language>("mn");
   const [query, setQuery] = useState("");
-  const [darkMode, setDarkMode] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>("create");
@@ -856,6 +858,9 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const [notificationPageOpen, setNotificationPageOpen] = useState(false);
   const [activityNotifications, setActivityNotifications] = useState<ActivityNotification[]>([]);
   const [selectedSubjectContent, setSelectedSubjectContent] = useState<SubjectContentTarget>(null);
+  // Students and parents browse assignments/materials one subject at a time.
+  const [subjectScopeOptions, setSubjectScopeOptions] = useState<SubjectScopeOption[]>([]);
+  const [subjectScope, setSubjectScope] = useState("");
 
   const activeNav = navItems.find((item) => item.id === activeModule) ?? navItems[0];
   const visibleNavItems = navItems.filter((item) => visibleModulesByRole[role].includes(item.id));
@@ -863,6 +868,9 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const dashboard = copy.dashboards[role];
   const createCopy = copy.create[activeModule];
   const activeResource: SchoolResource | null = activeModule === "dashboard" || activeModule === "settings" ? null : activeModule;
+  const needsSubjectScope = role === "student" || role === "parent";
+  const scopeThisResource = needsSubjectScope && activeResource !== null && subjectScopedResources.has(activeResource);
+  const activeSubjectName = subjectScopeOptions.find((option) => option.id === subjectScope)?.name ?? "";
   const modalFields = modalMode === "edit" && resourceData ? resourceData.columns : createConfig[activeModule].fields;
   const modalTitle = modalMode === "edit" ? `${copy.common.edit} ${copy.recordLabel[activeModule]}` : createCopy.title;
   const modalAction = modalMode === "edit" ? copy.common.saveChanges : createCopy.action;
@@ -871,32 +879,24 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const canManageActiveModule = activeModule === "attendance" ? canManageAttendance : role === "admin";
 
   async function logout() {
-    window.localStorage.removeItem(demoSessionKey);
-    window.sessionStorage.removeItem(demoSessionKey);
-    await authService.signOut();
+    authService.signOut();
     router.push("/login");
   }
 
   async function saveProfile({ name, email, avatarUrl }: { name: string; email: string; avatarUrl: string }) {
-    if (isSupabaseConfigured) {
-      const { error } = await authService.updateProfile({ name, email, avatarUrl });
+    const result = await authService.updateProfile({ name, email, avatarUrl });
 
-      if (error) {
-        setToast(language === "mn" ? "Профайл хадгалахад алдаа гарлаа" : "Could not save profile");
-        return false;
-      }
-    } else {
-      try {
-        const demoSession = window.sessionStorage.getItem(demoSessionKey);
-        const parsedSession = demoSession ? (JSON.parse(demoSession) as Record<string, unknown>) : {};
-
-        window.sessionStorage.setItem(
-          demoSessionKey,
-          JSON.stringify({ ...parsedSession, email, name, avatarUrl })
-        );
-      } catch {
-        // Ignore demo session persistence errors; local state below still updates.
-      }
+    if ("error" in result) {
+      setToast(
+        result.error === "email-exists"
+          ? language === "mn"
+            ? "Энэ и-мэйл өөр хэрэглэгчид бүртгэлтэй байна"
+            : "That email is already taken"
+          : language === "mn"
+            ? "Профайл хадгалахад алдаа гарлаа"
+            : "Could not save profile"
+      );
+      return false;
     }
 
     setCurrentUserEmail(email);
@@ -1066,72 +1066,28 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
     let ignore = false;
 
     async function checkAuth() {
-      if (isSupabaseConfigured) {
-        const { data } = await authService.getSession();
+      await Promise.resolve();
+      if (ignore) return;
 
-        if (!ignore) {
-          if (!data.session) {
-            router.replace("/login");
-            return;
-          }
-
-          const sessionRole = data.session.user.user_metadata?.role;
-          const nextRole = isRole(sessionRole) ? sessionRole : "student";
-
-          // Route protection: a signed-in user may only view the dashboard that
-          // matches their role. Anyone else is bounced to their own dashboard.
-          if (nextRole !== lockedRole) {
-            router.replace(dashboardPathForRole(nextRole));
-            return;
-          }
-
-          setCurrentUserEmail(data.session.user.email ?? "");
-          setCurrentUserName(typeof data.session.user.user_metadata?.name === "string" ? data.session.user.user_metadata.name : "");
-          setCurrentUserAvatar(typeof data.session.user.user_metadata?.avatar_url === "string" ? data.session.user.user_metadata.avatar_url : "");
-          setRole(nextRole);
-          setActiveModule((currentModule) => (visibleModulesByRole[nextRole].includes(currentModule) ? currentModule : "dashboard"));
-
-          setAuthChecked(true);
-        }
-
+      const user = authService.getSession();
+      if (!user) {
+        router.replace("/login");
         return;
       }
 
-      await Promise.resolve();
-
-      if (!ignore) {
-        window.localStorage.removeItem(demoSessionKey);
-        const demoSession = window.sessionStorage.getItem(demoSessionKey);
-
-        if (!demoSession) {
-          router.replace("/login");
-          return;
-        }
-
-        try {
-          const parsedSession = JSON.parse(demoSession) as { email?: unknown; role?: unknown; name?: unknown; avatarUrl?: unknown };
-          const nextRole = isRole(parsedSession.role) ? parsedSession.role : "student";
-
-          // Route protection (demo mode): enforce that the session role matches
-          // the dashboard being rendered.
-          if (nextRole !== lockedRole) {
-            router.replace(dashboardPathForRole(nextRole));
-            return;
-          }
-
-          setCurrentUserEmail(typeof parsedSession.email === "string" ? parsedSession.email : "");
-          setCurrentUserName(typeof parsedSession.name === "string" ? parsedSession.name : "");
-          setCurrentUserAvatar(typeof parsedSession.avatarUrl === "string" ? parsedSession.avatarUrl : "");
-          setRole(nextRole);
-          setActiveModule((currentModule) => (visibleModulesByRole[nextRole].includes(currentModule) ? currentModule : "dashboard"));
-        } catch {
-          // Corrupt session payload — treat as unauthenticated.
-          router.replace("/login");
-          return;
-        }
-
-        setAuthChecked(true);
+      // Route protection: a signed-in user may only view the dashboard that
+      // matches their role. Anyone else is bounced to their own dashboard.
+      if (user.role !== lockedRole) {
+        router.replace(dashboardPathForRole(user.role));
+        return;
       }
+
+      setCurrentUserEmail(user.email);
+      setCurrentUserName(user.name);
+      setCurrentUserAvatar(user.avatarUrl);
+      setRole(user.role);
+      setActiveModule((currentModule) => (visibleModulesByRole[user.role].includes(currentModule) ? currentModule : "dashboard"));
+      setAuthChecked(true);
     }
 
     checkAuth();
@@ -1140,6 +1096,36 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
       ignore = true;
     };
   }, [router, lockedRole]);
+
+  // Pull the subjects this student/parent is enrolled in — they become the tabs
+  // above assignments and materials.
+  useEffect(() => {
+    // Nothing to clear on the way out: the tabs only render for the roles that
+    // need them, and the role is fixed for the lifetime of the dashboard.
+    if (!authChecked || !needsSubjectScope) return;
+
+    let ignore = false;
+
+    listSchoolResource("subjects", { mode: "summary" })
+      .then((table) => {
+        if (ignore) return;
+
+        const nameIndex = table.columns.findIndex((column) => column.toLowerCase() === "name");
+        const options = table.rows
+          .map((row, rowIndex) => ({ id: table.ids[rowIndex] ?? "", name: row[nameIndex >= 0 ? nameIndex : 0] ?? "" }))
+          .filter((option) => option.id && option.name);
+
+        setSubjectScopeOptions(options);
+        setSubjectScope((current) => (options.some((o) => o.id === current) ? current : (options[0]?.id ?? "")));
+      })
+      .catch(() => {
+        if (!ignore) setSubjectScopeOptions([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [authChecked, needsSubjectScope]);
 
   useEffect(() => {
     let ignore = false;
@@ -1153,11 +1139,22 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
         return;
       }
 
+      // Wait for the subject tabs before asking for a scoped resource — the
+      // server rejects a page request that carries no subject.
+      if (scopeThisResource && !subjectScope) {
+        setResourceData({ columns: [], ids: [], rows: [] });
+        setResourceLoading(false);
+        return;
+      }
+
       setResourceLoading(true);
       setResourceError("");
 
       try {
-        const result = await loadResourceData(activeResource);
+        const result = await loadResourceData(
+          activeResource,
+          scopeThisResource ? { mode: "page", subjectId: subjectScope } : { mode: "summary" }
+        );
         let data = result.data;
 
         if (result.needsLocalParentFilter && role === "parent" && currentUserEmail && parentScopedResources.has(activeResource)) {
@@ -1187,26 +1184,27 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
     return () => {
       ignore = true;
     };
-  }, [activeResource, authChecked, copy.common.databaseOffline, currentUserEmail, role]);
+  }, [activeResource, authChecked, copy.common.databaseOffline, currentUserEmail, role, scopeThisResource, subjectScope]);
 
   if (!authChecked) {
     return (
-      <main className={`educore-shell auth-check${darkMode ? " dark" : ""}`}>
+      <main className="educore-shell auth-check dark">
         <div className="auth-loading">
-          <Image className="ec-loading-logo" src="/data/subjects/download.png" alt="Nova Mind Academy" width={559} height={534} priority />
+          <Image className="ec-loading-logo" src="/logo-mark.png" alt="Nova Mind Academy" width={544} height={420} priority />
           <strong>{copy.app.loadingSession}</strong>
+          <span className="ec-spinner" style={{ "--ec-spinner-size": "18px", "--ec-spinner-width": "2px" } as CSSProperties} />
         </div>
       </main>
     );
   }
 
   return (
-    <main className={`educore-shell${darkMode ? " dark" : ""}`}>
+    <main className="educore-shell dark">
       <button className={`ec-backdrop${mobileOpen ? " show" : ""}`} onClick={() => setMobileOpen(false)} type="button" />
       <aside className={`ec-sidebar${mobileOpen ? " open" : ""}`}>
         <div className="ec-brand">
           <span className="ec-brand-logo">
-            <Image src="/data/subjects/download.png" alt="Nova Mind Academy" width={559} height={534} priority />
+            <Image src="/logo-mark.png" alt="Nova Mind Academy" width={544} height={420} priority />
           </span>
           <div>
             <strong>Nova Mind</strong>
@@ -1268,9 +1266,6 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               <Check size={16} />
             </div>
           </div>
-          <button className="ec-icon-button theme-toggle" onClick={() => setDarkMode((value) => !value)} type="button">
-            {darkMode ? <Sun size={19} /> : <Moon size={19} />}
-          </button>
           <button
             className={`ec-icon-button notification-toggle${notificationPageOpen ? " active" : ""}`}
             onClick={() => {
@@ -1326,7 +1321,6 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               selectedSubjectContent ? (
                 <SubjectContentPanel
                   canManage={role === "admin" || role === "teacher"}
-                  darkMode={darkMode}
                   language={language}
                   subject={selectedSubjectContent}
                   onBack={() => setSelectedSubjectContent(null)}
@@ -1349,6 +1343,18 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
                   onOpenContent={openSubjectContent}
                 />
               )
+            ) : null}
+            {activeModule === "assignments" || activeModule === "materials" ? (
+              <>
+                {scopeThisResource ? (
+                  <SubjectScopeTabs language={language} onChange={setSubjectScope} options={subjectScopeOptions} value={subjectScope} />
+                ) : null}
+                {subjectScopeOptions.length === 0 && scopeThisResource ? null : activeModule === "assignments" ? (
+                  <AssignmentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
+                ) : (
+                  <MaterialsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
+                )}
+              </>
             ) : null}
             {activeModule === "classes" ? (
               <ClassesModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
@@ -1374,12 +1380,10 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
                 currentUserAvatar={currentUserAvatar}
                 currentUserEmail={currentUserEmail}
                 currentUserName={currentUserName}
-                darkMode={darkMode}
                 language={language}
                 logout={logout}
                 onSaveProfile={saveProfile}
                 role={role}
-                setDarkMode={setDarkMode}
                 setLanguage={setLanguage}
               />
             ) : null}
@@ -1531,16 +1535,6 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
           <Bell size={20} />
           {unreadNotifications > 0 ? <span className="notification-count">{unreadNotifications}</span> : null}
           <span>{language === "mn" ? "Мэдэгдэл" : "Notification"}</span>
-        </button>
-        <button
-          className={!notificationPageOpen && activeModule === "settings" ? "active" : ""}
-          onClick={() => {
-            openModule("settings");
-          }}
-          type="button"
-        >
-          <SettingsIcon size={20} />
-          <span>{copy.nav.settings.label}</span>
         </button>
       </nav>
     </main>
@@ -1860,7 +1854,54 @@ function SubjectsModule({
   );
 }
 
-function AssignmentsModule({ apiData, copy, error, language, loading, ...controls }: ModuleApiProps) {
+/** Subject picker shown to students and parents above scoped resources. */
+function SubjectScopeTabs({
+  options,
+  value,
+  onChange,
+  language
+}: {
+  options: SubjectScopeOption[];
+  value: string;
+  onChange: (id: string) => void;
+  language: Language;
+}) {
+  if (options.length === 0) {
+    return (
+      <Card>
+        <CardContent>
+          <div className="table-empty">
+            <strong>{language === "mn" ? "Хичээл олдсонгүй" : "No subjects yet"}</strong>
+            <p>
+              {language === "mn"
+                ? "Та ямар нэг хичээлд бүртгэгдсэний дараа энд харагдана."
+                : "Once you are enrolled in a subject it will show up here."}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="subject-scope-tabs" role="tablist">
+      {options.map((option) => (
+        <button
+          aria-selected={option.id === value}
+          className={option.id === value ? "active" : ""}
+          key={option.id}
+          onClick={() => onChange(option.id)}
+          role="tab"
+          type="button"
+        >
+          {translateValue(option.name, language)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AssignmentsModule({ apiData, copy, error, language, loading, scopeLabel, ...controls }: ModuleApiProps & { scopeLabel?: string }) {
   return (
     <ModuleTable
       apiData={apiData}
@@ -1868,7 +1909,7 @@ function AssignmentsModule({ apiData, copy, error, language, loading, ...control
       error={error}
       language={language}
       loading={loading}
-      title={copy.tables.assignments}
+      title={scopeLabel ? `${copy.tables.assignments} — ${translateValue(scopeLabel, language)}` : copy.tables.assignments}
       columns={["Subject", "Title", "Type", "Due Date", "Max Score", "Description"]}
       rows={[]}
       {...controls}
@@ -1876,7 +1917,7 @@ function AssignmentsModule({ apiData, copy, error, language, loading, ...control
   );
 }
 
-function MaterialsModule({ apiData, copy, error, language, loading, ...controls }: ModuleApiProps) {
+function MaterialsModule({ apiData, copy, error, language, loading, scopeLabel, ...controls }: ModuleApiProps & { scopeLabel?: string }) {
   return (
     <ModuleTable
       apiData={apiData}
@@ -1884,7 +1925,7 @@ function MaterialsModule({ apiData, copy, error, language, loading, ...controls 
       error={error}
       language={language}
       loading={loading}
-      title={copy.tables.materials}
+      title={scopeLabel ? `${copy.tables.materials} — ${translateValue(scopeLabel, language)}` : copy.tables.materials}
       columns={["Subject", "Title", "File Type", "Uploaded By"]}
       rows={[]}
       {...controls}
@@ -1894,14 +1935,12 @@ function MaterialsModule({ apiData, copy, error, language, loading, ...controls 
 
 function SubjectContentPanel({
   canManage,
-  darkMode,
   language,
   subject,
   onBack,
   onSaved
 }: {
   canManage: boolean;
-  darkMode: boolean;
   language: Language;
   subject: Exclude<SubjectContentTarget, null>;
   onBack: () => void;
@@ -2500,7 +2539,8 @@ function SubjectContentPanel({
       {loading ? (
         <Card>
           <CardContent>
-            <div className="table-empty">
+            <div className="ec-loading-panel">
+              <span className="ec-spinner" style={{ "--ec-spinner-size": "30px", "--ec-spinner-width": "3px" } as CSSProperties} />
               <strong>{language === "mn" ? "Агуулга ачаалж байна..." : "Loading content..."}</strong>
             </div>
           </CardContent>
@@ -2694,7 +2734,6 @@ function SubjectContentPanel({
                   <form className="subject-inline-form subject-lesson-form" onSubmit={addAssignment}>
                     <Input onChange={(event) => setAssignmentForm((current) => ({ ...current, title: event.target.value }))} placeholder={language === "mn" ? "Даалгаврын нэр" : "Assignment title"} required value={assignmentForm.title} />
                     <DatePicker
-                      darkMode={darkMode}
                       onChange={(val) => setAssignmentForm((current) => ({ ...current, dueDate: val }))}
                       placeholder={language === "mn" ? "Дуусах огноо" : "Due date"}
                       value={assignmentForm.dueDate}
@@ -3198,24 +3237,20 @@ function SettingsModule({
   currentUserAvatar,
   currentUserEmail,
   currentUserName,
-  darkMode,
   language,
   logout,
   onSaveProfile,
   role,
-  setDarkMode,
   setLanguage
 }: {
   copy: AppCopy;
   currentUserAvatar: string;
   currentUserEmail: string;
   currentUserName: string;
-  darkMode: boolean;
   language: Language;
   logout: () => void;
   onSaveProfile: (values: { name: string; email: string; avatarUrl: string }) => Promise<boolean>;
   role: Role;
-  setDarkMode: (value: boolean) => void;
   setLanguage: (value: Language) => void;
 }) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
@@ -3345,21 +3380,6 @@ function SettingsModule({
               <ChevronRight size={18} />
             </button>
 
-            <button className="mobile-setting-row" onClick={() => setDarkMode(!darkMode)} type="button">
-              <span>
-                {darkMode
-                  ? language === "mn"
-                    ? "Гэрэлтэй горим"
-                    : "Light Mode"
-                  : language === "mn"
-                    ? "Шөнийн горим"
-                    : "Night Mode"}
-              </span>
-              <span className={`mobile-switch${darkMode ? " active" : ""}`} aria-hidden="true">
-                <span />
-              </span>
-            </button>
-
             <button className="mobile-setting-row" onClick={() => setLanguage(language === "mn" ? "en" : "mn")} type="button">
               <span>{language === "mn" ? "Монгол хэл" : "English"}</span>
               <span className={`mobile-switch${language === "mn" ? " active" : ""}`} aria-hidden="true">
@@ -3411,6 +3431,34 @@ function SettingsModule({
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+const SKELETON_ROW_COUNT = 5;
+const SKELETON_BAR_WIDTHS = ["78%", "60%", "88%", "52%", "72%", "66%"];
+
+/** Placeholder rows shown while a resource loads for the first time. */
+function TableSkeletonRows({ columns, gridColumns, language }: { columns: string[]; gridColumns: string; language: Language }) {
+  return (
+    <>
+      {Array.from({ length: SKELETON_ROW_COUNT }, (_, rowIndex) => (
+        <div aria-hidden className="ec-table-row is-skeleton" key={`skeleton-row-${rowIndex}`} style={{ gridTemplateColumns: gridColumns }}>
+          {columns.map((column, columnIndex) => (
+            <span data-label={translateColumn(column, language)} key={column}>
+              <span
+                className="ec-skeleton ec-skeleton-bar"
+                style={
+                  {
+                    "--ec-bar-width": SKELETON_BAR_WIDTHS[(rowIndex + columnIndex) % SKELETON_BAR_WIDTHS.length],
+                    "--ec-skeleton-delay": `${rowIndex * 0.12}s`
+                  } as CSSProperties
+                }
+              />
+            </span>
+          ))}
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -3477,7 +3525,18 @@ function ModuleTable({
       <CardHeader>
         <div>
           <CardTitle>{title}</CardTitle>
-          {loading || error ? <p className="table-subtitle">{loading ? copy.common.loadingRecords : error}</p> : null}
+          {loading || error ? (
+            <p className="table-subtitle">
+              {loading ? (
+                <>
+                  <span className="ec-spinner" style={{ "--ec-spinner-size": "13px", "--ec-spinner-width": "2px" } as CSSProperties} />
+                  {copy.common.loadingRecords}
+                </>
+              ) : (
+                error
+              )}
+            </p>
+          ) : null}
         </div>
         <div className="table-actions">
           <Input value={filterQuery} onChange={(event) => setFilterQuery(event.target.value)} placeholder={copy.common.filterRecords} />
@@ -3497,7 +3556,9 @@ function ModuleTable({
             ))}
             {showActions ? <span className="table-action-title">{copy.common.actions}</span> : null}
           </div>
-          {filteredRows.length > 0 ? (
+          {loading && displayRows.length === 0 ? (
+            <TableSkeletonRows columns={displayColumns} gridColumns={gridColumns} language={language} />
+          ) : filteredRows.length > 0 ? (
             filteredRows.map(({ id, row }) => (
               <div className="ec-table-row" key={id ?? row.join("-")} style={{ gridTemplateColumns: gridColumns }}>
                 {row.map((cell, index) => (

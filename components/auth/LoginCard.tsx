@@ -1,16 +1,21 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useSiteReady } from "@/lib/site-ready";
 import { SecureBadge } from "./SecureBadge";
 import { LoginForm } from "./LoginForm";
 
+const hidden = { opacity: 0, y: 24, scale: 0.98, filter: "blur(8px)" };
+
 /** Right-side dark glass card containing the secure badge, heading and form. */
 export function LoginCard() {
+  const ready = useSiteReady();
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      initial={hidden}
+      animate={ready ? { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" } : hidden}
+      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
       className="relative w-full max-w-md"
     >
       {/* glow behind the card */}

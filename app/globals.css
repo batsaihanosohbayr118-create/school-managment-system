@@ -1,15 +1,17 @@
 @import "tailwindcss";
 
+/* The app is dark-only — there is no light theme and no theme toggle. */
 :root {
-  --bg: #eef4ff;
-  --panel: rgba(255, 255, 255, 0.78);
-  --panel-strong: rgba(255, 255, 255, 0.92);
-  --line: rgba(148, 163, 184, 0.28);
-  --ink: #0f172a;
-  --muted: #64748b;
+  --bg: #070b16;
+  --panel: rgba(15, 23, 42, 0.78);
+  --panel-strong: rgba(15, 23, 42, 0.94);
+  --line: rgba(148, 163, 184, 0.2);
+  --ink: #e5eefc;
+  --muted: #94a3b8;
   --primary: #4f46e5;
   --accent: #10b981;
-  --shadow: 0 24px 70px rgba(36, 48, 77, 0.16);
+  --shadow: 0 24px 70px rgba(2, 6, 23, 0.55);
+  color-scheme: dark;
 }
 
 * {
@@ -31,9 +33,9 @@ body {
   margin: 0;
   color: var(--ink);
   background:
-    radial-gradient(circle at 12% 12%, rgba(79, 70, 229, 0.18), transparent 32%),
-    radial-gradient(circle at 88% 8%, rgba(16, 185, 129, 0.2), transparent 32%),
-    linear-gradient(135deg, #f8fbff 0%, #edf4ff 48%, #f7fff9 100%);
+    radial-gradient(circle at 12% 12%, rgba(79, 70, 229, 0.28), transparent 32%),
+    radial-gradient(circle at 88% 8%, rgba(16, 185, 129, 0.18), transparent 32%),
+    linear-gradient(135deg, #020617 0%, #0f172a 100%);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -129,13 +131,13 @@ a {
 
 .ec-brand-logo img {
   width: 100%;
-  height: 100%;
+  height: auto;
   object-fit: contain;
 }
 
 .ec-loading-logo {
-  width: 72px !important;
-  height: 72px !important;
+  width: 76px !important;
+  height: auto !important;
   object-fit: contain;
   animation: ec-loading-pulse 1.4s ease-in-out infinite;
   will-change: transform, opacity;
@@ -157,6 +159,335 @@ a {
 @media (prefers-reduced-motion: reduce) {
   .ec-loading-logo {
     animation: none;
+  }
+}
+
+/* ==========================================================================
+   Loading animations — shared spinner / skeleton primitives
+   ========================================================================== */
+
+.ec-spinner {
+  width: var(--ec-spinner-size, 22px);
+  height: var(--ec-spinner-size, 22px);
+  flex-shrink: 0;
+  border: var(--ec-spinner-width, 2.5px) solid rgba(148, 163, 184, 0.3);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: ec-spin 0.7s linear infinite;
+}
+
+@keyframes ec-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ec-loading-panel {
+  display: grid;
+  gap: 12px;
+  min-height: 150px;
+  place-content: center;
+  justify-items: center;
+  padding: 22px;
+  color: var(--ink);
+  text-align: center;
+}
+
+.ec-loading-panel strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ec-loading-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Shimmering placeholder block — sized by whatever wraps it. */
+.ec-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+}
+
+.ec-skeleton::after {
+  position: absolute;
+  content: "";
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transform: translateX(-100%);
+  animation: ec-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes ec-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.educore-shell.dark .ec-skeleton {
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.educore-shell.dark .ec-skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(226, 232, 240, 0.16), transparent);
+}
+
+/* Skeleton bar inside a table cell. */
+.ec-skeleton-bar {
+  display: block;
+  width: var(--ec-bar-width, 100%);
+  height: 12px;
+}
+
+.ec-table-row.is-skeleton {
+  pointer-events: none;
+}
+
+/* Rows fade in one after another so the table fills top-down. */
+.ec-table-row.is-skeleton .ec-skeleton::after {
+  animation-delay: var(--ec-skeleton-delay, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ec-spinner,
+  .ec-skeleton::after {
+    animation: none;
+  }
+
+  .ec-spinner {
+    border-top-color: rgba(148, 163, 184, 0.3);
+    border-right-color: var(--primary);
+  }
+}
+
+/* --- Site entry splash (components/SiteLoader.tsx) ---
+   Covers the very first paint and fades out once the document has loaded.
+   Sits above every other layer, including the offline notice and modals. */
+
+.site-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 26px;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(79, 70, 229, 0.28), transparent 34%),
+    radial-gradient(circle at 88% 8%, rgba(16, 185, 129, 0.18), transparent 34%),
+    linear-gradient(135deg, #020617 0%, #0f172a 100%);
+}
+
+.site-loader.is-leaving {
+  opacity: 0;
+  transform: scale(1.04);
+  pointer-events: none;
+  transition:
+    opacity 450ms ease,
+    transform 450ms ease;
+}
+
+/* Logo centred inside two counter-rotating rings. */
+.site-loader-mark {
+  position: relative;
+  display: grid;
+  width: 132px;
+  height: 132px;
+  place-items: center;
+}
+
+.site-loader-mark img {
+  width: 80px;
+  height: auto;
+  object-fit: contain;
+  animation: ec-loading-pulse 1.6s ease-in-out infinite;
+}
+
+.site-loader-ring {
+  position: absolute;
+  inset: 0;
+  border: 3px solid transparent;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: ec-spin 1.1s linear infinite;
+}
+
+.site-loader-ring.is-inner {
+  inset: 13px;
+  border-width: 2px;
+  border-top-color: transparent;
+  border-bottom-color: #06b6d4;
+  animation-duration: 1.7s;
+  animation-direction: reverse;
+}
+
+.site-loader-copy {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  text-align: center;
+}
+
+.site-loader-copy strong {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg, var(--primary), #06b6d4);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.site-loader-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.site-loader-bar {
+  position: relative;
+  width: 184px;
+  height: 4px;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+}
+
+.site-loader-bar::after {
+  position: absolute;
+  content: "";
+  inset: 0 auto 0 0;
+  width: 42%;
+  background: linear-gradient(90deg, var(--primary), #06b6d4);
+  border-radius: inherit;
+  animation: ec-track 1.2s ease-in-out infinite;
+}
+
+
+@media (max-width: 480px) {
+  .site-loader-mark {
+    width: 108px;
+    height: 108px;
+  }
+
+  .site-loader-mark img {
+    width: 64px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-loader-ring,
+  .site-loader-mark img,
+  .site-loader-bar::after {
+    animation: none;
+  }
+
+  .site-loader.is-leaving {
+    transform: none;
+  }
+
+  .site-loader-bar::after {
+    width: 100%;
+    opacity: 0.7;
+  }
+}
+
+/* --- Full-screen route transition loader (app/loading.tsx) --- */
+
+.route-loading {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding: 24px;
+  animation: ec-fade-in 0.25s ease-out both;
+}
+
+.route-loading strong {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg, var(--primary), #06b6d4);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Logo sits inside a slowly rotating ring. */
+.route-loading-mark {
+  position: relative;
+  display: grid;
+  width: 104px;
+  height: 104px;
+  place-items: center;
+}
+
+.route-loading-ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid transparent;
+  border-top-color: var(--primary);
+  border-right-color: rgba(6, 182, 212, 0.55);
+  border-radius: 50%;
+  animation: ec-spin 1.5s linear infinite;
+}
+
+/* Indeterminate progress bar — the sliver travels the full track. */
+.route-loading-bar {
+  position: relative;
+  width: 168px;
+  height: 4px;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+}
+
+.route-loading-bar::after {
+  position: absolute;
+  content: "";
+  inset: 0 auto 0 0;
+  width: 42%;
+  background: linear-gradient(90deg, var(--primary), #06b6d4);
+  border-radius: inherit;
+  animation: ec-track 1.2s ease-in-out infinite;
+}
+
+@keyframes ec-track {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(238%);
+  }
+}
+
+@keyframes ec-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-loading,
+  .route-loading-ring,
+  .route-loading-bar::after {
+    animation: none;
+  }
+
+  .route-loading-bar::after {
+    width: 100%;
+    opacity: 0.7;
   }
 }
 
@@ -186,6 +517,12 @@ a {
 .auth-subtitle {
   margin: 0;
   color: var(--muted);
+}
+
+.table-subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .ec-sidebar nav {
@@ -1700,6 +2037,55 @@ a {
   border-color: transparent;
 }
 
+/* Subject picker above assignments/materials for students and parents. */
+.subject-scope-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.subject-scope-tabs button {
+  padding: 9px 16px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.subject-scope-tabs button:hover {
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.subject-scope-tabs button.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary), #06b6d4);
+  border-color: transparent;
+}
+
+@media (max-width: 760px) {
+  .subject-scope-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .subject-scope-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .subject-scope-tabs button {
+    flex-shrink: 0;
+  }
+}
+
 .table-empty {
   display: grid;
   gap: 5px;
@@ -2072,10 +2458,9 @@ a {
 }
 
 .auth-loading img {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: auto;
   object-fit: contain;
-  border-radius: 10px;
 }
 
 .auth-card {
@@ -2121,7 +2506,7 @@ a {
 
 .auth-brand-logo img {
   width: 100%;
-  height: 100%;
+  height: auto;
   object-fit: contain;
 }
 
@@ -2600,10 +2985,6 @@ a {
     display: none;
   }
 
-  .theme-toggle {
-    display: none;
-  }
-
   .logout-toggle {
     display: none;
   }
@@ -2786,7 +3167,7 @@ a {
     left: 10px;
     z-index: 70;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
     min-height: 66px;
     padding: 6px;
@@ -3963,11 +4344,11 @@ a {
    Admin — User Management
    ========================================================================== */
 .um-page {
-  --um-bg: #f4f7fe;
-  --um-surface: #ffffff;
-  --um-ink: #0f172a;
-  --um-muted: #5b6b86;
-  --um-line: rgba(15, 23, 42, 0.1);
+  --um-bg: #070b16;
+  --um-surface: #0f1830;
+  --um-ink: #e8eefc;
+  --um-muted: #97a6c4;
+  --um-line: rgba(148, 163, 184, 0.18);
   --um-primary: #4f46e5;
   --um-danger: #e11d48;
   min-height: 100vh;
@@ -3982,8 +4363,8 @@ a {
   place-content: center;
   justify-items: center;
   gap: 12px;
-  color: #5b6b86;
-  background: #f4f7fe;
+  color: #97a6c4;
+  background: #070b16;
 }
 
 .um-header {
@@ -4350,54 +4731,41 @@ a {
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .um-page {
-    --um-bg: #070b16;
-    --um-surface: #0f1830;
-    --um-ink: #e8eefc;
-    --um-muted: #97a6c4;
-    --um-line: rgba(148, 163, 184, 0.18);
-  }
+/* User-management surfaces — dark unconditionally (the base vars above already
+   carry the dark palette; these are the per-component pieces). */
+.um-table thead th {
+  background: #101c39;
+}
 
-  .um-loading {
-    background: #070b16;
-    color: #97a6c4;
-  }
+.um-row-actions button,
+.um-back {
+  background: #101c39;
+}
 
-  .um-table thead th {
-    background: #101c39;
-  }
+.um-banner {
+  background: rgba(120, 53, 15, 0.25);
+  border-color: rgba(234, 88, 12, 0.4);
+  color: #fdba74;
+}
 
-  .um-row-actions button,
-  .um-back {
-    background: #101c39;
-  }
+.um-modal {
+  background: #0f1830;
+}
 
-  .um-banner {
-    background: rgba(120, 53, 15, 0.25);
-    border-color: rgba(234, 88, 12, 0.4);
-    color: #fdba74;
-  }
+.um-modal-head strong {
+  color: #e8eefc;
+}
 
-  .um-modal {
-    background: #0f1830;
-  }
+.um-modal-head button,
+.um-select {
+  background: #101c39;
+  color: #e8eefc;
+  border-color: rgba(148, 163, 184, 0.2);
+}
 
-  .um-modal-head strong {
-    color: #e8eefc;
-  }
-
-  .um-modal-head button,
-  .um-select {
-    background: #101c39;
-    color: #e8eefc;
-    border-color: rgba(148, 163, 184, 0.2);
-  }
-
-  .um-modal-note,
-  .um-field > span {
-    color: #97a6c4;
-  }
+.um-modal-note,
+.um-field > span {
+  color: #97a6c4;
 }
 /* ==========================================================================
    Auth (login) — keep browser autofill on-theme (dark glass inputs)

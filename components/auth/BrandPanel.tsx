@@ -7,7 +7,7 @@ import { Star } from "lucide-react";
 const BRAND = {
   name: "Nova Mind",
   suffix: "Academy",
-  logo: "/data/subjects/download.png",
+  logo: "/logo-mark.png",
   background: "/background3.png"
 } as const;
 
@@ -36,7 +36,7 @@ export function BrandPanel() {
           className="flex items-center gap-3"
         >
           <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur">
-            <Image src={BRAND.logo} alt={BRAND.name} width={559} height={534} className="h-9 w-9 object-contain" priority />
+            <Image src={BRAND.logo} alt={BRAND.name} width={544} height={420} className="h-7 w-auto object-contain" priority />
           </span>
           <span className="leading-tight">
             <strong className="block text-[18px] font-extrabold text-white">{BRAND.name}</strong>

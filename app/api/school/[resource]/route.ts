@@ -7,7 +7,7 @@ import {
   updateResource,
   type SchoolRequestContext
 } from "@/lib/school-db";
-import { resolveRequestSession } from "@/lib/school-session";
+import { resolveRequestSession } from "@/lib/school-session-server";
 
 export const runtime = "nodejs";
 

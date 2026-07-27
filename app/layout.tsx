@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import NoConnectionBanner from "@/components/NoConnection";
+import SiteLoader from "@/components/SiteLoader";
+import MotionProvider from "@/components/MotionProvider";
 
 export const metadata: Metadata = {
   title: "Nova Mind Academy",
@@ -31,9 +33,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="mn">
       <body>
-        {children}
+        <SiteLoader />
+        <MotionProvider>{children}</MotionProvider>
         <NoConnectionBanner />
       </body>
     </html>
