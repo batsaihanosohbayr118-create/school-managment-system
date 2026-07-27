@@ -285,6 +285,101 @@ reach the mobile client.
 | Column rename in `school-db.ts` breaks a projection | Projections resolve columns by name and fail loudly; Vitest covers the missing-column case |
 | App Store rejection | A real native app with device integrations is a far stronger 4.2 position than a webview. Not zero risk, but not the same class of risk. |
 
+## Plan A verification (2026-07-27)
+
+Ran against the live Supabase project (`boiuusbqmlrftpryestw`), not demo mode.
+Four real accounts, temp passwords reset via the Admin API for this session:
+`admin@gmail.com` (admin), `amraa@gmail.com` (teacher, Mathematics),
+`bilgee@gmail.com` (student, Mathematics), `ganbaa@gmail.com` (parent, child
+Bilgee). A second student, `hangai@gmail.com`, was added in the same subject
+specifically to prove student/parent scoping isolates by identity, not just
+by subject — two students sharing a class is the case a subject-only filter
+gets wrong.
+
+**Two infrastructure defects blocked verification and were fixed first, both
+unrelated to the mobile endpoints themselves:**
+
+1. `DATABASE_URL` pointed at the direct-connection host
+   (`db.<ref>.supabase.co`), which resolves to an IPv6-only address this
+   network can't reach. Every request silently fell back to the local JSON
+   store (`lib/school-db.ts`'s documented fallback). Fixed by switching to the
+   session pooler host in `.env.local`.
+2. The live schema had drifted from what `lib/school-db.ts` expects —
+   `CREATE TABLE IF NOT EXISTS` only creates missing tables, never adds
+   columns to existing ones. Nine columns were missing across `teachers`,
+   `students`, `grade_records`, `attendance_records`, and `timetable_slots`
+   (e.g. `subject_id`, `subjects`, `student_id`). Every write to those tables
+   was throwing and silently landing in the local fallback instead, masked by
+   a 201 response. Fixed with additive `ALTER TABLE ... ADD COLUMN IF NOT
+   EXISTS` statements — no data loss, nothing dropped.
+
+**Two authorization defects were found during verification and fixed
+(see `060fec0` and `1080a8f`):**
+
+1. **Read scoping for grades/attendance was subject-only, not
+   student-scoped.** A student or parent saw every row for a subject they
+   were connected to, including classmates'/other children's rows — not just
+   their own. Confirmed with the two-student fixture: before the fix, the
+   student token for Bilgee returned both Bilgee's and Hangai's Mathematics
+   grade and attendance row; same for the parent token. This is the exact
+   failure CLAUDE.md's "load-bearing rule" names, and it affected the
+   pre-existing `/api/school/grades` endpoint equally, not just the new
+   mobile one. Fix: `filterResourceTable` now additionally filters attendance
+   and grades by the caller's own student identity (or, for a parent, their
+   linked child's) after the subject filter. Assignments, materials, and
+   timetable stay subject-scoped on purpose — they describe the class, not an
+   individual.
+2. **Write authorization could be bypassed entirely.** `createResource`,
+   `updateResource`, and `deleteResource` each called `requireManageAccess`
+   *inside* a `try` block whose `catch` treats every error — including a
+   deliberate permission denial — as "Postgres is unreachable," and silently
+   retries the write against the local JSON store, still returning success.
+   Confirmed: a student's `POST /api/mobile/grades` returned `200` and the row
+   was found in `.local-data/school-store.json`. Fix: moved the
+   `requireManageAccess` call before the `try` block in all three functions so
+   a permission denial throws directly instead of being absorbed by the
+   fallback path.
+
+### Step 2 — read scoping (after both fixes), grades endpoint
+
+| Role | Rows | Students visible | Subjects visible |
+| --- | --- | --- | --- |
+| admin | 2 | Bilgee, Hangai | Mathematics |
+| teacher (amraa) | 2 | Bilgee, Hangai | Mathematics |
+| student (bilgee) | 1 | Bilgee | Mathematics |
+| parent (ganbaa) | 1 | Bilgee | Mathematics |
+
+Teacher correctly sees both students — they share the teacher's one subject.
+Student and parent each see only the one row that is theirs.
+
+### Step 3 — write authorization
+
+| Caller | Endpoint | Result |
+| --- | --- | --- |
+| student token | `POST /api/mobile/grades` | `403` (`"You do not have permission to manage this resource."`) |
+| parent token | `POST /api/mobile/grades` | `403` |
+| teacher token | `POST /api/mobile/grades` | `200`, row created |
+
+### Step 4 — payments visibility
+
+`GET /api/mobile/payments` with the teacher token: `{"payments":[]}` — matches
+`school-db.ts:744`, teachers see no payment rows. Student and parent tokens
+each returned only their own/their child's payment row, not the other
+student's.
+
+### Step 5 — typed shapes
+
+`GET /api/mobile/timetable` with the student token returned objects with
+`subject`, `day`, `timeLabel`, `startsAt`, `endsAt`, `teacher`, `className` —
+no `columns` or `rows` key anywhere in any mobile response checked.
+
+### Step 6 — full static check
+
+`npm test` (44 tests), `npx tsc --noEmit`, `npm run lint` (106 pre-existing
+problems, none in touched files), `npm run build` (all six `/api/mobile/*`
+routes register) all pass. `git status --porcelain` clean after restoring the
+generated build artifacts.
+
 ## Future work (not this spec)
 
 - Push notifications for announcements, grades, and payment reminders
