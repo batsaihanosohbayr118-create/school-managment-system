@@ -2,6 +2,42 @@
 
 Read this first; it tells you exactly where work stands and what to do next.
 
+## Update: Plan A Tasks 2-10 done
+
+Tasks 2 through 10 of `docs/superpowers/plans/2026-07-27-expo-plan-a-mobile-api.md`
+are implemented, tested, and committed on `main` (this branch was merged from
+`feat/expo-mobile-api` via PR #1 in the meantime, so everything below lives on
+`main` now, not a feature branch).
+
+| Task | Commit |
+| --- | --- |
+| 2 — `shared/api-types.ts` | `ca203c7` |
+| 3 — `shared/api-error.ts` | `69b6107` |
+| 4 — CORS for the four existing routes | `0110c8f` |
+| 5 — `lib/mobile/table.ts`, `toTimetableSlots` | `eb8d8e0` |
+| 6 — `toGradeEntries`, `toAttendanceEntries` | `d5624a4` |
+| 7 — `toPaymentEntries`, `toAnnouncementEntries` | `ce869a2` |
+| 8 — `lib/mobile/route-helpers.ts` | `17b575d` |
+| 9 — six read endpoints under `app/api/mobile/` | `8210615` |
+| 10 — teacher write endpoints (attendance, grades) | `0ffe09d` |
+
+Verified after every task: `npm test` (44 tests), `npx tsc --noEmit`, and after
+Tasks 9-10 also `npm run build` (all six `/api/mobile/*` routes register) plus a
+live CORS preflight check against `npm run dev`. Lint has 6 pre-existing errors
+in `components/auth/LoginForm.tsx` and `components/dashboard/DashboardApp.tsx`
+unrelated to this work — do not attribute new lint failures to this change
+without checking those files first.
+
+**Task 11 (cross-role curl verification) is blocked on the owner**, same
+prerequisite as before: `SUPABASE_SERVICE_ROLE_KEY` is still unset in
+`.env.local`, so `/admin/users` cannot create the four role accounts needed to
+obtain per-role Supabase tokens. `.env.local` now points at a live Supabase
+project (`NEXT_PUBLIC_SUPABASE_URL` is set), so there is no demo-mode
+shortcut — a real sign-in is required to get a token. Nothing else in Plan A
+depends on Task 11 being done first, but it is the only remaining task and
+should not be skipped: it is what proves a student cannot read another
+student's grades.
+
 ## Resolved: the disk-full outage
 
 `npm run build` failed with `ENOSPC: no space left on device` and the shell
