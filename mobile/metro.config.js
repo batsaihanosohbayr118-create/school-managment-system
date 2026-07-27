@@ -10,7 +10,10 @@ const config = getDefaultConfig(projectRoot);
 
 // Watch the shared/ directory that lives outside mobile/ so edits there
 // trigger a rebuild, same contract as @shared/* in the web app's tsconfig.
-config.watchFolders = [sharedRoot];
+// Appended, not assigned: getDefaultConfig() already populates watchFolders
+// with its own npm-workspace detection, and overwriting that (rather than
+// adding to it) is what expo-doctor's Metro config check warns against.
+config.watchFolders = [...(config.watchFolders ?? []), sharedRoot];
 
 // Packages hoisted to the workspace root (npm workspaces) still need to
 // resolve from inside mobile/.
