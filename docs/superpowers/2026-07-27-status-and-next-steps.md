@@ -28,15 +28,56 @@ in `components/auth/LoginForm.tsx` and `components/dashboard/DashboardApp.tsx`
 unrelated to this work — do not attribute new lint failures to this change
 without checking those files first.
 
-**Task 11 (cross-role curl verification) is blocked on the owner**, same
-prerequisite as before: `SUPABASE_SERVICE_ROLE_KEY` is still unset in
-`.env.local`, so `/admin/users` cannot create the four role accounts needed to
-obtain per-role Supabase tokens. `.env.local` now points at a live Supabase
-project (`NEXT_PUBLIC_SUPABASE_URL` is set), so there is no demo-mode
-shortcut — a real sign-in is required to get a token. Nothing else in Plan A
-depends on Task 11 being done first, but it is the only remaining task and
-should not be skipped: it is what proves a student cannot read another
-student's grades.
+## Update: Plan A Task 11 done — Plan A is complete
+
+`SUPABASE_SERVICE_ROLE_KEY` is now set. `DATABASE_URL` was also switched from
+the direct-connection host to the session pooler (the direct host is
+IPv6-only and unreachable from this network) — see `.env.local`.
+
+Two infrastructure defects had to be fixed before verification meant anything
+(both pre-existing, unrelated to Plan A's own code):
+
+- The live Postgres schema had drifted from what `lib/school-db.ts` expects —
+  9 columns missing across 5 tables, because `CREATE TABLE IF NOT EXISTS`
+  never adds columns to a table that already exists. Fixed with additive
+  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` (no data loss).
+- `DATABASE_URL` pointed at an IPv6-only host, so every request was silently
+  hitting the local JSON fallback store instead of Postgres.
+
+Verification then found **two real authorization defects**, both fixed and
+committed:
+
+- `060fec0` — grades/attendance were scoped by subject only for
+  student/parent roles, so a student could read a classmate's grades if they
+  shared a class. Now also scoped to the caller's own student identity.
+- `1080a8f` — `createResource`/`updateResource`/`deleteResource` ran the
+  permission check inside the same `try` block whose `catch` silently retries
+  against the local fallback store on any error, so a denied write still
+  returned `200` and landed in the local file. The permission check now runs
+  before that block.
+
+Full results, including per-role row counts and status codes, are in
+`docs/superpowers/specs/2026-07-27-expo-mobile-app-design.md` under
+"Plan A verification (2026-07-27)".
+
+**Loose ends from this session, not yet cleaned up:**
+
+- Four real Supabase accounts had their passwords reset to a shared temp
+  value (`MobileVerify-2026-Temp!`) to obtain per-role tokens:
+  `admin@gmail.com`, `amraa@gmail.com`, `bilgee@gmail.com`, `ganbaa@gmail.com`.
+  Their original passwords are gone. Decide whether to reset them again to
+  something else or leave the temp password in place.
+- Test fixtures now live in the production tables: teacher Amraa
+  (Mathematics), students Bilgee and Hangai (both Mathematics, Grade 8A),
+  parent Ganbaa (child: Bilgee), 3 grade rows, 2 attendance rows, 2 payment
+  rows, 1 timetable slot, 1 announcement. Decide whether to keep these as seed
+  data or delete them via `/admin/dashboard`.
+
+## Plan B — Expo client
+
+Not started. Plan A is now fully verified against real data, so both
+blockers noted in the original design doc (the Metro/watchFolders question
+and the exact context shape) can be resolved by writing Plan B's first task.
 
 ## Resolved: the disk-full outage
 
