@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ResourceTable } from "@/lib/school-db";
-import { toTimetableSlots } from "@/lib/mobile/projections";
+import { toAttendanceEntries, toGradeEntries, toTimetableSlots } from "@/lib/mobile/projections";
 
 const timetable: ResourceTable = {
   columns: ["Subject", "Day", "Time", "Teacher", "Class"],
@@ -41,5 +41,59 @@ describe("toTimetableSlots", () => {
   it("throws when a source column has been renamed", () => {
     const broken: ResourceTable = { ...timetable, columns: ["Subject", "Weekday", "Time", "Teacher", "Class"] };
     expect(() => toTimetableSlots(broken)).toThrow(/Day/);
+  });
+});
+
+const grades: ResourceTable = {
+  columns: ["Student", "Subject", "Score", "Semester"],
+  ids: ["GR-1", "GR-2"],
+  rows: [
+    ["Бат", "Математик", "92", "Намар"],
+    ["Бат", "Физик", "N/A", "Намар"]
+  ]
+};
+
+describe("toGradeEntries", () => {
+  it("parses a numeric score", () => {
+    const [first] = toGradeEntries(grades);
+    expect(first.id).toBe("GR-1");
+    expect(first.student).toBe("Бат");
+    expect(first.subject).toBe("Математик");
+    expect(first.score).toBe(92);
+    expect(first.scoreLabel).toBe("92");
+    expect(first.semester).toBe("Намар");
+  });
+
+  it("keeps the label and nulls the number when the score is not numeric", () => {
+    const [, second] = toGradeEntries(grades);
+    expect(second.score).toBeNull();
+    expect(second.scoreLabel).toBe("N/A");
+  });
+
+  it("throws when a column is renamed", () => {
+    expect(() => toGradeEntries({ ...grades, columns: ["Student", "Subject", "Mark", "Semester"] })).toThrow(/Score/);
+  });
+});
+
+const attendance: ResourceTable = {
+  columns: ["Student", "Subject", "Date", "Status"],
+  ids: ["AT-1"],
+  rows: [["Бат", "Математик", "2026-05-18", "Present"]]
+};
+
+describe("toAttendanceEntries", () => {
+  it("maps the row", () => {
+    const [first] = toAttendanceEntries(attendance);
+    expect(first).toEqual({
+      id: "AT-1",
+      student: "Бат",
+      subject: "Математик",
+      date: "2026-05-18",
+      status: "Present"
+    });
+  });
+
+  it("returns an empty array for no rows", () => {
+    expect(toAttendanceEntries({ ...attendance, ids: [], rows: [] })).toEqual([]);
   });
 });
