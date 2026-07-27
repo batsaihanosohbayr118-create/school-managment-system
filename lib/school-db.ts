@@ -638,6 +638,27 @@ function filterByColumnValues(table: ResourceTable, columnName: string, allowedV
   return { ...table, ids, rows };
 }
 
+/**
+ * Resolves the display name of the student a student/parent session is
+ * scoped to — the student themself, or the parent's linked child.
+ */
+async function ownStudentFullName(role: "student" | "parent", normalizedEmail: string): Promise<string | null> {
+  if (role === "student") {
+    const students = await fetchRawTable("students");
+    const student = students.find((row) => normalizedToken((row as DbRow).email) === normalizedEmail);
+    return student ? normalizedToken((student as DbRow).full_name) : null;
+  }
+
+  const parents = await fetchRawTable("parents");
+  const parent = parents.find((row) => normalizedToken((row as DbRow).email) === normalizedEmail);
+  const studentEmail = normalizedToken((parent as DbRow | undefined)?.student_email);
+  if (!studentEmail) return null;
+
+  const students = await fetchRawTable("students");
+  const student = students.find((row) => normalizedToken((row as DbRow).email) === studentEmail);
+  return student ? normalizedToken((student as DbRow).full_name) : null;
+}
+
 async function filterResourceTable(
   resource: SchoolResource,
   table: ResourceTable,
@@ -736,7 +757,32 @@ async function filterResourceTable(
     }
 
     const allowed = subjectFilter ? new Set([subjectNameById(subjectFilter) || subjectFilter]) : accessibleSubjects;
-    return filterByColumnValues(table, "Subject", allowed);
+    const bySubject = filterByColumnValues(table, "Subject", allowed);
+
+    // Subject scoping alone is not enough for per-student records: two
+    // students in the same subject would otherwise see each other's grades
+    // and attendance. Assignments/materials/timetable stay subject-scoped —
+    // they describe the class, not an individual student.
+    if ((resource === "attendance" || resource === "grades") && (role === "student" || role === "parent")) {
+      const studentName = await ownStudentFullName(role, email);
+      const studentIndex = bySubject.columns.findIndex((column) => column.toLowerCase() === "student");
+      if (!studentName || studentIndex < 0) {
+        return { ...bySubject, ids: [], rows: [] };
+      }
+
+      const ids: string[] = [];
+      const rows: string[][] = [];
+      bySubject.rows.forEach((row, rowIndex) => {
+        if (normalizedToken(row[studentIndex]) === studentName) {
+          rows.push(row);
+          ids.push(bySubject.ids[rowIndex] ?? "");
+        }
+      });
+
+      return { ...bySubject, ids, rows };
+    }
+
+    return bySubject;
   }
 
   if (resource === "payments") {
