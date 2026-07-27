@@ -61,7 +61,7 @@ re-derive, but do not contradict either:
 ### Task 1: npm workspaces, shared directory, Vitest
 
 **Files:**
-- Create: `vitest.config.ts`, `shared/.gitkeep`
+- Create: `vitest.config.ts`
 - Modify: `package.json`, `tsconfig.json`
 
 - [ ] **Step 1: Install Vitest**
@@ -70,16 +70,17 @@ re-derive, but do not contradict either:
 npm i -D vitest@^3
 ```
 
-- [ ] **Step 2: Declare the workspace and test scripts**
+- [ ] **Step 2: Add the test scripts**
 
-In `package.json`, add a top-level `"workspaces"` key (the `mobile` package does
-not exist yet; it is created in Plan B, and npm tolerates the entry only once the
-directory exists — so add it in Plan B instead). For now add only the scripts:
+In `package.json`, add to `"scripts"`:
 
 ```json
 "test": "vitest run",
 "test:watch": "vitest"
 ```
+
+Do **not** add a `"workspaces"` key here. It goes in Plan B, once `mobile/`
+exists — npm errors on a workspace entry pointing at a missing directory.
 
 - [ ] **Step 3: Make `@shared/*` resolvable**
 
@@ -1490,19 +1491,29 @@ for role in ADMIN TEACHER STUDENT PARENT; do
   tok=$(eval echo \$TOK_$role)
   echo "--- $role grades ---"
   curl -s http://localhost:3000/api/mobile/grades -H "Authorization: Bearer $tok" \
-    | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const g=JSON.parse(s).grades||[];console.log(g.length+' rows:', [...new Set(g.map(x=>x.student))].join(', '))})"
+    | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const g=JSON.parse(s).grades||[];console.log(g.length+' rows');console.log('  students:',[...new Set(g.map(x=>x.student))].join(', ')||'(none)');console.log('  subjects:',[...new Set(g.map(x=>x.subject))].join(', ')||'(none)')})"
 done
 ```
 
 Expected:
 
-- admin — every student
-- teacher — only students in the teacher's own subjects
+- admin — every student, every subject
+- teacher — **only the teacher's own subject(s)**, and whichever students take
+  them
 - student — only that student's own name
 - parent — only their child's name
 
-**A student or parent seeing more than one name is a failure. Stop and fix it
-before continuing.**
+**A student or parent seeing more than one name is a failure.**
+
+**Zero rows for the teacher is also a failure, not a pass.** The grades filter
+matches the *Subject* column against `allowedSubjectNames`, which for a teacher
+reads the `subject` column of the `teachers` row whose email matches the token
+(`school-db.ts:596-601`). If that teacher has no row in the `teachers` table, or
+the email does not match, the allowed set is empty and every response is empty —
+which a row-count check alone would read as "correctly scoped". Check the
+printed subject list against what that teacher actually teaches. If it is empty,
+fix the teacher record before continuing; an empty result proves nothing about
+scoping.
 
 - [ ] **Step 3: Confirm writes are refused for the wrong roles**
 
