@@ -1,21 +1,20 @@
 # Status & Next Steps — 2026-07-27
 
-Handoff written mid-execution because the machine ran out of disk space. Read
-this first; it tells you exactly where work stopped and what to do next.
+Read this first; it tells you exactly where work stands and what to do next.
 
-## BLOCKER: disk full
+## Resolved: the disk-full outage
 
-`npm run build` failed with `ENOSPC: no space left on device`, and afterwards no
-shell command could run at all — the tooling could not even write its own output
-file. **Nothing can proceed until space is freed.**
+`npm run build` failed with `ENOSPC: no space left on device` and the shell
+stopped returning output entirely. Clearing `.next` recovered enough space to
+continue; Plan A Task 1 was then finished and committed.
 
-Diagnose and clear:
+**Disk headroom is still thin — 6.3 GB free, 97% used.** Expect this to recur,
+especially once Expo and its iOS toolchain land. Reclaim more before Plan B:
 
 ```bash
 df -h /System/Volumes/Data
-rm -rf ~/Desktop/Projects/school-managment-system/.next
-npm cache clean --force
 du -sh ~/Desktop/Projects/*/node_modules 2>/dev/null | sort -h
+npm cache clean --force
 ```
 
 There are 11 project directories under `~/Desktop/Projects`. Their
@@ -38,42 +37,36 @@ Nothing has been merged to `main`.
 | `b25cec5` | Expo mobile app design spec (**current**) |
 | `68bed6e` | Expo Plan A — typed mobile API (**current**) |
 | `4e27360` | Two defect fixes in Plan A |
+| `7904a11` | **Plan A Task 1** — vitest + `shared/` |
 
-### Uncommitted, on disk right now
-
-Plan A Task 1 was written but never committed:
+### Plan A Task 1 — done and verified
 
 - `vitest.config.ts` — new
 - `shared/__tests__/smoke.test.ts` — new
-- `package.json` — added `test` / `test:watch` scripts, `vitest@^3.2.7` devDep
-- `tsconfig.json` — added the `@shared/*` path alias
-
-These files are in place. Do not rewrite them; just finish verifying and commit.
-
-### Verification actually performed — stated plainly
+- `package.json` — `test` / `test:watch` scripts, `vitest@^3.2.7` devDep
+- `tsconfig.json` — `@shared/*` path alias
 
 | Check | Result |
 | --- | --- |
-| `npm test` | **Passed** — 1 test, vitest 3.2.7 |
-| `npx tsc --noEmit` | **Passed** — no errors |
-| `npm run build` | **Did not complete.** Compiled successfully and generated all 12 pages, then failed writing build traces with `ENOSPC`. This is a disk failure, not a code failure — but it means the build is *unverified*, not verified. |
-| Task 1 commit | **Not done** |
+| `npm test` | Passed — 1 test, vitest 3.2.7 |
+| `npx tsc --noEmit` | Passed |
+| `npm run build` | Passed — all 12 routes, 4 API routes dynamic, proxy present |
+| Working tree | Clean |
 
-An attempt to `rm -rf .next` was made but could not be confirmed, because the
-shell had already stopped returning output.
+One thing to know when running the build: it regenerates `public/sw.js`,
+`public/fallback-<hash>.js`, and `next-env.d.ts`, which are committed artifacts.
+The fallback file's hash changes every build. Restore them before committing so
+they do not pollute the diff:
+
+```bash
+rm -f public/fallback-*.js
+git checkout -- next-env.d.ts public/sw.js public/fallback-kMQV8Yz_Vmd_J9x02OIFG.js
+```
 
 ## Resume here
 
-1. Free disk space (above).
-2. Re-run the Task 1 verification: `npm test`, `npx tsc --noEmit`,
-   `npm run build`. All three must pass before committing.
-3. Commit Task 1:
-   ```bash
-   git add package.json package-lock.json tsconfig.json vitest.config.ts shared
-   git commit -m "test: add vitest and a shared/ directory"
-   ```
-4. Continue with Plan A Task 2 in
-   `docs/superpowers/plans/2026-07-27-expo-plan-a-mobile-api.md`.
+Continue with **Plan A Task 2** in
+`docs/superpowers/plans/2026-07-27-expo-plan-a-mobile-api.md`.
 
 ## What remains
 
