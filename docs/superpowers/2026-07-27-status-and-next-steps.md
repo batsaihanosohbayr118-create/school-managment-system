@@ -60,24 +60,54 @@ Full results, including per-role row counts and status codes, are in
 `docs/superpowers/specs/2026-07-27-expo-mobile-app-design.md` under
 "Plan A verification (2026-07-27)".
 
-**Loose ends from this session, not yet cleaned up:**
+**Loose end from this session, not yet cleaned up:**
 
 - Four real Supabase accounts had their passwords reset to a shared temp
   value (`MobileVerify-2026-Temp!`) to obtain per-role tokens:
   `admin@gmail.com`, `amraa@gmail.com`, `bilgee@gmail.com`, `ganbaa@gmail.com`.
-  Their original passwords are gone. Decide whether to reset them again to
-  something else or leave the temp password in place.
-- Test fixtures now live in the production tables: teacher Amraa
-  (Mathematics), students Bilgee and Hangai (both Mathematics, Grade 8A),
-  parent Ganbaa (child: Bilgee), 3 grade rows, 2 attendance rows, 2 payment
-  rows, 1 timetable slot, 1 announcement. Decide whether to keep these as seed
-  data or delete them via `/admin/dashboard`.
+  Their original passwords are gone; the owner is resetting these themselves.
+  (The test fixture data used alongside these accounts — teacher Amraa,
+  students Bilgee/Hangai, parent Ganbaa, and their grades/attendance/
+  payments/timetable/announcement rows — has been deleted from production.)
 
 ## Plan B — Expo client
 
-Not started. Plan A is now fully verified against real data, so both
-blockers noted in the original design doc (the Metro/watchFolders question
-and the exact context shape) can be resolved by writing Plan B's first task.
+In progress on `main` (no feature branch). Design doc:
+`docs/superpowers/specs/2026-07-27-expo-mobile-app-design.md`. No task-by-task
+plan file was written for Plan B — it's being worked commit-by-commit against
+the design doc's own outline instead.
+
+| Done | Commit |
+| --- | --- |
+| `mobile/` npm workspace, Expo Router (tabs template), `shared/` wired via Metro watchFolders + `@shared/*` | `1bbcaaa` |
+| `lib/i18n.ts` split — tables moved to `shared/i18n-tables.ts` | `3e9b79f` |
+| `shared/roles.ts` — role → visible tabs, `resolveRole()` | `dd68521` |
+| Supabase auth wired (`expo-secure-store`), login screen, admin web-redirect screen, root auth gate | `b2f45b4` |
+
+Verified after each: mobile's own `tsc --noEmit`, root `tsc`/`test`/`lint`/
+`build` unaffected, and a Metro web bundle (`npx expo start --web`, `CI=1`)
+compiles with no embedded error. **Not verified: an actual device.** This
+sandbox is Windows with no Xcode — everything so far is confirmed at the
+compile/bundle level only, never by tapping through the app. The owner should
+run `cd mobile && npx expo start`, scan the QR code with Expo Go, and try
+logging in with one of the four accounts above before more screens get built
+on top of unverified auth.
+
+Two Windows-only workarounds worth knowing about if `expo start` misbehaves
+later: `mobile/app.json`'s `experiments.typedRoutes` is off and `web.output`
+is `"single"` rather than `"static"` — both features route through
+`@expo/router-server`, which does a plain Node `require()` for `expo-router`
+submodules from wherever `@expo/cli` got hoisted to (the workspace root),
+not from `mobile/node_modules` where the real package lives. Only local web
+preview hit this; Expo Go over Metro didn't need it disabled.
+
+**Still to build**, in the order the design doc lists them: tab navigation
+actually driven by `shared/roles.ts` (the tab bar is still the unmodified
+template right now), the Home/Timetable/Grades/Attendance/Announcements/
+Payments/Settings screens, teacher attendance and grade entry, Face ID via
+`expo-local-authentication`, Google OAuth via `expo-auth-session`, the
+offline `AsyncStorage` read cache, and device verification per the design
+doc's "Verification" checklist (9 checks, device-only).
 
 ## Resolved: the disk-full outage
 
