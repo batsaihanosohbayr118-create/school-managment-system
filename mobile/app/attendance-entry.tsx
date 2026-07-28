@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
 
-import { Text, View } from '@/components/Themed';
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { ApiError } from '@shared/api-error';
 
@@ -10,6 +10,10 @@ const STATUSES = ['Present', 'Absent', 'Late'] as const;
 
 export default function AttendanceEntryScreen() {
   const router = useRouter();
+  // TextInput isn't a Themed component, so it doesn't pick up dark mode's
+  // text color on its own — typed text was invisible (black on black).
+  const textColor = useThemeColor({}, 'text');
+  const placeholderColor = useThemeColor({}, 'tabIconDefault');
   const [student, setStudent] = useState('');
   const [subject, setSubject] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -35,13 +39,32 @@ export default function AttendanceEntryScreen() {
       <Text style={styles.title}>Take attendance</Text>
 
       <Text style={styles.label}>Student</Text>
-      <TextInput style={styles.input} value={student} onChangeText={setStudent} editable={!submitting} autoFocus />
+      <TextInput
+        style={[styles.input, { color: textColor }]}
+        placeholderTextColor={placeholderColor}
+        value={student}
+        onChangeText={setStudent}
+        editable={!submitting}
+        autoFocus
+      />
 
       <Text style={styles.label}>Subject</Text>
-      <TextInput style={styles.input} value={subject} onChangeText={setSubject} editable={!submitting} />
+      <TextInput
+        style={[styles.input, { color: textColor }]}
+        placeholderTextColor={placeholderColor}
+        value={subject}
+        onChangeText={setSubject}
+        editable={!submitting}
+      />
 
       <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
-      <TextInput style={styles.input} value={date} onChangeText={setDate} editable={!submitting} />
+      <TextInput
+        style={[styles.input, { color: textColor }]}
+        placeholderTextColor={placeholderColor}
+        value={date}
+        onChangeText={setDate}
+        editable={!submitting}
+      />
 
       <Text style={styles.label}>Status</Text>
       <View style={styles.statusRow}>

@@ -2,12 +2,16 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
 
-import { Text, View } from '@/components/Themed';
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { ApiError } from '@shared/api-error';
 
 export default function GradeEntryScreen() {
   const router = useRouter();
+  // TextInput isn't a Themed component, so it doesn't pick up dark mode's
+  // text color on its own — typed text was invisible (black on black).
+  const textColor = useThemeColor({}, 'text');
+  const placeholderColor = useThemeColor({}, 'tabIconDefault');
   const [student, setStudent] = useState('');
   const [subject, setSubject] = useState('');
   const [score, setScore] = useState('');
@@ -33,14 +37,28 @@ export default function GradeEntryScreen() {
       <Text style={styles.title}>Enter grade</Text>
 
       <Text style={styles.label}>Student</Text>
-      <TextInput style={styles.input} value={student} onChangeText={setStudent} editable={!submitting} autoFocus />
+      <TextInput
+        style={[styles.input, { color: textColor }]}
+        placeholderTextColor={placeholderColor}
+        value={student}
+        onChangeText={setStudent}
+        editable={!submitting}
+        autoFocus
+      />
 
       <Text style={styles.label}>Subject</Text>
-      <TextInput style={styles.input} value={subject} onChangeText={setSubject} editable={!submitting} />
+      <TextInput
+        style={[styles.input, { color: textColor }]}
+        placeholderTextColor={placeholderColor}
+        value={subject}
+        onChangeText={setSubject}
+        editable={!submitting}
+      />
 
       <Text style={styles.label}>Score</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, { color: textColor }]}
+        placeholderTextColor={placeholderColor}
         value={score}
         onChangeText={setScore}
         editable={!submitting}
@@ -48,7 +66,13 @@ export default function GradeEntryScreen() {
       />
 
       <Text style={styles.label}>Semester</Text>
-      <TextInput style={styles.input} value={semester} onChangeText={setSemester} editable={!submitting} />
+      <TextInput
+        style={[styles.input, { color: textColor }]}
+        placeholderTextColor={placeholderColor}
+        value={semester}
+        onChangeText={setSemester}
+        editable={!submitting}
+      />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 

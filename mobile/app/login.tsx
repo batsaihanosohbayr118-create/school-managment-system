@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
 
-import { Text, View } from '@/components/Themed';
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { useAuth } from '@/lib/auth-context';
 
 export default function LoginScreen() {
@@ -10,6 +10,10 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // TextInput isn't a Themed component, so it doesn't pick up dark mode's
+  // text color on its own — typed text was invisible (black on black).
+  const textColor = useThemeColor({}, 'text');
+  const placeholderColor = useThemeColor({}, 'tabIconDefault');
 
   async function handleSubmit() {
     setError(null);
@@ -26,8 +30,9 @@ export default function LoginScreen() {
       <Text style={styles.title}>Nova Mind Academy</Text>
 
       <TextInput
-        style={styles.input}
+        style={[styles.input, { color: textColor }]}
         placeholder="Email"
+        placeholderTextColor={placeholderColor}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
@@ -36,8 +41,9 @@ export default function LoginScreen() {
         editable={!submitting}
       />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { color: textColor }]}
         placeholder="Password"
+        placeholderTextColor={placeholderColor}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
