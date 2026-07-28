@@ -4957,3 +4957,11 @@ a {
     transform: none;
   }
 }
+
+/* Hint under a record field — e.g. why a picker has nothing to offer. */
+.record-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}

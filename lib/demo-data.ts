@@ -1,6 +1,5 @@
 import {
   BookMarked,
-  BookOpen,
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
@@ -17,7 +16,6 @@ import {
 import type {
   Announcement,
   AttendanceRecord,
-  ClassRoom,
   GradeRecord,
   NavItem,
   PaymentRecord,
@@ -30,7 +28,7 @@ import { subjectCatalog } from "@/lib/subjects";
 
 // IMPORTANT: These exports are NOT unused leftovers.
 // - navItems drives the sidebar (icons can't be stored as JSON/DB data).
-// - students/teachers/classes/subjects/attendance/grades/payments/timetable/
+// - students/teachers/subjects/attendance/grades/payments/timetable/
 //   announcements are used as a FALLBACK data source in
 //   app/page.tsx (demoResourceData / fetchFallbackResource) whenever
 //   the local /api/school API is unreachable, and by
@@ -49,7 +47,6 @@ export const navItems: NavItem[] = [
   { id: "subjects", label: "Subjects", icon: BookMarked, description: "Subject catalog, categories and grade levels" },
   { id: "assignments", label: "Assignments", icon: ClipboardList, description: "Subject assignments and submission status" },
   { id: "materials", label: "Materials", icon: FileText, description: "Learning materials and subject files" },
-  { id: "classes", label: "Classes", icon: BookOpen, description: "Class sections, teachers, students, schedules" },
   { id: "attendance", label: "Attendance", icon: ClipboardCheck, description: "Daily attendance and reports" },
   { id: "grades", label: "Grades", icon: CalendarDays, description: "Scores, GPA, semester reports" },
   { id: "payments", label: "Payments", icon: WalletCards, description: "Tuition tracking and invoices" },
@@ -64,8 +61,6 @@ export const subjects: Subject[] = subjectCatalog;
 export const students: Student[] = [];
 
 export const teachers: Teacher[] = [];
-
-export const classes: ClassRoom[] = [];
 
 export const attendance: AttendanceRecord[] = [];
 

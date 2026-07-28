@@ -10,7 +10,6 @@ export type NavModule =
   | "subjects"
   | "assignments"
   | "materials"
-  | "classes"
   | "attendance"
   | "grades"
   | "payments"
@@ -36,7 +35,6 @@ export type Student = {
   address: string;
   parentName: string;
   parentEmail: string;
-  className: string;
   rollNumber: string;
   attendance: number;
   gpa: number;
@@ -63,15 +61,6 @@ export type Parent = {
   student: string;
   phone: string;
   occupation: string;
-};
-
-export type ClassRoom = {
-  id: string;
-  name: string;
-  section: string;
-  teacher: string;
-  students: number;
-  schedule: string;
 };
 
 export type SubjectTopic = {

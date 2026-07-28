@@ -227,7 +227,6 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
   subjects: { fields: ["Name", "Code", "Description", "Teacher", "Category", "Grade Levels"] },
   assignments: { fields: ["Subject", "Title", "Type", "Due Date", "Max Score", "Description"] },
   materials: { fields: ["Subject", "Title", "File Type", "File URL"] },
-  classes: { fields: ["Class", "Section", "Teacher"] },
   attendance: { fields: ["Student", "Subject", "Class", "Date", "Status"] },
   grades: { fields: ["Student", "Subject", "Score", "Semester"] },
   payments: { fields: ["Student", "Amount", "Status", "Due Date"] },
@@ -239,7 +238,7 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
 
 const visibleModulesByRole: Record<Role, NavModule[]> = {
   admin: ["dashboard", "students", "teachers", "parents", "subjects", "assignments", "materials", "payments", "timetable", "announcements", "wellbeing"],
-  teacher: ["dashboard", "students", "subjects", "assignments", "materials", "classes", "attendance", "timetable", "announcements"],
+  teacher: ["dashboard", "students", "subjects", "assignments", "materials", "attendance", "timetable", "announcements"],
   student: ["dashboard", "subjects", "assignments", "materials", "attendance", "payments", "timetable", "announcements"],
   parent: ["dashboard", "subjects", "assignments", "materials", "attendance", "payments", "timetable", "announcements"]
 };
@@ -369,7 +368,13 @@ function escapeHtml(value: string) {
  */
 function editFieldsFor(module: NavModule, columns: string[]) {
   if (module !== "students") return columns;
-  return columns.map((column) => (column === "Class" ? "Password" : column));
+
+  // Password is not a table column, so it has no slot of its own — put it
+  // beside the email it belongs to.
+  const fields = [...columns];
+  const emailIndex = fields.indexOf("Email");
+  fields.splice(emailIndex < 0 ? fields.length : emailIndex + 1, 0, "Password");
+  return fields;
 }
 
 function mergeSubmittedValues(
@@ -472,7 +477,7 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
   switch (resource) {
     case "students":
       return {
-        columns: ["Name", "Class", "Attendance", "GPA", "Payment", "Parent Email"],
+        columns: ["Name", "Attendance", "GPA", "Payment", "Parent Email"],
         ids: [],
         rows: []
       };
@@ -503,12 +508,6 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
     case "materials":
       return {
         columns: ["Subject", "Title", "File Type", "Uploaded By"],
-        ids: [],
-        rows: []
-      };
-    case "classes":
-      return {
-        columns: ["Class", "Section", "Teacher", "Students", "Schedule"],
         ids: [],
         rows: []
       };
@@ -558,6 +557,42 @@ async function fetchFallbackResource(resource: SchoolResource) {
     console.warn("Local school API unavailable; using bundled demo data fallback.", error);
     return demoResourceData(resource);
   }
+}
+
+type StudentOption = { value: string; label: string };
+
+/**
+ * Students an admin can still attach a parent to. The server rejects any
+ * student that already has one, so listing them would only produce an error
+ * after the admin picked a name.
+ *
+ * `keepStudent` is the parent's current student when editing — without it the
+ * dropdown could not display the value it already holds.
+ */
+async function loadUnlinkedStudents(keepStudent: string): Promise<StudentOption[]> {
+  const [studentResult, parentResult] = await Promise.all([
+    loadResourceData("students"),
+    loadResourceData("parents")
+  ]);
+
+  const nameAt = studentResult.data.columns.indexOf("Name");
+  const emailAt = studentResult.data.columns.indexOf("Email");
+  const linkedAt = parentResult.data.columns.indexOf("Student");
+  if (nameAt < 0) return [];
+
+  const keep = keepStudent.trim().toLowerCase();
+  const linked = new Set(
+    (linkedAt < 0 ? [] : parentResult.data.rows.map((row) => (row[linkedAt] ?? "").trim().toLowerCase()))
+      .filter((name) => name && name !== keep)
+  );
+
+  return studentResult.data.rows
+    .map((row) => ({ name: (row[nameAt] ?? "").trim(), email: emailAt < 0 ? "" : (row[emailAt] ?? "").trim() }))
+    .filter((student) => student.name && !linked.has(student.name.toLowerCase()))
+    .map((student) => ({
+      value: student.name,
+      label: student.email ? `${student.name} — ${student.email}` : student.name
+    }));
 }
 
 type SubjectScopeOption = { id: string; name: string };
@@ -615,12 +650,15 @@ async function deleteResourceData(resource: SchoolResource, recordId: string) {
 }
 
 function StatusDropdown({
+  labels,
   language,
   onChange,
   options,
   placeholder,
   value
 }: {
+  /** Display text per option, for lists whose value is not self-explanatory. */
+  labels?: Record<string, string>;
   language: Language;
   onChange: (value: string) => void;
   options: string[];
@@ -628,7 +666,8 @@ function StatusDropdown({
   value: string;
 }) {
   const [open, setOpen] = useState(false);
-  const selectedLabel = value ? translateValue(value, language) : placeholder;
+  const optionLabel = (option: string) => labels?.[option] ?? translateValue(option, language);
+  const selectedLabel = value ? optionLabel(value) : placeholder;
 
   return (
     <div
@@ -666,7 +705,7 @@ function StatusDropdown({
                 role="option"
                 type="button"
               >
-                <span>{translateValue(option, language)}</span>
+                <span>{optionLabel(option)}</span>
                 {selected ? <Check aria-hidden="true" size={16} /> : null}
               </button>
             );
@@ -988,6 +1027,8 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const [notificationPageOpen, setNotificationPageOpen] = useState(false);
   const [activityNotifications, setActivityNotifications] = useState<ActivityNotification[]>([]);
   const [selectedSubjectContent, setSelectedSubjectContent] = useState<SubjectContentTarget>(null);
+  // null while the parent dialog is still loading the student list.
+  const [studentOptions, setStudentOptions] = useState<StudentOption[] | null>(null);
   // Students and parents browse assignments/materials one subject at a time.
   const [subjectScopeOptions, setSubjectScopeOptions] = useState<SubjectScopeOption[]>([]);
   const [subjectScope, setSubjectScope] = useState("");
@@ -1055,7 +1096,6 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
       students: { en: "Student", mn: "Сурагч" },
       teachers: { en: "Teacher", mn: "Багш" },
       subjects: { en: "Subject", mn: "Хичээл" },
-      classes: { en: "Class", mn: "Анги" },
       attendance: { en: "Attendance", mn: "Ирц" },
       grades: { en: "Grade", mn: "Дүн" },
       payments: { en: "Payment", mn: "Төлбөр" },
@@ -1147,6 +1187,21 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
     // assignments and grades without the admin typing catalogue names by hand.
     setFormValues(activeModule === "students" ? { Subjects: defaultStudentSubjectsValue } : {});
     setModalOpen(true);
+
+    if (activeModule === "parents") {
+      void refreshStudentOptions("");
+    }
+  }
+
+  /** Opening the parent dialog is an event, so the fetch belongs here. */
+  async function refreshStudentOptions(keepStudent: string) {
+    setStudentOptions(null);
+
+    try {
+      setStudentOptions(await loadUnlinkedStudents(keepStudent));
+    } catch {
+      setStudentOptions([]);
+    }
   }
 
   function openEditModal(recordId: string, row: string[], columns: string[]) {
@@ -1165,6 +1220,10 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
 
     setFormValues(values);
     setModalOpen(true);
+
+    if (activeModule === "parents") {
+      void refreshStudentOptions(values.Student ?? "");
+    }
   }
 
   function requestDeleteRecord(recordId: string, row: string[]) {
@@ -1495,9 +1554,6 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
                 )}
               </>
             ) : null}
-            {activeModule === "classes" ? (
-              <ClassesModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
-            ) : null}
             {activeModule === "attendance" ? (
               <AttendanceModule apiData={resourceData} canManage={canManageAttendance} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
@@ -1593,18 +1649,27 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               </button>
             </div>
             {modalFields.map((field, index) => {
-              const options = statusOptionsFor(activeModule, field);
+              // A parent is attached to a student who does not have one yet, so
+              // that field is a live list rather than a typed name.
+              const picksStudent = activeModule === "parents" && field === "Student";
+              const options = picksStudent
+                ? (studentOptions ?? []).map((student) => student.value)
+                : statusOptionsFor(activeModule, field);
 
               return options ? (
                 <div className="record-field" key={field}>
                   <span>{translateColumn(field, language)}</span>
                   <StatusDropdown
+                    labels={picksStudent ? Object.fromEntries((studentOptions ?? []).map((s) => [s.value, s.label])) : undefined}
                     language={language}
                     onChange={(value) => setFormValues((current) => ({ ...current, [field]: value }))}
                     options={options}
-                    placeholder={translateColumn(field, language)}
+                    placeholder={picksStudent && studentOptions === null ? copy.common.loadingStudents : translateColumn(field, language)}
                     value={formValues[field] ?? ""}
                   />
+                  {picksStudent && studentOptions?.length === 0 ? (
+                    <small className="record-hint">{copy.common.noUnlinkedStudents}</small>
+                  ) : null}
                 </div>
               ) : (
                 <label className="record-field" key={field}>
@@ -1986,7 +2051,7 @@ function StudentsModule({ apiData, copy, error, language, loading, ...controls }
       language={language}
       loading={loading}
       title={copy.tables.students}
-      columns={["Name", "Email", "Class", "Subjects", "Attendance", "GPA", "Payment", "Parent Email"]}
+      columns={["Name", "Email", "Subjects", "Attendance", "GPA", "Payment", "Parent Email"]}
       rows={[]}
       {...controls}
     />
@@ -3330,22 +3395,6 @@ function SubjectContentPanel({
         </div>
       ) : null}
     </section>
-  );
-}
-
-function ClassesModule({ apiData, copy, error, language, loading, ...controls }: ModuleApiProps) {
-  return (
-    <ModuleTable
-      apiData={apiData}
-      copy={copy}
-      error={error}
-      language={language}
-      loading={loading}
-      title={copy.tables.classes}
-      columns={["Class", "Section", "Teacher", "Students", "Schedule"]}
-      rows={[]}
-      {...controls}
-    />
   );
 }
 
