@@ -16,6 +16,7 @@ export type NavModule =
   | "payments"
   | "timetable"
   | "announcements"
+  | "wellbeing"
   | "settings";
 
 export type NavItem = {
@@ -179,5 +180,14 @@ export type Announcement = {
   title: string;
   content: string;
   audience: "All" | "Teachers" | "Students";
+  date: string;
+};
+
+/** A reflection prompt the school psychologist publishes to the student corner. */
+export type WellbeingPrompt = {
+  id: string;
+  question: string;
+  category: string;
+  note: string;
   date: string;
 };

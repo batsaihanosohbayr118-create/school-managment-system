@@ -43,8 +43,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { WellbeingCorner } from "@/components/dashboard/WellbeingCorner";
 import {
-  chartData,
   navItems,
   subjects
 } from "@/lib/demo-data";
@@ -101,11 +101,121 @@ type SubjectContentTarget = {
   name: string;
 } | null;
 
-const pieData = [
-  { name: "Present", value: 76, color: "#10b981" },
-  { name: "Late", value: 12, color: "#f59e0b" },
-  { name: "Absent", value: 12, color: "#ef4444" }
-];
+type RevenuePoint = { month: string; revenue: number };
+type AttendanceSlice = { name: string; value: number; color: string };
+
+const attendanceStatusColors: Record<string, string> = {
+  present: "#10b981",
+  late: "#f59e0b",
+  absent: "#ef4444",
+  excused: "#38bdf8"
+};
+
+const shortMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** Resources each role's dashboard derives its metrics and charts from. */
+const dashboardResources: Record<Role, SchoolResource[]> = {
+  admin: ["students", "teachers", "payments", "attendance"],
+  teacher: ["attendance", "grades", "timetable", "assignments"],
+  student: ["grades", "attendance", "payments", "timetable"],
+  parent: ["attendance", "grades", "payments", "announcements"]
+};
+
+const emptyTable: ResourceTableData = { columns: [], ids: [], rows: [] };
+
+function cellValues(table: ResourceTableData, name: string) {
+  const index = table.columns.findIndex((column) => column.toLowerCase() === name.toLowerCase());
+  if (index < 0) return [];
+  return table.rows.map((row) => (row[index] ?? "").trim());
+}
+
+function countMatching(table: ResourceTableData, name: string, expected: string) {
+  return cellValues(table, name).filter((value) => value.toLowerCase() === expected.toLowerCase()).length;
+}
+
+function parseAmount(value: string | undefined) {
+  const parsed = parseFloat((value ?? "").replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function averageScore(table: ResourceTableData) {
+  const scores = cellValues(table, "Score")
+    .map((value) => parseFloat(value.replace(/[^\d.-]/g, "")))
+    .filter((value) => Number.isFinite(value));
+
+  if (scores.length === 0) return null;
+  return scores.reduce((sum, value) => sum + value, 0) / scores.length;
+}
+
+function attendancePercent(table: ResourceTableData) {
+  const total = table.rows.length;
+  if (total === 0) return { percent: 0, present: 0, total: 0 };
+  const present = countMatching(table, "Status", "Present");
+  return { percent: Math.round((present / total) * 100), present, total };
+}
+
+/** Dates arrive as free-form TEXT, so accept ISO first and fall back to Date parsing. */
+function toDate(value: string | undefined) {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function monthKey(value: string | undefined) {
+  const iso = /^(\d{4})-(\d{2})/.exec((value ?? "").trim());
+  if (iso) return `${iso[1]}-${iso[2]}`;
+  const parsed = toDate(value);
+  if (!parsed) return null;
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Safe across a 6-month window: no month name can repeat inside it. */
+function monthLabel(key: string, language: Language) {
+  const monthNumber = Number(key.slice(5, 7));
+  if (!monthNumber) return key;
+  return language === "mn" ? `${monthNumber}-р сар` : shortMonthNames[monthNumber - 1];
+}
+
+/** Paid invoices grouped by due-date month, most recent six months. */
+function buildRevenueSeries(payments: ResourceTableData, language: Language): RevenuePoint[] {
+  const dueDates = cellValues(payments, "Due Date");
+  const amounts = cellValues(payments, "Amount");
+  const statuses = cellValues(payments, "Status");
+  if (dueDates.length === 0 || amounts.length === 0) return [];
+
+  const totals = new Map<string, number>();
+
+  dueDates.forEach((dueDate, index) => {
+    if (statuses[index] && statuses[index].toLowerCase() !== "paid") return;
+    const key = monthKey(dueDate);
+    if (!key) return;
+    totals.set(key, (totals.get(key) ?? 0) + parseAmount(amounts[index]));
+  });
+
+  return [...totals.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-6)
+    .map(([key, revenue]) => ({ month: monthLabel(key, language), revenue }));
+}
+
+function buildAttendanceMix(attendance: ResourceTableData, language: Language): AttendanceSlice[] {
+  const counts = new Map<string, number>();
+
+  for (const status of cellValues(attendance, "Status")) {
+    if (!status) continue;
+    counts.set(status, (counts.get(status) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .sort(([, a], [, b]) => b - a)
+    .map(([status, value]) => ({
+      name: translateValue(status, language),
+      value,
+      color: attendanceStatusColors[status.toLowerCase()] ?? "#6366f1"
+    }));
+}
 
 const createConfig: Record<NavModule, { fields: string[] }> = {
   dashboard: { fields: ["Report title", "Date range"] },
@@ -121,11 +231,12 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
   payments: { fields: ["Student", "Amount", "Status", "Due Date"] },
   timetable: { fields: ["Day", "Time", "Subject", "Teacher", "Class"] },
   announcements: { fields: ["Title", "Audience", "Content"] },
+  wellbeing: { fields: ["Question", "Category", "Note", "Date"] },
   settings: { fields: ["Setting name", "Value"] }
 };
 
 const visibleModulesByRole: Record<Role, NavModule[]> = {
-  admin: ["dashboard", "students", "teachers", "parents", "subjects", "assignments", "materials", "payments", "timetable", "announcements"],
+  admin: ["dashboard", "students", "teachers", "parents", "subjects", "assignments", "materials", "payments", "timetable", "announcements", "wellbeing"],
   teacher: ["dashboard", "students", "subjects", "assignments", "materials", "classes", "attendance", "timetable", "announcements"],
   student: ["dashboard", "subjects", "assignments", "materials", "attendance", "payments", "timetable", "announcements"],
   parent: ["dashboard", "subjects", "assignments", "materials", "attendance", "payments", "timetable", "announcements"]
@@ -171,6 +282,7 @@ function statusOptionsFor(resource: NavModule, field: string) {
   if (resource === "students" && field === "Payment") return ["Unpaid", "Partial", "Paid"];
   if (resource === "payments" && field === "Status") return ["Unpaid", "Partial", "Paid"];
   if (resource === "attendance" && field === "Status") return ["Present", "Late", "Absent"];
+  if (resource === "wellbeing" && field === "Category") return ["General", "Mood", "Stress", "Sleep", "Friendship", "Family", "Focus"];
   return null;
 }
 
@@ -415,6 +527,12 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
     case "announcements":
       return {
         columns: ["Title", "Content", "Audience", "Date"],
+        ids: [],
+        rows: []
+      };
+    case "wellbeing":
+      return {
+        columns: ["Question", "Category", "Note", "Date"],
         ids: [],
         rows: []
       };
@@ -930,7 +1048,8 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
       grades: { en: "Grade", mn: "Дүн" },
       payments: { en: "Payment", mn: "Төлбөр" },
       timetable: { en: "Timetable", mn: "Хуваарь" },
-      announcements: { en: "Announcement", mn: "Зарлал" }
+      announcements: { en: "Announcement", mn: "Зарлал" },
+      wellbeing: { en: "Wellbeing question", mn: "Сэтгэл зүйн асуулт" }
     };
     const actionCopy = {
       created: {
@@ -1374,6 +1493,9 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
             {activeModule === "announcements" ? (
               <AnnouncementsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
+            {activeModule === "wellbeing" ? (
+              <WellbeingModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+            ) : null}
             {activeModule === "settings" ? (
               <SettingsModule
                 copy={copy}
@@ -1413,6 +1535,8 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
           </>
         )}
       </section>
+
+      {role === "student" ? <WellbeingCorner copy={copy} /> : null}
 
       {modalOpen ? (
         <div className="modal-layer">
@@ -1607,120 +1731,147 @@ function NotificationsPage({
 
 function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; currentUserEmail: string; language: Language; role: Role }) {
   const dashboard = copy.dashboards[role];
-  const localizedPieData = pieData.map((entry) => ({ ...entry, name: translateValue(entry.name, language) }));
   const [liveStats, setLiveStats] = useState<string[][] | null>(null);
+  const [revenueSeries, setRevenueSeries] = useState<RevenuePoint[]>([]);
+  const [attendanceMix, setAttendanceMix] = useState<AttendanceSlice[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchCounts() {
+      const s = dashboard.stats;
+      const mn = language === "mn";
+      const stat = (index: number, value: string, helper: string) => [s[index]?.[0] ?? "", value, helper];
+
       try {
-        const s = dashboard.stats;
+        const resources = dashboardResources[role];
+        const loaded = await Promise.all(resources.map((resource) => loadResourceData(resource)));
+        if (cancelled) return;
+
+        const tables = new Map<SchoolResource, ResourceTableData>(
+          resources.map((resource, index) => [resource, loaded[index].data])
+        );
+        const table = (resource: SchoolResource) => tables.get(resource) ?? emptyTable;
+
+        const payments = table("payments");
+        const attendance = table("attendance");
+        const grades = table("grades");
+
+        const series = buildRevenueSeries(payments, language);
+        setRevenueSeries(series);
+        setAttendanceMix(buildAttendanceMix(attendance, language));
+
+        const { percent: attPct, present, total: attTotal } = attendancePercent(attendance);
+        const attendanceHelper = attTotal > 0
+          ? (mn ? `${attTotal} бүртгэлээс ${present}` : `${present} of ${attTotal} records`)
+          : (mn ? "Бүртгэл алга" : "No records yet");
+
+        const statuses = cellValues(payments, "Status");
+        const amounts = cellValues(payments, "Amount");
+        const sumWhereStatus = (expected: string) =>
+          amounts.reduce((sum, amount, index) => (statuses[index]?.toLowerCase() === expected ? sum + parseAmount(amount) : sum), 0);
+        const paidTotal = sumWhereStatus("paid");
+        const unpaidCount = countMatching(payments, "Status", "Unpaid");
+
+        const semesters = cellValues(grades, "Semester").filter(Boolean);
+        const latestSemester = semesters.length > 0 ? semesters[semesters.length - 1] : "";
+        const gradeHelper = latestSemester || (mn ? `${grades.rows.length} дүн` : `${grades.rows.length} grades`);
+        const avg = averageScore(grades);
+        const gpa = avg === null ? "0.0" : (avg / 25).toFixed(1);
 
         if (role === "admin") {
-          const [studentData, teacherData, paymentData, attendanceData] = await Promise.all([
-            loadResourceData("students"),
-            loadResourceData("teachers"),
-            loadResourceData("payments"),
-            loadResourceData("attendance")
-          ]);
-          const studentCount = studentData.data.rows.length;
-          const teacherCount = teacherData.data.rows.length;
-          const paidCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const amountCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "amount");
-          const revenue = paymentData.data.rows
-            .filter((row) => row[paidCol]?.toLowerCase() === "paid")
-            .reduce((sum, row) => sum + (parseFloat((row[amountCol] ?? "").replace(/[^\d.]/g, "")) || 0), 0);
-          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
-          const totalAtt = attendanceData.data.rows.length;
-          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
+          const students = table("students");
+          const teachers = table("teachers");
+          const classCount = new Set(cellValues(students, "Class").filter(Boolean)).size;
+          const subjectCount = new Set(
+            cellValues(teachers, "Subject").flatMap((value) => value.split(",").map((item) => item.trim())).filter(Boolean)
+          ).size;
+
+          // Month-over-month revenue change, only claimed when two months exist.
+          const previous = series.length >= 2 ? series[series.length - 2].revenue : 0;
+          const current = series.length >= 1 ? series[series.length - 1].revenue : 0;
+          const revenueHelper = series.length >= 2 && previous > 0
+            ? `${current >= previous ? "+" : ""}${(((current - previous) / previous) * 100).toFixed(1)}%${mn ? " өмнөх сараас" : " vs last month"}`
+            : (mn ? `${countMatching(payments, "Status", "Paid")} төлөгдсөн` : `${countMatching(payments, "Status", "Paid")} paid`);
+
           setLiveStats([
-            [s[0]?.[0] ?? "", studentCount.toString(), s[0]?.[2] ?? ""],
-            [s[1]?.[0] ?? "", teacherCount.toString(), s[1]?.[2] ?? ""],
-            [s[2]?.[0] ?? "", `$${revenue.toLocaleString()}`, s[2]?.[2] ?? ""],
-            [s[3]?.[0] ?? "", `${attPct}%`, s[3]?.[2] ?? ""]
+            stat(0, students.rows.length.toString(), mn ? `${classCount} анги` : `${classCount} classes`),
+            stat(1, teachers.rows.length.toString(), mn ? `${subjectCount} хичээл` : `${subjectCount} subjects`),
+            stat(2, `$${paidTotal.toLocaleString()}`, revenueHelper),
+            stat(3, `${attPct}%`, attendanceHelper)
           ]);
         }
 
         if (role === "teacher") {
-          const [attendanceData, gradesData] = await Promise.all([
-            loadResourceData("attendance"),
-            loadResourceData("grades")
-          ]);
-          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
-          const totalAtt = attendanceData.data.rows.length;
-          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
-          const scoreCol = gradesData.data.columns.findIndex((c) => c.toLowerCase() === "score");
-          const scores = gradesData.data.rows.map((row) => parseFloat((row[scoreCol] ?? "").replace(/[^\d.]/g, ""))).filter((v) => !isNaN(v));
-          const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+          const timetable = table("timetable");
+          const assignments = table("assignments");
+          const today = weekdayNames[new Date().getDay()];
+          const todayClasses = countMatching(timetable, "Day", today);
+          const dueDates = cellValues(assignments, "Due Date");
+          const startOfToday = new Date();
+          startOfToday.setHours(0, 0, 0, 0);
+          const pastDue = dueDates.filter((value) => {
+            const due = toDate(value);
+            return due !== null && due < startOfToday;
+          }).length;
+
           setLiveStats([
-            [s[0]?.[0] ?? "", s[0]?.[1] ?? "", s[0]?.[2] ?? ""],
-            [s[1]?.[0] ?? "", `${attPct}%`, s[1]?.[2] ?? ""],
-            [s[2]?.[0] ?? "", gradesData.data.rows.length.toString(), s[2]?.[2] ?? ""],
-            [s[3]?.[0] ?? "", `${avgScore}%`, s[3]?.[2] ?? ""]
+            stat(0, todayClasses.toString(), mn ? `${timetable.rows.length} долоо хоногт` : `${timetable.rows.length} weekly`),
+            stat(1, `${attPct}%`, attendanceHelper),
+            stat(2, assignments.rows.length.toString(), mn ? `${pastDue} хугацаа хэтэрсэн` : `${pastDue} past due`),
+            stat(3, avg === null ? "0%" : `${Math.round(avg)}%`, gradeHelper)
           ]);
         }
 
         if (role === "student") {
-          const [gradesData, attendanceData, paymentData] = await Promise.all([
-            loadResourceData("grades"),
-            loadResourceData("attendance"),
-            loadResourceData("payments")
-          ]);
-          const scoreCol = gradesData.data.columns.findIndex((c) => c.toLowerCase() === "score");
-          const scores = gradesData.data.rows.map((row) => parseFloat((row[scoreCol] ?? "").replace(/[^\d.]/g, ""))).filter((v) => !isNaN(v));
-          const avgGpa = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length / 25).toFixed(1) : "0.0";
-          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
-          const totalAtt = attendanceData.data.rows.length;
-          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
-          const statusCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const unpaidCount = paymentData.data.rows.filter((row) => row[statusCol]?.toLowerCase() === "unpaid").length;
-          const payStatus = unpaidCount === 0
-            ? (language === "mn" ? "Төлсөн" : "Paid")
-            : (language === "mn" ? `${unpaidCount} төлөөгүй` : `${unpaidCount} unpaid`);
+          const timetable = table("timetable");
+          const today = weekdayNames[new Date().getDay()];
+          const todayClasses = countMatching(timetable, "Day", today);
+          const payStatus = payments.rows.length === 0
+            ? (mn ? "Нэхэмжлэх алга" : "No invoices")
+            : unpaidCount === 0
+              ? (mn ? "Төлсөн" : "Paid")
+              : (mn ? `${unpaidCount} төлөөгүй` : `${unpaidCount} unpaid`);
+
           setLiveStats([
-            [s[0]?.[0] ?? "", avgGpa, s[0]?.[2] ?? ""],
-            [s[1]?.[0] ?? "", `${attPct}%`, s[1]?.[2] ?? ""],
-            [s[2]?.[0] ?? "", s[2]?.[1] ?? "", s[2]?.[2] ?? ""],
-            [s[3]?.[0] ?? "", payStatus, s[3]?.[2] ?? ""]
+            stat(0, gpa, gradeHelper),
+            stat(1, `${attPct}%`, attendanceHelper),
+            stat(2, todayClasses.toString(), mn ? `${today} өдөр` : today),
+            stat(3, payStatus, mn ? `${payments.rows.length} нэхэмжлэх` : `${payments.rows.length} invoices`)
           ]);
         }
 
         if (role === "parent") {
-          const [attendanceData, gradesData, paymentData, announcementData] = await Promise.all([
-            loadResourceData("attendance"),
-            loadResourceData("grades"),
-            loadResourceData("payments"),
-            loadResourceData("announcements")
-          ]);
-          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
-          const totalAtt = attendanceData.data.rows.length;
-          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
-          const scoreCol = gradesData.data.columns.findIndex((c) => c.toLowerCase() === "score");
-          const scores = gradesData.data.rows.map((row) => parseFloat((row[scoreCol] ?? "").replace(/[^\d.]/g, ""))).filter((v) => !isNaN(v));
-          const avgGpa = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length / 25).toFixed(1) : "0.0";
-          const statusCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const amountCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "amount");
-          const openPayments = paymentData.data.rows
-            .filter((row) => row[statusCol]?.toLowerCase() === "unpaid")
-            .reduce((sum, row) => sum + (parseFloat((row[amountCol] ?? "").replace(/[^\d.]/g, "")) || 0), 0);
+          const announcements = table("announcements");
+          const weekAgo = new Date();
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          const recent = cellValues(announcements, "Date").filter((value) => {
+            const posted = toDate(value);
+            return posted !== null && posted >= weekAgo;
+          }).length;
+          const openPayments = sumWhereStatus("unpaid");
+
           setLiveStats([
-            [s[0]?.[0] ?? "", `${attPct}%`, s[0]?.[2] ?? ""],
-            [s[1]?.[0] ?? "", avgGpa, s[1]?.[2] ?? ""],
-            [s[2]?.[0] ?? "", `$${openPayments.toLocaleString()}`, s[2]?.[2] ?? ""],
-            [s[3]?.[0] ?? "", announcementData.data.rows.length.toString(), s[3]?.[2] ?? ""]
+            stat(0, `${attPct}%`, attendanceHelper),
+            stat(1, gpa, gradeHelper),
+            stat(2, `$${openPayments.toLocaleString()}`, mn ? `${unpaidCount} төлөөгүй` : `${unpaidCount} unpaid`),
+            stat(3, announcements.rows.length.toString(), mn ? `${recent} шинэ` : `${recent} this week`)
           ]);
         }
       } catch {
-        // fallback to i18n hardcoded values
+        // Leave the neutral placeholders from i18n in place rather than inventing numbers.
       }
     }
+
     fetchCounts();
+
+    return () => {
+      cancelled = true;
+    };
   }, [role, language, dashboard.stats]);
 
   const displayStats = liveStats ?? dashboard.stats;
+  const attendanceTotal = attendanceMix.reduce((sum, slice) => sum + slice.value, 0);
 
   return (
     <>
@@ -1740,39 +1891,63 @@ function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; 
             <Badge tone="blue">{copy.common.live}</Badge>
           </CardHeader>
           <CardContent className="chart-box">
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="revenue" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.32)" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.3)", borderRadius: 14, color: "#e5eefc" }} />
-                <Area dataKey="revenue" fill="url(#revenue)" stroke="#4f46e5" strokeWidth={3} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {revenueSeries.length === 0 ? (
+              <div className="table-empty">
+                <strong>{language === "mn" ? "Төлбөрийн бүртгэл алга" : "No payment records yet"}</strong>
+                <p>
+                  {language === "mn"
+                    ? "Төлөгдсөн нэхэмжлэх бүртгэгдсэний дараа сарын орлого энд харагдана."
+                    : "Monthly revenue appears here once paid invoices are recorded."}
+                </p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={revenueSeries}>
+                  <defs>
+                    <linearGradient id="revenue" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.32)" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.3)", borderRadius: 14, color: "#e5eefc" }} />
+                  <Area dataKey="revenue" fill="url(#revenue)" stroke="#4f46e5" strokeWidth={3} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
             <CardTitle>{language === "mn" ? "Ирцийн бүтэц" : "Attendance Mix"}</CardTitle>
-            <Badge tone="emerald">{translateValue("Today", language)}</Badge>
+            <Badge tone="emerald">
+              {attendanceTotal} {language === "mn" ? "бүртгэл" : attendanceTotal === 1 ? "record" : "records"}
+            </Badge>
           </CardHeader>
           <CardContent className="chart-box">
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={localizedPieData} dataKey="value" innerRadius={62} outerRadius={90} paddingAngle={5}>
-                  {localizedPieData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.3)", borderRadius: 14, color: "#e5eefc" }} />
-              </PieChart>
-            </ResponsiveContainer>
+            {attendanceMix.length === 0 ? (
+              <div className="table-empty">
+                <strong>{language === "mn" ? "Ирцийн бүртгэл алга" : "No attendance records yet"}</strong>
+                <p>
+                  {language === "mn"
+                    ? "Ирц бүртгэж эхэлмэгц ирсэн, хоцорсон, тасалсны харьцаа энд харагдана."
+                    : "The present, late and absent split shows up here once attendance is marked."}
+                </p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie data={attendanceMix} dataKey="value" innerRadius={62} outerRadius={90} paddingAngle={5}>
+                    {attendanceMix.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.3)", borderRadius: 14, color: "#e5eefc" }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </section>
@@ -3226,6 +3401,22 @@ function AnnouncementsModule({ apiData, copy, error, language, loading, ...contr
       loading={loading}
       title={copy.tables.announcements}
       columns={["Title", "Content", "Audience", "Date"]}
+      rows={[]}
+      {...controls}
+    />
+  );
+}
+
+function WellbeingModule({ apiData, copy, error, language, loading, ...controls }: ModuleApiProps) {
+  return (
+    <ModuleTable
+      apiData={apiData}
+      copy={copy}
+      error={error}
+      language={language}
+      loading={loading}
+      title={copy.tables.wellbeing}
+      columns={["Question", "Category", "Note", "Date"]}
       rows={[]}
       {...controls}
     />

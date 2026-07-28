@@ -38,6 +38,13 @@ const valueTranslations: Record<string, string> = {
   "Computer Science": "Мэдээлэл зүй",
   Dark: "Харанхуй",
   Done: "Дууссан",
+  Family: "Гэр бүл",
+  Focus: "Анхаарал",
+  Friendship: "Найз нөхөд",
+  General: "Ерөнхий",
+  Mood: "Сэтгэл санаа",
+  Sleep: "Нойр",
+  Stress: "Стресс",
   English: "Англи хэл",
   Geography: "Газар зүй",
   "Grade 7": "7-р анги",
@@ -145,6 +152,7 @@ export const translations = {
       payments: { label: "Payments", description: "Tuition tracking and invoices" },
       timetable: { label: "Timetable", description: "Weekly timetable and teacher schedules" },
       announcements: { label: "Announcements", description: "Notices and dashboard notifications" },
+      wellbeing: { label: "Wellbeing Corner", description: "Reflection prompts the psychologist publishes to students" },
       settings: { label: "Settings", description: "Profile, roles, permissions, preferences" }
     } satisfies Record<NavModule, { label: string; description: string }>,
     roles: { admin: "Admin", teacher: "Teacher", student: "Student", parent: "Parent" } satisfies Record<Role, string>,
@@ -169,40 +177,40 @@ export const translations = {
         title: "Admin Command Center",
         subtitle: "Total school operations, revenue, attendance, and recent activities.",
         stats: [
-          ["Total Students", "516", "+12 this month"],
-          ["Total Teachers", "80", "10 present today"],
-          ["Revenue", "$21,000", "+8.4% vs last month"],
-          ["Attendance", "92%", "School average"]
+          ["Total Students", "—", "Loading"],
+          ["Total Teachers", "—", "Loading"],
+          ["Revenue", "—", "Loading"],
+          ["Attendance", "—", "Loading"]
         ]
       },
       teacher: {
         title: "Teacher Workspace",
         subtitle: "Today classes, attendance actions, and pending grading.",
         stats: [
-          ["Today Classes", "7", "3 remaining"],
-          ["Student Attendance", "94%", "Grade 8A"],
-          ["Pending Grading", "24", "Assignments"],
-          ["Class Average", "88%", "This semester"]
+          ["Today Classes", "—", "Loading"],
+          ["Student Attendance", "—", "Loading"],
+          ["Assignments", "—", "Loading"],
+          ["Class Average", "—", "Loading"]
         ]
       },
       student: {
         title: "Student Portal",
         subtitle: "GPA, attendance, upcoming classes, announcements, and payments.",
         stats: [
-          ["GPA", "3.8", "Spring 2026"],
-          ["Attendance", "96%", "Excellent"],
-          ["Upcoming Classes", "4", "Today"],
-          ["Payment Status", "Paid", "May invoice"]
+          ["GPA", "—", "Loading"],
+          ["Attendance", "—", "Loading"],
+          ["Today Classes", "—", "Loading"],
+          ["Payment Status", "—", "Loading"]
         ]
       },
       parent: {
         title: "Parent Portal",
         subtitle: "Child attendance, grades, announcements, and payment status in one place.",
         stats: [
-          ["Child Attendance", "96%", "Current month"],
-          ["Latest GPA", "3.8", "Spring 2026"],
-          ["Open Payments", "$0", "All clear"],
-          ["Announcements", "3", "This week"]
+          ["Child Attendance", "—", "Loading"],
+          ["Latest GPA", "—", "Loading"],
+          ["Open Payments", "—", "Loading"],
+          ["Announcements", "—", "Loading"]
         ]
       }
     } satisfies Record<Role, { title: string; subtitle: string; stats: string[][] }>,
@@ -220,6 +228,7 @@ export const translations = {
       payments: { action: "Add Payment", title: "Add Payment" },
       timetable: { action: "Add Schedule", title: "Add Timetable Slot" },
       announcements: { action: "Create Notice", title: "Create Announcement" },
+      wellbeing: { action: "Add Question", title: "Add Wellbeing Question" },
       settings: { action: "Save Settings", title: "Update Settings" }
     } satisfies Record<NavModule, { action: string; title: string }>,
     recordLabel: {
@@ -236,10 +245,12 @@ export const translations = {
       payments: "Payment",
       timetable: "Timetable Slot",
       announcements: "Announcement",
+      wellbeing: "Wellbeing Question",
       settings: "Setting"
     } satisfies Record<NavModule, string>,
     moduleSubtitle: {
-      settings: "Manage theme, account session, role access, and preferences."
+      settings: "Manage theme, account session, role access, and preferences.",
+      wellbeing: "Questions published here appear in the student's Wellbeing Corner."
     } satisfies Partial<Record<NavModule, string>>,
     tables: {
       students: "Student Management",
@@ -253,7 +264,20 @@ export const translations = {
       grades: "Grade System",
       payments: "Payment System",
       timetable: "Timetable System",
-      announcements: "Announcement System"
+      announcements: "Announcement System",
+      wellbeing: "Wellbeing Corner"
+    },
+    wellbeing: {
+      openLabel: "Wellbeing Corner",
+      title: "Wellbeing Corner",
+      subtitle: "A few questions from the school psychologist. Take your time — nothing here is recorded.",
+      emptyTitle: "No questions yet",
+      emptyBody: "When the psychologist publishes a question it will appear here.",
+      loading: "Loading questions…",
+      loadFailed: "The questions could not be loaded. Try again in a moment.",
+      counter: (index: number, total: number) => `Question ${index} of ${total}`,
+      previous: "Previous",
+      next: "Next"
     },
     common: {
       account: "Account",
@@ -332,6 +356,8 @@ export const translations = {
       Time: "Time",
       Title: "Title",
       Value: "Value",
+      Question: "Question",
+      Note: "Note",
       "Report title": "Report title"
     } satisfies Record<string, string>
   },
@@ -384,6 +410,7 @@ export const translations = {
       payments: { label: "Төлбөр", description: "Сургалтын төлбөр ба нэхэмжлэх" },
       timetable: { label: "Хуваарь", description: "Долоо хоногийн хичээл ба багшийн хуваарь" },
       announcements: { label: "Зарлал", description: "Мэдэгдэл болон dashboard-ийн зарлал" },
+      wellbeing: { label: "Сэтгэл зүйчийн булан", description: "Сурагчдад зориулж сэтгэл зүйчийн нийтэлдэг асуултууд" },
       settings: { label: "Тохиргоо", description: "Профайл, эрх, зөвшөөрөл, тохиргоо" }
     } satisfies Record<NavModule, { label: string; description: string }>,
     roles: { admin: "Админ", teacher: "Багш", student: "Сурагч", parent: "Эцэг эх" } satisfies Record<Role, string>,
@@ -408,40 +435,40 @@ export const translations = {
         title: "Админы удирдлагын төв",
         subtitle: "Сургуулийн үйл ажиллагаа, орлого, ирц болон сүүлийн идэвх.",
         stats: [
-          ["Нийт сурагч", "516", "+12 энэ сард"],
-          ["Нийт багш", "80", "Өнөөдөр 10 ирсэн"],
-          ["Орлого", "$21,000", "Өмнөх сараас +8.4%"],
-          ["Ирц", "92%", "Сургуулийн дундаж"]
+          ["Нийт сурагч", "—", "Ачаалж байна"],
+          ["Нийт багш", "—", "Ачаалж байна"],
+          ["Орлого", "—", "Ачаалж байна"],
+          ["Ирц", "—", "Ачаалж байна"]
         ]
       },
       teacher: {
         title: "Багшийн ажлын талбар",
         subtitle: "Өнөөдрийн анги, ирцийн үйлдэл, шалгах дүнгийн ажил.",
         stats: [
-          ["Өнөөдрийн анги", "7", "3 үлдсэн"],
-          ["Сурагчийн ирц", "94%", "8A анги"],
-          ["Шалгах ажил", "24", "Даалгавар"],
-          ["Ангийн дундаж", "88%", "Энэ улирал"]
+          ["Өнөөдрийн анги", "—", "Ачаалж байна"],
+          ["Сурагчийн ирц", "—", "Ачаалж байна"],
+          ["Даалгавар", "—", "Ачаалж байна"],
+          ["Ангийн дундаж", "—", "Ачаалж байна"]
         ]
       },
       student: {
         title: "Сурагчийн портал",
         subtitle: "GPA, ирц, дараагийн хичээл, зарлал болон төлбөр.",
         stats: [
-          ["GPA", "3.8", "2026 оны хавар"],
-          ["Ирц", "96%", "Маш сайн"],
-          ["Дараагийн хичээл", "4", "Өнөөдөр"],
-          ["Төлбөрийн төлөв", "Төлсөн", "5-р сарын нэхэмжлэх"]
+          ["GPA", "—", "Ачаалж байна"],
+          ["Ирц", "—", "Ачаалж байна"],
+          ["Өнөөдрийн хичээл", "—", "Ачаалж байна"],
+          ["Төлбөрийн төлөв", "—", "Ачаалж байна"]
         ]
       },
       parent: {
         title: "Эцэг эхийн портал",
         subtitle: "Хүүхдийн ирц, дүн, зарлал болон төлбөрийн төлөвийг нэг дор харна.",
         stats: [
-          ["Хүүхдийн ирц", "96%", "Энэ сар"],
-          ["Сүүлийн GPA", "3.8", "2026 оны хавар"],
-          ["Төлөх төлбөр", "$0", "Бүгд цэвэр"],
-          ["Зарлал", "3", "Энэ долоо хоног"]
+          ["Хүүхдийн ирц", "—", "Ачаалж байна"],
+          ["Сүүлийн GPA", "—", "Ачаалж байна"],
+          ["Төлөх төлбөр", "—", "Ачаалж байна"],
+          ["Зарлал", "—", "Ачаалж байна"]
         ]
       }
     } satisfies Record<Role, { title: string; subtitle: string; stats: string[][] }>,
@@ -459,6 +486,7 @@ export const translations = {
       payments: { action: "Төлбөр нэмэх", title: "Төлбөр нэмэх" },
       timetable: { action: "Хуваарь нэмэх", title: "Хичээлийн цаг нэмэх" },
       announcements: { action: "Зарлал үүсгэх", title: "Зарлал үүсгэх" },
+      wellbeing: { action: "Асуулт нэмэх", title: "Сэтгэл зүйн асуулт нэмэх" },
       settings: { action: "Тохиргоо хадгалах", title: "Тохиргоо шинэчлэх" }
     } satisfies Record<NavModule, { action: string; title: string }>,
     recordLabel: {
@@ -475,10 +503,12 @@ export const translations = {
       payments: "Төлбөр",
       timetable: "Хичээлийн цаг",
       announcements: "Зарлал",
+      wellbeing: "Сэтгэл зүйн асуулт",
       settings: "Тохиргоо"
     } satisfies Record<NavModule, string>,
     moduleSubtitle: {
-      settings: "Theme, хэрэглэгчийн session, role access болон preference-ийг удирдана."
+      settings: "Theme, хэрэглэгчийн session, role access болон preference-ийг удирдана.",
+      wellbeing: "Энд нийтэлсэн асуултууд сурагчийн Сэтгэл зүйчийн буланд харагдана."
     } satisfies Partial<Record<NavModule, string>>,
     tables: {
       students: "Сурагчийн удирдлага",
@@ -492,7 +522,20 @@ export const translations = {
       grades: "Дүнгийн систем",
       payments: "Төлбөрийн систем",
       timetable: "Хуваарийн систем",
-      announcements: "Зарлалын систем"
+      announcements: "Зарлалын систем",
+      wellbeing: "Сэтгэл зүйчийн булан"
+    },
+    wellbeing: {
+      openLabel: "Сэтгэл зүйчийн булан",
+      title: "Сэтгэл зүйчийн булан",
+      subtitle: "Сургуулийн сэтгэл зүйчээс хэдэн асуулт. Яараад хэрэггүй — энд юу ч бүртгэгдэхгүй.",
+      emptyTitle: "Асуулт хараахан алга",
+      emptyBody: "Сэтгэл зүйч асуулт нийтэлмэгц энд харагдана.",
+      loading: "Асуултуудыг ачаалж байна…",
+      loadFailed: "Асуултуудыг ачаалж чадсангүй. Хэсэг хүлээгээд дахин оролдоно уу.",
+      counter: (index: number, total: number) => `${total}-аас ${index} дэх асуулт`,
+      previous: "Өмнөх",
+      next: "Дараах"
     },
     common: {
       account: "Бүртгэл",
@@ -571,6 +614,8 @@ export const translations = {
       Time: "Цаг",
       Title: "Гарчиг",
       Value: "Утга",
+      Question: "Асуулт",
+      Note: "Тайлбар",
       "Report title": "Тайлангийн гарчиг"
     } satisfies Record<string, string>
   }

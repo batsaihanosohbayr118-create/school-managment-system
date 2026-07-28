@@ -51,7 +51,8 @@ const resourceColumns: Record<SchoolResource, string[]> = {
   grades: ["Student", "Subject", "Score", "Semester"],
   payments: ["Student", "Amount", "Status", "Due Date"],
   timetable: ["Subject", "Day", "Time", "Teacher", "Class"],
-  announcements: ["Title", "Content", "Audience", "Date"]
+  announcements: ["Title", "Content", "Audience", "Date"],
+  wellbeing: ["Question", "Category", "Note", "Date"]
 };
 
 const localStoreRoot = process.env.VERCEL ? path.join(tmpdir(), "educore") : path.join(process.cwd(), ".local-data");
@@ -78,7 +79,8 @@ const localSeedData: LocalStore = {
   grades: [],
   payments: [],
   timetable: [],
-  announcements: []
+  announcements: [],
+  wellbeing: []
 };
 
 function getDatabaseUrl() {
@@ -281,6 +283,15 @@ async function initializeSchoolDatabase() {
       date TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS wellbeing_prompts (
+      id TEXT PRIMARY KEY,
+      question TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'General',
+      note TEXT NOT NULL DEFAULT '',
+      date TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   await seedIfEmpty();
@@ -464,6 +475,8 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
       return [values.Subject, values.Day, values.Time ?? "", values.Teacher ?? "", values.Class ?? ""].map(stringValue);
     case "announcements":
       return [values.Title, values.Content ?? "", values.Audience || "All", values.Date ?? new Date().toISOString().slice(0, 10)].map(stringValue);
+    case "wellbeing":
+      return [values.Question, values.Category || "General", values.Note ?? "", values.Date || new Date().toISOString().slice(0, 10)].map(stringValue);
   }
 }
 
@@ -531,6 +544,8 @@ function rowToArray(resource: SchoolResource, row: QueryRow | DbRow | LocalResou
       return [row.subject, row.day, row.time, row.teacher, row.class_name].map(stringValue);
     case "announcements":
       return [row.title, row.content, row.audience, row.date].map(stringValue);
+    case "wellbeing":
+      return [row.question, row.category, row.note, row.date].map(stringValue);
   }
 }
 
@@ -547,7 +562,8 @@ function tableName(resource: SchoolResource) {
     grades: "grade_records",
     payments: "payment_records",
     timetable: "timetable_slots",
-    announcements: "announcements"
+    announcements: "announcements",
+    wellbeing: "wellbeing_prompts"
   };
 
   return names[resource];
@@ -812,6 +828,7 @@ function manageRolesFor(resource: SchoolResource) {
     case "classes":
     case "payments":
     case "announcements":
+    case "wellbeing":
       return new Set<Role>(["admin"]);
     case "attendance":
     case "grades":
@@ -967,13 +984,15 @@ async function ensureTeacherSubject(pool: Pool, context: SchoolRequestContext | 
 }
 
 export async function createResource(resource: SchoolResource, values: Record<string, string>, context?: SchoolRequestContext) {
+  // Outside the try: a permission failure is not a database failure, and must
+  // never fall through to the local-store write below.
+  requireManageAccess(resource, context?.session.role ?? "admin");
+
   try {
     await ensureSchoolDatabase();
 
     const pool = getPool();
     const id = `${resource.slice(0, 2).toUpperCase()}-${Date.now().toString().slice(-6)}`;
-    const role = context?.session.role ?? "admin";
-    requireManageAccess(resource, role);
 
     switch (resource) {
       case "students": {
@@ -1118,6 +1137,13 @@ export async function createResource(resource: SchoolResource, values: Record<st
           [id, values.Title, values.Content ?? "", values.Audience ?? "All", values.Date ?? new Date().toISOString().slice(0, 10)]
         );
         break;
+      case "wellbeing":
+        await pool.query(
+          `INSERT INTO wellbeing_prompts (id, question, category, note, date)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [id, values.Question, values.Category || "General", values.Note ?? "", values.Date || new Date().toISOString().slice(0, 10)]
+        );
+        break;
     }
 
     return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "neon" }, mode: "summary" });
@@ -1128,10 +1154,10 @@ export async function createResource(resource: SchoolResource, values: Record<st
 }
 
 export async function deleteResource(resource: SchoolResource, id: string, context?: SchoolRequestContext) {
+  requireManageAccess(resource, context?.session.role ?? "admin");
+
   try {
     await ensureSchoolDatabase();
-    const role = context?.session.role ?? "admin";
-    requireManageAccess(resource, role);
     await getPool().query(`DELETE FROM ${tableName(resource)} WHERE id = $1`, [id]);
     return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "neon" }, mode: "summary" });
   } catch (error) {
@@ -1141,11 +1167,11 @@ export async function deleteResource(resource: SchoolResource, id: string, conte
 }
 
 export async function updateResource(resource: SchoolResource, id: string, values: Record<string, string>, context?: SchoolRequestContext) {
+  requireManageAccess(resource, context?.session.role ?? "admin");
+
   try {
     await ensureSchoolDatabase();
     const pool = getPool();
-    const role = context?.session.role ?? "admin";
-    requireManageAccess(resource, role);
 
     switch (resource) {
       case "students": {
@@ -1299,6 +1325,14 @@ export async function updateResource(resource: SchoolResource, id: string, value
            SET title = $1, content = $2, audience = $3, date = $4
            WHERE id = $5`,
           [values.Title, values.Content, values.Audience, values.Date, id]
+        );
+        break;
+      case "wellbeing":
+        await pool.query(
+          `UPDATE wellbeing_prompts
+           SET question = $1, category = $2, note = $3, date = $4
+           WHERE id = $5`,
+          [values.Question, values.Category, values.Note, values.Date, id]
         );
         break;
     }
