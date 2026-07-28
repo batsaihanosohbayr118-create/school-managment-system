@@ -219,7 +219,9 @@ function buildAttendanceMix(attendance: ResourceTableData, language: Language): 
 
 const createConfig: Record<NavModule, { fields: string[] }> = {
   dashboard: { fields: ["Report title", "Date range"] },
-  students: { fields: ["Name", "Email", "Class", "Subjects", "Parent name", "Phone", "Payment", "Parent Email"] },
+  // "Password" provisions the student's login account; the class is set later
+  // from the Students table, where it can be changed without a password reset.
+  students: { fields: ["Name", "Email", "Password", "Subjects", "Parent name", "Phone", "Payment", "Parent Email"] },
   teachers: { fields: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"] },
   parents: { fields: ["Name", "Student", "Phone", "Occupation", "Email"] },
   subjects: { fields: ["Name", "Code", "Description", "Teacher", "Category", "Grade Levels"] },
@@ -1598,9 +1600,11 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
                 <label className="record-field" key={field}>
                   <span>{translateColumn(field, language)}</span>
                   <Input
+                    autoComplete={field === "Password" ? "new-password" : undefined}
                     onChange={(event) => setFormValues((current) => ({ ...current, [field]: event.target.value }))}
                     placeholder={translateColumn(field, language)}
                     required={index === 0}
+                    type={field === "Password" ? "password" : "text"}
                     value={formValues[field] ?? ""}
                   />
                 </label>

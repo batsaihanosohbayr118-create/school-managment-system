@@ -358,6 +358,9 @@ export const translations = {
       Value: "Value",
       Question: "Question",
       Note: "Note",
+      Password: "Password",
+      Subjects: "Subjects",
+      "Parent Email": "Parent Email",
       "Report title": "Report title"
     } satisfies Record<string, string>
   },
@@ -616,6 +619,9 @@ export const translations = {
       Value: "Утга",
       Question: "Асуулт",
       Note: "Тайлбар",
+      Password: "Нууц үг",
+      Subjects: "Хичээлүүд",
+      "Parent Email": "Эцэг эхийн имэйл",
       "Report title": "Тайлангийн гарчиг"
     } satisfies Record<string, string>
   }

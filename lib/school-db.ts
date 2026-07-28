@@ -5,6 +5,7 @@ import path from "node:path";
 
 import type { NavModule, Role } from "@/lib/types";
 import { defaultStudentSubjects, defaultStudentSubjectsValue, subjectCatalog } from "@/lib/subjects";
+import { AccountConflictError, createAccount } from "@/lib/auth-db";
 import type { SchoolSession } from "./school-session";
 
 export type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
@@ -978,10 +979,47 @@ async function ensureTeacherSubject(pool: Pool, context: SchoolRequestContext | 
   return assignedSubject;
 }
 
+/**
+ * Adding a student record does not by itself let that student sign in — the
+ * login lives in `app_users`. When the administrator supplies a password we
+ * provision both, and we do it BEFORE writing the student row so a duplicate
+ * email fails without leaving a student nobody can log in as.
+ *
+ * The two must share an email: row-level access matches the session email
+ * against `students.email`, so a mismatch logs the student into an empty app.
+ */
+async function provisionStudentLogin(values: Record<string, string>) {
+  const password = values.Password?.trim();
+  if (!password) return;
+
+  const email = values.Email?.trim();
+  if (!email) {
+    throw new Error("Email is required when you set a student password.");
+  }
+
+  try {
+    await createAccount({
+      email,
+      password,
+      name: values.Name?.trim() || email,
+      role: "student"
+    });
+  } catch (error) {
+    if (error instanceof AccountConflictError) {
+      throw new Error(`An account with this ${error.field} already exists.`);
+    }
+    throw error;
+  }
+}
+
 export async function createResource(resource: SchoolResource, values: Record<string, string>, context?: SchoolRequestContext) {
   // Outside the try: a permission failure is not a database failure, and must
   // never fall through to the local-store write below.
   requireManageAccess(resource, context?.session.role ?? "admin");
+
+  if (resource === "students") {
+    await provisionStudentLogin(values);
+  }
 
   try {
     await ensureSchoolDatabase();
