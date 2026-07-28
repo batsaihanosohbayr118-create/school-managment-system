@@ -222,7 +222,8 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
   // "Password" provisions the student's login account; the class is set later
   // from the Students table, where it can be changed without a password reset.
   students: { fields: ["Name", "Email", "Password", "Subjects", "Parent name", "Phone", "Payment", "Parent Email"] },
-  teachers: { fields: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"] },
+  // "Password" provisions the teacher's login, as it does for students and parents.
+  teachers: { fields: ["Name", "Subject", "Email", "Password", "Salary", "Contact"] },
   // "Password" provisions the parent's login, the same way it does for students.
   parents: { fields: ["Name", "Student", "Phone", "Password", "Email"] },
   subjects: { fields: ["Name", "Code", "Description", "Teacher", "Category", "Grade Levels"] },
@@ -368,8 +369,10 @@ function escapeHtml(value: string) {
  * reset a student's sign-in from the same place they edit the record.
  */
 function editFieldsFor(module: NavModule, columns: string[]) {
-  // A parent's occupation is not editable here; that slot sets their password.
+  // A parent's occupation and a teacher's experience are not editable here;
+  // those slots set the person's password instead.
   if (module === "parents") return columns.map((column) => (column === "Occupation" ? "Password" : column));
+  if (module === "teachers") return columns.map((column) => (column === "Experience" ? "Password" : column));
   if (module !== "students") return columns;
 
   // Password is not a table column, so it has no slot of its own — put it
@@ -486,7 +489,7 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
       };
     case "teachers":
       return {
-        columns: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"],
+        columns: ["Name", "Subject", "Email", "Experience", "Salary", "Contact"],
         ids: [],
         rows: []
       };
@@ -2073,7 +2076,7 @@ function TeachersModule({ apiData, copy, error, language, loading, ...controls }
       language={language}
       loading={loading}
       title={copy.tables.teachers}
-      columns={["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"]}
+      columns={["Name", "Email", "Subject", "Experience", "Salary", "Contact"]}
       rows={[]}
       {...controls}
     />

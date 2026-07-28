@@ -335,6 +335,7 @@ export async function setAccountPassword(input: {
   name: string;
   password: string;
   role: Role;
+  subject?: string;
   studentEmail?: string;
 }): Promise<"created" | "updated"> {
   await ensureReady();
