@@ -321,32 +321,34 @@ export async function updateAccount(id: string, input: UpdateAccountInput): Prom
 }
 
 /**
- * Sets a student's sign-in password, creating the account when they do not
- * have one yet — students added before the password field existed have a
+ * Sets someone's sign-in password, creating the account when they do not have
+ * one yet — people added before the password field existed have a school
  * record but no login.
  *
- * The UPDATE is restricted to student accounts on purpose: an administrator
- * editing a student must never be able to reset a teacher's or an admin's
+ * The UPDATE is scoped to the given role on purpose: an administrator editing
+ * a student or a parent must never be able to reset a teacher's or an admin's
  * password by reusing their email. In that case no row matches, and
  * createAccount raises the email conflict instead.
  */
-export async function setStudentPassword(
-  email: string,
-  name: string,
-  password: string
-): Promise<"created" | "updated"> {
+export async function setAccountPassword(input: {
+  email: string;
+  name: string;
+  password: string;
+  role: Role;
+  studentEmail?: string;
+}): Promise<"created" | "updated"> {
   await ensureReady();
 
-  const passwordHash = await hashPassword(password);
+  const passwordHash = await hashPassword(input.password);
   const { rowCount } = await getPool().query(
     `UPDATE app_users SET password_hash = $1
-     WHERE LOWER(email) = LOWER($2) AND role = 'student';`,
-    [passwordHash, email.trim()]
+     WHERE LOWER(email) = LOWER($2) AND role = $3;`,
+    [passwordHash, input.email.trim(), input.role]
   );
 
   if ((rowCount ?? 0) > 0) return "updated";
 
-  await createAccount({ email, password, name, role: "student" });
+  await createAccount(input);
   return "created";
 }
 

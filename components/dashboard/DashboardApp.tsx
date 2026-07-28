@@ -223,7 +223,8 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
   // from the Students table, where it can be changed without a password reset.
   students: { fields: ["Name", "Email", "Password", "Subjects", "Parent name", "Phone", "Payment", "Parent Email"] },
   teachers: { fields: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"] },
-  parents: { fields: ["Name", "Student", "Phone", "Occupation", "Email"] },
+  // "Password" provisions the parent's login, the same way it does for students.
+  parents: { fields: ["Name", "Student", "Phone", "Password", "Email"] },
   subjects: { fields: ["Name", "Code", "Description", "Teacher", "Category", "Grade Levels"] },
   assignments: { fields: ["Subject", "Title", "Type", "Due Date", "Max Score", "Description"] },
   materials: { fields: ["Subject", "Title", "File Type", "File URL"] },
@@ -367,6 +368,8 @@ function escapeHtml(value: string) {
  * reset a student's sign-in from the same place they edit the record.
  */
 function editFieldsFor(module: NavModule, columns: string[]) {
+  // A parent's occupation is not editable here; that slot sets their password.
+  if (module === "parents") return columns.map((column) => (column === "Occupation" ? "Password" : column));
   if (module !== "students") return columns;
 
   // Password is not a table column, so it has no slot of its own — put it

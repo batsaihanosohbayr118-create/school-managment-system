@@ -5,7 +5,7 @@ import path from "node:path";
 
 import type { NavModule, Role } from "@/lib/types";
 import { defaultStudentSubjects, defaultStudentSubjectsValue, subjectCatalog } from "@/lib/subjects";
-import { AccountConflictError, createAccount, setStudentPassword } from "@/lib/auth-db";
+import { AccountConflictError, createAccount, setAccountPassword } from "@/lib/auth-db";
 import type { SchoolSession } from "./school-session";
 
 export type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
@@ -969,54 +969,39 @@ async function ensureTeacherSubject(pool: Pool, context: SchoolRequestContext | 
 }
 
 /**
- * Adding a student record does not by itself let that student sign in — the
- * login lives in `app_users`. When the administrator supplies a password we
- * provision both, and we do it BEFORE writing the student row so a duplicate
- * email fails without leaving a student nobody can log in as.
+ * A school record does not by itself let that person sign in — the login lives
+ * in `app_users`. When the administrator supplies a password we provision both.
  *
- * The two must share an email: row-level access matches the session email
- * against `students.email`, so a mismatch logs the student into an empty app.
+ * The two must share an email. Row-level access looks the session email up in
+ * `students.email` (a student) or `parents.email` (a parent), so a mismatch
+ * signs them into an app with nothing in it.
+ *
+ * `create` refuses an email that is already taken; `set` also accepts an
+ * existing account and just changes its password, which is how someone added
+ * before this field existed finally gets a login.
  */
-async function provisionStudentLogin(values: Record<string, string>) {
+async function applyLogin(
+  mode: "create" | "set",
+  role: Extract<Role, "student" | "parent">,
+  values: Record<string, string>,
+  studentEmail?: string
+) {
   const password = values.Password?.trim();
   if (!password) return;
 
   const email = values.Email?.trim();
   if (!email) {
-    throw new ValidationError("Email is required when you set a student password.");
+    throw new ValidationError("Email is required when you set a password.");
   }
 
+  const account = { email, password, name: values.Name?.trim() || email, role, studentEmail };
+
   try {
-    await createAccount({
-      email,
-      password,
-      name: values.Name?.trim() || email,
-      role: "student"
-    });
-  } catch (error) {
-    if (error instanceof AccountConflictError) {
-      throw new ValidationError(`An account with this ${error.field} already exists.`);
+    if (mode === "create") {
+      await createAccount(account);
+    } else {
+      await setAccountPassword(account);
     }
-    throw error;
-  }
-}
-
-/**
- * Editing a student: a filled password sets their sign-in credentials, and
- * creates the account when they never had one. Blank means "leave it alone",
- * so the admin can change a class or a grade without touching the password.
- */
-async function applyStudentPassword(values: Record<string, string>) {
-  const password = values.Password?.trim();
-  if (!password) return;
-
-  const email = values.Email?.trim();
-  if (!email) {
-    throw new ValidationError("Email is required when you set a student password.");
-  }
-
-  try {
-    await setStudentPassword(email, values.Name?.trim() || email, password);
   } catch (error) {
     if (error instanceof AccountConflictError) {
       throw new ValidationError(`An account with this ${error.field} already exists.`);
@@ -1031,7 +1016,7 @@ export async function createResource(resource: SchoolResource, values: Record<st
   requireManageAccess(resource, context?.session.role ?? "admin");
 
   if (resource === "students") {
-    await provisionStudentLogin(values);
+    await applyLogin("create", "student", values);
   }
 
   try {
@@ -1076,6 +1061,9 @@ export async function createResource(resource: SchoolResource, values: Record<st
         const student = await resolveStudentByToken(pool, values.Student);
         if (!student) throw new ValidationError("Student is required.");
         if (stringValue((student as DbRow).parent_id)) throw new ValidationError("This student already has a parent account.");
+        // Before the INSERT: a taken email must fail without leaving a parent
+        // row that nobody can sign in as.
+        await applyLogin("create", "parent", values, stringValue((student as DbRow).email));
         await pool.query(
           `
           INSERT INTO parents (id, email, name, student, student_email, student_id, phone, occupation)
@@ -1222,7 +1210,7 @@ export async function updateResource(resource: SchoolResource, id: string, value
   requireManageAccess(resource, context?.session.role ?? "admin");
 
   if (resource === "students") {
-    await applyStudentPassword(values);
+    await applyLogin("set", "student", values);
   }
 
   try {
@@ -1270,13 +1258,14 @@ export async function updateResource(resource: SchoolResource, id: string, value
         if (!student) throw new ValidationError("Student is required.");
         const conflictingParent = await pool.query<QueryRow>(`SELECT id FROM parents WHERE student_id = $1 AND id <> $2 LIMIT 1`, [stringValue((student as DbRow).id), id]);
         if (conflictingParent.rows.length > 0) throw new ValidationError("This student already has a parent account.");
+        await applyLogin("set", "parent", values, stringValue((student as DbRow).email));
         await pool.query(
           `
           UPDATE parents
-          SET name = $1, email = $2, student = $3, student_email = $4, student_id = $5, phone = $6, occupation = $7
+          SET name = $1, email = $2, student = $3, student_email = $4, student_id = $5, phone = $6, occupation = COALESCE($7, occupation)
           WHERE id = $8
         `,
-          [values.Name, values.Email ?? "", stringValue((student as DbRow).full_name), stringValue((student as DbRow).email), stringValue((student as DbRow).id), values.Phone ?? "", values.Occupation ?? "", id]
+          [values.Name, values.Email ?? "", stringValue((student as DbRow).full_name), stringValue((student as DbRow).email), stringValue((student as DbRow).id), values.Phone ?? "", values.Occupation ?? null, id]
         );
         await pool.query(`UPDATE students SET parent_id = $1, parent_email = $2, parent_name = $3 WHERE id = $4`, [id, values.Email ?? "", values.Name, stringValue((student as DbRow).id)]);
         break;
