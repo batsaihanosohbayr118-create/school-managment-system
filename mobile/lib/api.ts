@@ -54,5 +54,7 @@ export const api = {
   postAttendance: (body: { student: string; subject?: string; date?: string; status: string }) =>
     request<AttendanceResponse>("/api/mobile/attendance", { method: "POST", body: JSON.stringify(body) }),
   postGrade: (body: { student: string; subject?: string; score: number | string; semester?: string }) =>
-    request<GradesResponse>("/api/mobile/grades", { method: "POST", body: JSON.stringify(body) })
+    request<GradesResponse>("/api/mobile/grades", { method: "POST", body: JSON.stringify(body) }),
+  postTimetable: (body: { subject: string; teacher?: string; class?: string; day: string; time: string }) =>
+    request<TimetableResponse>("/api/mobile/timetable", { method: "POST", body: JSON.stringify(body) })
 };

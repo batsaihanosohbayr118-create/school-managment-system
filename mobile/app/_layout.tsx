@@ -92,6 +92,7 @@ function RootLayoutNav() {
         <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
         <Stack.Screen name="attendance-entry" options={{ presentation: 'modal' }} />
         <Stack.Screen name="grade-entry" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="timetable-entry" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );

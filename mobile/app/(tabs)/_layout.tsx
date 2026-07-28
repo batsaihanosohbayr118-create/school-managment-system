@@ -26,7 +26,8 @@ const tabMeta: Record<MobileTab, { routeName: string; title: string; icon: SFSym
 /** Where a teacher's "+" on a tab's header should lead, if anywhere. */
 const addEntryRouteByTab: Partial<Record<MobileTab, string>> = {
   attendance: '/attendance-entry',
-  grades: '/grade-entry'
+  grades: '/grade-entry',
+  timetable: '/timetable-entry'
 };
 
 export default function TabLayout() {
