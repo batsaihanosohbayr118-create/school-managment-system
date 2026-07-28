@@ -5,7 +5,7 @@ import path from "node:path";
 
 import type { NavModule, Role } from "@/lib/types";
 import { defaultStudentSubjects, defaultStudentSubjectsValue, subjectCatalog } from "@/lib/subjects";
-import { AccountConflictError, createAccount } from "@/lib/auth-db";
+import { AccountConflictError, createAccount, setStudentPassword } from "@/lib/auth-db";
 import type { SchoolSession } from "./school-session";
 
 export type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
@@ -1012,6 +1012,30 @@ async function provisionStudentLogin(values: Record<string, string>) {
   }
 }
 
+/**
+ * Editing a student: a filled password sets their sign-in credentials, and
+ * creates the account when they never had one. Blank means "leave it alone",
+ * so the admin can change a class or a grade without touching the password.
+ */
+async function applyStudentPassword(values: Record<string, string>) {
+  const password = values.Password?.trim();
+  if (!password) return;
+
+  const email = values.Email?.trim();
+  if (!email) {
+    throw new Error("Email is required when you set a student password.");
+  }
+
+  try {
+    await setStudentPassword(email, values.Name?.trim() || email, password);
+  } catch (error) {
+    if (error instanceof AccountConflictError) {
+      throw new Error(`An account with this ${error.field} already exists.`);
+    }
+    throw error;
+  }
+}
+
 export async function createResource(resource: SchoolResource, values: Record<string, string>, context?: SchoolRequestContext) {
   // Outside the try: a permission failure is not a database failure, and must
   // never fall through to the local-store write below.
@@ -1202,6 +1226,10 @@ export async function deleteResource(resource: SchoolResource, id: string, conte
 export async function updateResource(resource: SchoolResource, id: string, values: Record<string, string>, context?: SchoolRequestContext) {
   requireManageAccess(resource, context?.session.role ?? "admin");
 
+  if (resource === "students") {
+    await applyStudentPassword(values);
+  }
+
   try {
     await ensureSchoolDatabase();
     const pool = getPool();
@@ -1209,13 +1237,15 @@ export async function updateResource(resource: SchoolResource, id: string, value
     switch (resource) {
       case "students": {
         const subjects = getRequestedSubjects(values);
+        // COALESCE on the fields the edit dialog does not show: passing "" for a
+        // key the form never sent would erase a value the admin cannot even see.
         await pool.query(
           `
           UPDATE students
-          SET full_name = $1, email = $2, class_name = $3, subjects = $4, attendance = $5, gpa = $6, payment_status = $7, parent_email = $8, parent_name = $9
+          SET full_name = $1, email = $2, class_name = COALESCE($3, class_name), subjects = $4, attendance = $5, gpa = $6, payment_status = $7, parent_email = $8, parent_name = COALESCE($9, parent_name)
           WHERE id = $10
         `,
-          [values.Name, values.Email ?? "", values.Class ?? "", subjects.join(", "), numberValue(values.Attendance), numberValue(values.GPA), values.Payment ?? "Unpaid", values["Parent Email"] ?? "", values["Parent name"] ?? "", id]
+          [values.Name, values.Email ?? "", values.Class ?? null, subjects.join(", "), numberValue(values.Attendance), numberValue(values.GPA), values.Payment ?? "Unpaid", values["Parent Email"] ?? "", values["Parent name"] ?? null, id]
         );
         const subjectPairs = await Promise.all(subjects.map(async (subjectToken) => {
           const subject = await resolveSubjectByToken(pool, subjectToken);

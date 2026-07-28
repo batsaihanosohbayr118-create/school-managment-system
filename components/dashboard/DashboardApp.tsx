@@ -362,6 +362,16 @@ function escapeHtml(value: string) {
   });
 }
 
+/**
+ * Edit dialogs mirror the resource's table columns. Students are the exception:
+ * the class slot carries the password field instead, so an admin can set or
+ * reset a student's sign-in from the same place they edit the record.
+ */
+function editFieldsFor(module: NavModule, columns: string[]) {
+  if (module !== "students") return columns;
+  return columns.map((column) => (column === "Class" ? "Password" : column));
+}
+
 function mergeSubmittedValues(
   data: ResourceTableData,
   recordId: string | null,
@@ -991,7 +1001,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const needsSubjectScope = role === "student" || role === "parent";
   const scopeThisResource = needsSubjectScope && activeResource !== null && subjectScopedResources.has(activeResource);
   const activeSubjectName = subjectScopeOptions.find((option) => option.id === subjectScope)?.name ?? "";
-  const modalFields = modalMode === "edit" && resourceData ? resourceData.columns : createConfig[activeModule].fields;
+  const modalFields = modalMode === "edit" && resourceData ? editFieldsFor(activeModule, resourceData.columns) : createConfig[activeModule].fields;
   const modalTitle = modalMode === "edit" ? `${copy.common.edit} ${copy.recordLabel[activeModule]}` : createCopy.title;
   const modalAction = modalMode === "edit" ? copy.common.saveChanges : createCopy.action;
   const unreadNotifications = activityNotifications.filter((item) => !item.read).length;
