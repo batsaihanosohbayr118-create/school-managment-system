@@ -68,7 +68,7 @@ import {
 } from "@/lib/school-api";
 import { authService } from "@/lib/auth-client";
 import { dashboardPathForRole } from "@/lib/auth-flow";
-import { subjectOptions } from "@/lib/subjects";
+import { defaultStudentSubjectsValue, subjectOptions } from "@/lib/subjects";
 import type { NavModule, Role, SubjectAssignment, SubjectContent, SubjectLesson } from "@/lib/types";
 import type { SchoolResource } from "@/lib/school-db";
 
@@ -1131,19 +1131,27 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
 
     setModalMode("create");
     setEditingRecordId(null);
-    setFormValues({});
+    // Pre-fill the school-wide subject set so a new student can see their
+    // assignments and grades without the admin typing catalogue names by hand.
+    setFormValues(activeModule === "students" ? { Subjects: defaultStudentSubjectsValue } : {});
     setModalOpen(true);
   }
 
   function openEditModal(recordId: string, row: string[], columns: string[]) {
     setModalMode("edit");
     setEditingRecordId(recordId);
-    setFormValues(
-      columns.reduce<Record<string, string>>((current, column, index) => {
-        current[column] = row[index] ?? "";
-        return current;
-      }, {})
-    );
+
+    const values = columns.reduce<Record<string, string>>((current, column, index) => {
+      current[column] = row[index] ?? "";
+      return current;
+    }, {});
+
+    // An existing student saved before the default existed has this blank.
+    if (activeModule === "students" && !values.Subjects?.trim()) {
+      values.Subjects = defaultStudentSubjectsValue;
+    }
+
+    setFormValues(values);
     setModalOpen(true);
   }
 

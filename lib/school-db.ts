@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import type { NavModule, Role } from "@/lib/types";
-import { subjectCatalog } from "@/lib/subjects";
+import { defaultStudentSubjects, defaultStudentSubjectsValue, subjectCatalog } from "@/lib/subjects";
 import type { SchoolSession } from "./school-session";
 
 export type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
@@ -297,32 +297,22 @@ async function initializeSchoolDatabase() {
   await seedIfEmpty();
 }
 
+/**
+ * Seeds the subject catalogue from `subjectCatalog`, which is the single source
+ * of truth. Do NOT re-add a hardcoded list here: this runs on every server
+ * start, so anything listed is resurrected after an administrator deletes it.
+ */
 async function seedIfEmpty() {
   const pool = getPool();
 
-  await pool.query(`
-    INSERT INTO subjects (id, code, name, description, category, grade_levels)
-    VALUES
-      ('SB-MATH', 'MATH', 'Mathematics', 'Core mathematics curriculum', 'Core', 'Grade 7-12'),
-      ('SB-MN-LANG', 'MNLANG', 'Mongolian Language', 'National language study', 'Core', 'Grade 7-12'),
-      ('SB-MN-LIT', 'MNLIT', 'Mongolian Literature', 'Literature and composition', 'Core', 'Grade 7-12'),
-      ('SB-EN', 'ENG', 'English', 'English language and communication', 'Language', 'Grade 7-12'),
-      ('SB-RU', 'RUS', 'Russian', 'Russian language basics', 'Language', 'Grade 7-12'),
-      ('SB-HIST', 'HIST', 'History', 'Historical study and inquiry', 'Social Science', 'Grade 7-12'),
-      ('SB-SOC', 'SOC', 'Social Studies', 'Society, culture, and civics', 'Social Science', 'Grade 7-12'),
-      ('SB-GEO', 'GEO', 'Geography', 'Physical and human geography', 'Social Science', 'Grade 7-12'),
-      ('SB-PHY', 'PHY', 'Physics', 'Physics concepts and lab work', 'Science', 'Grade 8-12'),
-      ('SB-CHEM', 'CHEM', 'Chemistry', 'Matter, reactions, and lab skills', 'Science', 'Grade 8-12'),
-      ('SB-BIO', 'BIO', 'Biology', 'Life science and ecosystems', 'Science', 'Grade 7-12'),
-      ('SB-CS', 'CS', 'Computer Science', 'Programming and digital literacy', 'Technology', 'Grade 7-12'),
-      ('SB-PE', 'PE', 'Physical Education', 'Physical health and movement', 'Wellbeing', 'Grade 7-12'),
-      ('SB-ART', 'ART', 'Art', 'Creative visual expression', 'Arts', 'Grade 7-12'),
-      ('SB-MUSIC', 'MUSIC', 'Music', 'Music theory and performance', 'Arts', 'Grade 7-12'),
-      ('SB-TECH', 'TECH', 'Technology', 'Applied technology and design', 'Technology', 'Grade 7-12'),
-      ('SB-HEALTH', 'HEALTH', 'Health', 'Personal and community health', 'Wellbeing', 'Grade 7-12'),
-      ('SB-CIVIC', 'CIVIC', 'Civic Education', 'Citizenship and civic responsibility', 'Social Science', 'Grade 7-12')
-    ON CONFLICT (id) DO NOTHING;
-  `);
+  for (const subject of subjectCatalog) {
+    await pool.query(
+      `INSERT INTO subjects (id, code, name, description, category, grade_levels)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (id) DO NOTHING`,
+      [subject.id, subject.code, subject.name, subject.description, subject.category, subject.gradeLevels]
+    );
+  }
 }
 
 function stringValue(value: unknown) {
@@ -433,7 +423,7 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
         values.Name,
         values.Email || `${Date.now().toString().slice(-6)}@educore.mn`,
         values.Class,
-        values.Subjects ?? "",
+        values.Subjects?.trim() || defaultStudentSubjectsValue,
         values.Attendance ?? "0%",
         values.GPA ?? "0",
         values.Payment || "Unpaid",
@@ -939,8 +929,13 @@ function subjectNamesFromTokens(tokens: string[]) {
   return tokens.map((token) => token.trim()).filter(Boolean);
 }
 
+/**
+ * Falls back to the school-wide default set. A student with no subjects can see
+ * nothing at all, so an empty field is never what the administrator meant.
+ */
 function getRequestedSubjects(values: Record<string, string>) {
-  return subjectNamesFromTokens(csvList(values.Subjects));
+  const requested = subjectNamesFromTokens(csvList(values.Subjects));
+  return requested.length > 0 ? requested : [...defaultStudentSubjects];
 }
 
 async function replaceStudentSubjects(pool: Pool, studentId: string, subjectPairs: { id: string; name: string }[]) {
