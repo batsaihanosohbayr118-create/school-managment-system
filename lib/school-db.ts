@@ -1121,10 +1121,10 @@ export async function createResource(resource: SchoolResource, values: Record<st
         const student = await resolveStudentByToken(pool, values.Student);
         await pool.query(
           `
-          INSERT INTO attendance_records (id, student_id, subject_id, student, subject, class_name, date, status, recorded_by)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          INSERT INTO attendance_records (id, student_id, subject_id, student, subject, date, status, recorded_by)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `,
-          [id, stringValue((student as DbRow | null)?.id), subject ? stringValue(subject.id) : "", values.Student, subjectName, values.Class ?? "", values.Date ?? new Date().toISOString().slice(0, 10), values.Status ?? "Present", context?.session.email ?? ""]
+          [id, stringValue((student as DbRow | null)?.id), subject ? stringValue(subject.id) : "", values.Student, subjectName, values.Date ?? new Date().toISOString().slice(0, 10), values.Status ?? "Present", context?.session.email ?? ""]
         );
         break;
       }
@@ -1325,10 +1325,10 @@ export async function updateResource(resource: SchoolResource, id: string, value
         await pool.query(
           `
           UPDATE attendance_records
-          SET student_id = $1, subject_id = $2, student = $3, subject = $4, class_name = $5, date = $6, status = $7, recorded_by = $8
-          WHERE id = $9
+          SET student_id = $1, subject_id = $2, student = $3, subject = $4, date = $5, status = $6, recorded_by = $7
+          WHERE id = $8
         `,
-          [stringValue((student as DbRow | null)?.id), subject ? stringValue(subject.id) : "", values.Student, subject ? stringValue(subject.name) : values.Subject, values.Class ?? "", values.Date ?? "", values.Status ?? "Present", context?.session.email ?? "", id]
+          [stringValue((student as DbRow | null)?.id), subject ? stringValue(subject.id) : "", values.Student, subject ? stringValue(subject.name) : values.Subject, values.Date ?? "", values.Status ?? "Present", context?.session.email ?? "", id]
         );
         break;
       }

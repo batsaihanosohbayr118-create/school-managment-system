@@ -229,7 +229,7 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
   subjects: { fields: ["Name", "Code", "Description", "Teacher", "Category", "Grade Levels"] },
   assignments: { fields: ["Subject", "Title", "Type", "Due Date", "Max Score", "Description"] },
   materials: { fields: ["Subject", "Title", "File Type", "File URL"] },
-  attendance: { fields: ["Student", "Subject", "Class", "Date", "Status"] },
+  attendance: { fields: ["Student", "Subject", "Date", "Status"] },
   grades: { fields: ["Student", "Subject", "Score", "Semester"] },
   payments: { fields: ["Student", "Amount", "Status", "Due Date"] },
   timetable: { fields: ["Day", "Time", "Subject", "Teacher", "Class"] },
@@ -1878,7 +1878,7 @@ function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; 
         if (role === "admin") {
           const students = table("students");
           const teachers = table("teachers");
-          const classCount = new Set(cellValues(students, "Class").filter(Boolean)).size;
+          const withLogin = countMatching(students, "Payment", "Paid");
           const subjectCount = new Set(
             cellValues(teachers, "Subject").flatMap((value) => value.split(",").map((item) => item.trim())).filter(Boolean)
           ).size;
@@ -1891,7 +1891,7 @@ function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; 
             : (mn ? `${countMatching(payments, "Status", "Paid")} төлөгдсөн` : `${countMatching(payments, "Status", "Paid")} paid`);
 
           setLiveStats([
-            stat(0, students.rows.length.toString(), mn ? `${classCount} анги` : `${classCount} classes`),
+            stat(0, students.rows.length.toString(), mn ? `${withLogin} төлсөн` : `${withLogin} paid`),
             stat(1, teachers.rows.length.toString(), mn ? `${subjectCount} хичээл` : `${subjectCount} subjects`),
             stat(2, `$${paidTotal.toLocaleString()}`, revenueHelper),
             stat(3, `${attPct}%`, attendanceHelper)
