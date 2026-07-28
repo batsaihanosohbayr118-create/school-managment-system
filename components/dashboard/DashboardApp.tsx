@@ -1515,6 +1515,9 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
             {activeModule === "teachers" ? (
               <TeachersModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
+            {activeModule === "parents" ? (
+              <ParentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+            ) : null}
             {activeModule === "subjects" ? (
               selectedSubjectContent ? (
                 <SubjectContentPanel
