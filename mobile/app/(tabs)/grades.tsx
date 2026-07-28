@@ -1,3 +1,5 @@
+import { useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { FlatList, StyleSheet } from 'react-native';
 
 import { Text, View } from '@/components/Themed';
@@ -7,6 +9,15 @@ import type { GradeEntry } from '@shared/api-types';
 
 export default function GradesScreen() {
   const { data, error, loading, refetch } = useApiData(api.grades);
+
+  // Picks up a row a teacher just added via /grade-entry — that screen
+  // doesn't know how to reach back into this one's state, so refetch instead.
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
 
   if (loading) {
     return (

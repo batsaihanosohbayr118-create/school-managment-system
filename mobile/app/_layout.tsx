@@ -90,6 +90,8 @@ function RootLayoutNav() {
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="admin-web-only" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="attendance-entry" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="grade-entry" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );

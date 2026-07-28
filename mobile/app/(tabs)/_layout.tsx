@@ -1,6 +1,6 @@
 import { SymbolView } from 'expo-symbols';
 import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import type { SFSymbol } from 'sf-symbols-typescript';
 import type { MobileTab } from '@shared/roles';
 import { visibleTabsByRole } from '@shared/roles';
@@ -23,6 +23,12 @@ const tabMeta: Record<MobileTab, { routeName: string; title: string; icon: SFSym
   announcements: { routeName: 'announcements', title: 'Announcements', icon: 'megaphone.fill' }
 };
 
+/** Where a teacher's "+" on a tab's header should lead, if anywhere. */
+const addEntryRouteByTab: Partial<Record<MobileTab, string>> = {
+  attendance: '/attendance-entry',
+  grades: '/grade-entry'
+};
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { session } = useAuth();
@@ -33,6 +39,17 @@ export default function TabLayout() {
   // keeps a brief render-before-redirect from crashing instead of just
   // showing nothing for a frame.
   const tabs = session ? visibleTabsByRole[session.role] : [];
+  const isTeacher = session?.role === 'teacher';
+
+  const settingsButton = (
+    <Link href="/settings" asChild>
+      <Pressable style={{ marginRight: 15 }}>
+        {({ pressed }) => (
+          <SymbolView name="gearshape" size={22} tintColor={Colors[colorScheme].text} style={{ opacity: pressed ? 0.5 : 1 }} />
+        )}
+      </Pressable>
+    </Link>
+  );
 
   return (
     <Tabs
@@ -41,31 +58,39 @@ export default function TabLayout() {
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),
-        headerRight: () => (
-          <Link href="/settings" asChild>
-            <Pressable style={{ marginRight: 15 }}>
-              {({ pressed }) => (
-                <SymbolView
-                  name="gearshape"
-                  size={22}
-                  tintColor={Colors[colorScheme].text}
-                  style={{ opacity: pressed ? 0.5 : 1 }}
-                />
-              )}
-            </Pressable>
-          </Link>
-        )
+        headerRight: () => settingsButton
       }}
     >
       {tabs.map((tab) => {
         const meta = tabMeta[tab];
+        const addRoute = isTeacher ? addEntryRouteByTab[tab] : undefined;
+
         return (
           <Tabs.Screen
             key={tab}
             name={meta.routeName}
             options={{
               title: meta.title,
-              tabBarIcon: ({ color }) => <SymbolView name={meta.icon} tintColor={color} size={26} />
+              tabBarIcon: ({ color }) => <SymbolView name={meta.icon} tintColor={color} size={26} />,
+              headerRight: addRoute
+                ? () => (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Link href={addRoute} asChild>
+                        <Pressable style={{ marginRight: 15 }}>
+                          {({ pressed }) => (
+                            <SymbolView
+                              name="plus"
+                              size={22}
+                              tintColor={Colors[colorScheme].text}
+                              style={{ opacity: pressed ? 0.5 : 1 }}
+                            />
+                          )}
+                        </Pressable>
+                      </Link>
+                      {settingsButton}
+                    </View>
+                  )
+                : undefined
             }}
           />
         );
