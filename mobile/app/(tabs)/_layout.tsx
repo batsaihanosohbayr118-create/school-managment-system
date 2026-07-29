@@ -58,14 +58,18 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme].tint,
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-        headerRight: () => settingsButton
+        headerShown: useClientOnlyValue(false, true)
       }}
     >
       {tabs.map((tab) => {
         const meta = tabMeta[tab];
         const addRoute = isTeacher ? addEntryRouteByTab[tab] : undefined;
 
+        // Always a real function, never `undefined` — an explicit
+        // `headerRight: undefined` in a screen's own options is a present
+        // key, not a missing one, so it was masking screenOptions'
+        // shared default instead of falling back to it (every tab without
+        // a "+" was rendering with no header icons at all, gear included).
         return (
           <Tabs.Screen
             key={tab}
@@ -73,25 +77,25 @@ export default function TabLayout() {
             options={{
               title: meta.title,
               tabBarIcon: ({ color }) => <SymbolView name={meta.icon} tintColor={color} size={26} />,
-              headerRight: addRoute
-                ? () => (
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Link href={addRoute} asChild>
-                        <Pressable style={{ marginRight: 15 }}>
-                          {({ pressed }) => (
-                            <SymbolView
-                              name="plus"
-                              size={22}
-                              tintColor={Colors[colorScheme].text}
-                              style={{ opacity: pressed ? 0.5 : 1 }}
-                            />
-                          )}
-                        </Pressable>
-                      </Link>
-                      {settingsButton}
-                    </View>
-                  )
-                : undefined
+              headerRight: () => (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {addRoute ? (
+                    <Link href={addRoute} asChild>
+                      <Pressable style={{ marginRight: 15 }}>
+                        {({ pressed }) => (
+                          <SymbolView
+                            name="plus"
+                            size={22}
+                            tintColor={Colors[colorScheme].text}
+                            style={{ opacity: pressed ? 0.5 : 1 }}
+                          />
+                        )}
+                      </Pressable>
+                    </Link>
+                  ) : null}
+                  {settingsButton}
+                </View>
+              )
             }}
           />
         );
