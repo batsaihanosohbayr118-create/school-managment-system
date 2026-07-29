@@ -42,8 +42,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Home</Text>
-      {session ? <Text style={[styles.subtitle, { color: mutedColor }]}>{session.name || session.email}</Text> : null}
+      {session ? <Text style={styles.subtitle}>{session.name || session.email}</Text> : null}
 
       <SectionHeader icon="calendar" label={isTeacher ? "Today's classes" : "Today's schedule"} />
       {timetable.loading ? (
@@ -130,13 +129,9 @@ const styles = StyleSheet.create({
   content: {
     padding: 16
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold'
-  },
   subtitle: {
-    fontSize: 16,
-    marginTop: 2
+    fontSize: 22,
+    fontWeight: '800'
   },
   sectionHeader: {
     flexDirection: 'row',
