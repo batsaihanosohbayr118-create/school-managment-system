@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { ScrollView, StyleSheet } from 'react-native';
+import { Link } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { Text, View } from '@/components/Themed';
 import { useAuth } from '@/lib/auth-context';
@@ -61,6 +62,12 @@ export default function HomeScreen() {
           ) : (
             latestGrades.map((grade) => <GradeRow key={grade.id} grade={grade} />)
           )}
+
+          <Link href="/payments" asChild>
+            <Pressable style={styles.paymentsLink}>
+              <Text style={styles.paymentsLinkText}>View payments</Text>
+            </Pressable>
+          </Link>
         </>
       )}
     </ScrollView>
@@ -145,5 +152,18 @@ const styles = StyleSheet.create({
   score: {
     fontSize: 16,
     fontWeight: '700'
+  },
+  paymentsLink: {
+    marginTop: 20,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#2563eb'
+  },
+  paymentsLinkText: {
+    color: '#2563eb',
+    fontWeight: '600',
+    fontSize: 15
   }
 });
