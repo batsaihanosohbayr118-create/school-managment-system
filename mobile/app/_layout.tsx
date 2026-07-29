@@ -93,7 +93,7 @@ function RootLayoutNav() {
         <Stack.Screen name="attendance-entry" options={{ presentation: 'modal' }} />
         <Stack.Screen name="grade-entry" options={{ presentation: 'modal' }} />
         <Stack.Screen name="timetable-entry" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="payments" options={{ title: 'Payments' }} />
+        <Stack.Screen name="payments" options={{ title: 'Payments', headerBackTitle: 'Home' }} />
       </Stack>
     </ThemeProvider>
   );
