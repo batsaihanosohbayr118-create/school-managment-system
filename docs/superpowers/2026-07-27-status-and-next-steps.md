@@ -83,15 +83,30 @@ the design doc's own outline instead.
 | `lib/i18n.ts` split — tables moved to `shared/i18n-tables.ts` | `3e9b79f` |
 | `shared/roles.ts` — role → visible tabs, `resolveRole()` | `dd68521` |
 | Supabase auth wired (`expo-secure-store`), login screen, admin web-redirect screen, root auth gate | `b2f45b4` |
+| Downgraded to Expo SDK 54 (owner's Expo Go client), fixed the template's theme/icon code that broke on the downgrade, pinned root TypeScript back to 6.0.3 after an unrelated `node_modules` wipe drifted it | `7353cea` |
+| Fixed a two-React-copies bug (`Invalid hook call` on device) via Metro's `resolveRequest`, not `extraNodeModules` (which doesn't override an already-successful wrong-copy resolution) | `116cc6a` |
+| Role-driven tab navigation (`shared/roles.ts`'s `visibleTabsByRole`, both which tabs and their order) | `a7c9c82` |
+| `mobile/lib/api.ts` + `use-api.ts`; Timetable/Grades/Attendance/Announcements wired to `/api/mobile/*` | `233b6fe` |
+| `next.config.js`: `allowedDevOrigins` — LAN-IP dev access was hanging on "Checking session..." (blocked HMR websocket) | `100ebc6` |
+| Teacher attendance/grade entry screens (`+` in the tab header) | `121ccdd` |
+| Dark-mode `TextInput` fix — typed text was invisible (login, attendance-entry, grade-entry) | `4dc128e` |
+| Teacher timetable write, matching `manageRolesFor`'s existing `{admin, teacher}` for that resource | `ed2599d` |
+| Fixed a header-icon bug: `headerRight: undefined` on a per-screen options object is a present key, not a missing one, so it masked the shared default gear icon on Home/Announcements | `06bcf61` |
+| Home screen: today's schedule (day-matched against the device clock) + latest 3 grades for student/parent, today's classes only for teacher | `5ef4eb4` |
 
-Verified after each: mobile's own `tsc --noEmit`, root `tsc`/`test`/`lint`/
-`build` unaffected, and a Metro web bundle (`npx expo start --web`, `CI=1`)
-compiles with no embedded error. **Not verified: an actual device.** This
-sandbox is Windows with no Xcode — everything so far is confirmed at the
-compile/bundle level only, never by tapping through the app. The owner should
-run `cd mobile && npx expo start`, scan the QR code with Expo Go, and try
-logging in with one of the four accounts above before more screens get built
-on top of unverified auth.
+**Device-verified end to end this session** (owner's iPhone via Expo Go,
+SDK 54): login for all three non-admin roles, admin's web-redirect screen,
+role-correct tab sets and order, all four read screens showing real
+`/api/mobile/*` data, teacher write-then-see-it-in-the-list for attendance/
+grades/timetable, sign-out, and the Home summary for both a teacher and a
+student account.
+
+**Data note:** the two Task-11 test accounts (`amraa@gmail.com`,
+`bilgee@gmail.com`) had their `teachers`/`students` table rows deleted during
+Plan A's cleanup, which silently emptied their subject-scoped visibility
+(not a bug — no linkage record means no accessible subjects). Recreated both,
+linked to Mathematics, mid-session; do not re-delete them without re-linking
+first if testing continues.
 
 Two Windows-only workarounds worth knowing about if `expo start` misbehaves
 later: `mobile/app.json`'s `experiments.typedRoutes` is off and `web.output`
@@ -101,13 +116,13 @@ submodules from wherever `@expo/cli` got hoisted to (the workspace root),
 not from `mobile/node_modules` where the real package lives. Only local web
 preview hit this; Expo Go over Metro didn't need it disabled.
 
-**Still to build**, in the order the design doc lists them: tab navigation
-actually driven by `shared/roles.ts` (the tab bar is still the unmodified
-template right now), the Home/Timetable/Grades/Attendance/Announcements/
-Payments/Settings screens, teacher attendance and grade entry, Face ID via
-`expo-local-authentication`, Google OAuth via `expo-auth-session`, the
+**Still to build**, in the order the design doc lists them: Payments (design
+says "reached from Home, not a tab" — no link exists yet), language
+switching in Settings (the screen exists; only sign-out is wired), Face ID
+via `expo-local-authentication`, Google OAuth via `expo-auth-session`, the
 offline `AsyncStorage` read cache, and device verification per the design
-doc's "Verification" checklist (9 checks, device-only).
+doc's "Verification" checklist items 2, 3, 6, 7 (biometrics, airplane mode,
+Google sign-in — the rest of that checklist is now done).
 
 ## Resolved: the disk-full outage
 
