@@ -17,7 +17,11 @@ export default function TimetableEntryScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const textColor = useThemeColor({}, 'text');
-  const placeholderColor = useThemeColor({}, 'tabIconDefault');
+  const placeholderColor = useThemeColor({}, 'muted');
+  const inputBg = useThemeColor({}, 'card');
+  const borderColor = useThemeColor({}, 'border');
+  const tint = useThemeColor({}, 'tint');
+  const dangerColor = useThemeColor({}, 'danger');
 
   async function handleSubmit() {
     setError(null);
@@ -38,23 +42,18 @@ export default function TimetableEntryScreen() {
     }
   }
 
+  const inputStyle = [styles.input, { color: textColor, backgroundColor: inputBg, borderColor }];
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Add timetable slot</Text>
 
-      <Text style={styles.label}>Subject</Text>
-      <TextInput
-        style={[styles.input, { color: textColor }]}
-        placeholderTextColor={placeholderColor}
-        value={subject}
-        onChangeText={setSubject}
-        editable={!submitting}
-        autoFocus
-      />
+      <Text style={[styles.label, { color: placeholderColor }]}>Subject</Text>
+      <TextInput style={inputStyle} placeholderTextColor={placeholderColor} value={subject} onChangeText={setSubject} editable={!submitting} autoFocus />
 
-      <Text style={styles.label}>Day</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>Day</Text>
       <TextInput
-        style={[styles.input, { color: textColor }]}
+        style={inputStyle}
         placeholder="e.g. Monday"
         placeholderTextColor={placeholderColor}
         value={day}
@@ -62,9 +61,9 @@ export default function TimetableEntryScreen() {
         editable={!submitting}
       />
 
-      <Text style={styles.label}>Time</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>Time</Text>
       <TextInput
-        style={[styles.input, { color: textColor }]}
+        style={inputStyle}
         placeholder="e.g. 09:00-09:45"
         placeholderTextColor={placeholderColor}
         value={time}
@@ -72,9 +71,9 @@ export default function TimetableEntryScreen() {
         editable={!submitting}
       />
 
-      <Text style={styles.label}>Class</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>Class</Text>
       <TextInput
-        style={[styles.input, { color: textColor }]}
+        style={inputStyle}
         placeholder="e.g. Grade 8A"
         placeholderTextColor={placeholderColor}
         value={className}
@@ -82,19 +81,13 @@ export default function TimetableEntryScreen() {
         editable={!submitting}
       />
 
-      <Text style={styles.label}>Teacher</Text>
-      <TextInput
-        style={[styles.input, { color: textColor }]}
-        placeholderTextColor={placeholderColor}
-        value={teacher}
-        onChangeText={setTeacher}
-        editable={!submitting}
-      />
+      <Text style={[styles.label, { color: placeholderColor }]}>Teacher</Text>
+      <TextInput style={inputStyle} placeholderTextColor={placeholderColor} value={teacher} onChangeText={setTeacher} editable={!submitting} />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: dangerColor }]}>{error}</Text> : null}
 
       <Pressable
-        style={[styles.submit, (submitting || !subject || !day || !time) && styles.submitDisabled]}
+        style={[styles.submit, { backgroundColor: tint }, (submitting || !subject || !day || !time) && styles.submitDisabled]}
         onPress={handleSubmit}
         disabled={submitting || !subject || !day || !time}
       >
@@ -112,39 +105,37 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginBottom: 12
   },
   label: {
     fontSize: 13,
-    opacity: 0.6,
-    marginTop: 12
+    fontWeight: '600',
+    marginTop: 14
   },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#8888',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 16,
+    marginTop: 4
   },
   error: {
-    color: '#dc2626',
     marginTop: 16
   },
   submit: {
     marginTop: 24,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#2563eb',
-    borderRadius: 8
+    borderRadius: 10
   },
   submitDisabled: {
     opacity: 0.5
   },
   submitText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 16
   }
 });

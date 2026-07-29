@@ -2,13 +2,17 @@ import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { FlatList, StyleSheet } from 'react-native';
 
-import { Text, View } from '@/components/Themed';
+import { Badge, statusTone } from '@/components/Badge';
+import { Card } from '@/components/Card';
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { useApiData } from '@/lib/use-api';
 import type { AttendanceEntry } from '@shared/api-types';
 
 export default function AttendanceScreen() {
   const { data, error, loading, refetch } = useApiData(api.attendance);
+  const dangerColor = useThemeColor({}, 'danger');
+  const mutedColor = useThemeColor({}, 'muted');
 
   // Picks up a row a teacher just added via /attendance-entry — that screen
   // doesn't know how to reach back into this one's state, so refetch instead.
@@ -22,7 +26,7 @@ export default function AttendanceScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <Text>Loading…</Text>
+        <Text style={{ color: mutedColor }}>Loading…</Text>
       </View>
     );
   }
@@ -30,7 +34,7 @@ export default function AttendanceScreen() {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error.message}</Text>
+        <Text style={{ color: dangerColor }}>{error.message}</Text>
       </View>
     );
   }
@@ -38,13 +42,14 @@ export default function AttendanceScreen() {
   return (
     <FlatList
       style={styles.container}
+      contentContainerStyle={styles.content}
       data={data?.entries ?? []}
       keyExtractor={(entry) => entry.id}
       onRefresh={refetch}
       refreshing={loading}
       ListEmptyComponent={
         <View style={styles.center}>
-          <Text>No attendance records yet.</Text>
+          <Text style={{ color: mutedColor }}>No attendance records yet.</Text>
         </View>
       }
       renderItem={({ item }) => <AttendanceRow entry={item} />}
@@ -53,16 +58,18 @@ export default function AttendanceScreen() {
 }
 
 function AttendanceRow({ entry }: { entry: AttendanceEntry }) {
+  const mutedColor = useThemeColor({}, 'muted');
+
   return (
-    <View style={styles.row}>
+    <Card style={styles.card}>
       <View style={styles.rowHeader}>
         <Text style={styles.subject}>{entry.subject}</Text>
-        <Text style={styles.status}>{entry.status}</Text>
+        <Badge label={entry.status} tone={statusTone(entry.status)} />
       </View>
-      <Text style={styles.meta}>
+      <Text style={[styles.meta, { color: mutedColor }]}>
         {entry.student} · {entry.date}
       </Text>
-    </View>
+    </Card>
   );
 }
 
@@ -70,36 +77,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1
   },
+  content: {
+    padding: 16
+  },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20
   },
-  error: {
-    color: '#dc2626'
-  },
-  row: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#8884'
+  card: {
+    gap: 3
   },
   rowHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    alignItems: 'center'
   },
   subject: {
     fontSize: 17,
-    fontWeight: '600'
-  },
-  status: {
-    fontSize: 15,
-    fontWeight: '600'
+    fontWeight: '700'
   },
   meta: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginTop: 2
+    fontSize: 14
   }
 });

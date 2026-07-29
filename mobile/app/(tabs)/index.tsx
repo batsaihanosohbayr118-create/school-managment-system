@@ -2,8 +2,11 @@ import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { SymbolView } from 'expo-symbols';
+import type { SFSymbol } from 'sf-symbols-typescript';
 
-import { Text, View } from '@/components/Themed';
+import { Card } from '@/components/Card';
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { useApiData } from '@/lib/use-api';
@@ -15,6 +18,9 @@ const today = DAY_NAMES[new Date().getDay()];
 export default function HomeScreen() {
   const { session } = useAuth();
   const isTeacher = session?.role === 'teacher';
+  const mutedColor = useThemeColor({}, 'muted');
+  const dangerColor = useThemeColor({}, 'danger');
+  const tint = useThemeColor({}, 'tint');
 
   const timetable = useApiData(api.timetable);
   const grades = useApiData(api.grades);
@@ -37,35 +43,40 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Home</Text>
-      {session ? <Text style={styles.subtitle}>{session.name || session.email}</Text> : null}
+      {session ? <Text style={[styles.subtitle, { color: mutedColor }]}>{session.name || session.email}</Text> : null}
 
-      <Text style={styles.sectionTitle}>{isTeacher ? "Today's classes" : "Today's schedule"}</Text>
+      <SectionHeader icon="calendar" label={isTeacher ? "Today's classes" : "Today's schedule"} />
       {timetable.loading ? (
-        <Text style={styles.muted}>Loading…</Text>
+        <Text style={{ color: mutedColor }}>Loading…</Text>
       ) : timetable.error ? (
-        <Text style={styles.error}>{timetable.error.message}</Text>
+        <Text style={{ color: dangerColor }}>{timetable.error.message}</Text>
       ) : todaysSlots.length === 0 ? (
-        <Text style={styles.muted}>Nothing scheduled for {today}.</Text>
+        <Text style={{ color: mutedColor }}>Nothing scheduled for {today}.</Text>
       ) : (
         todaysSlots.map((slot) => <TimetableRow key={slot.id} slot={slot} />)
       )}
 
       {!isTeacher && (
         <>
-          <Text style={styles.sectionTitle}>Latest grades</Text>
+          <SectionHeader icon="chart.bar.fill" label="Latest grades" />
           {grades.loading ? (
-            <Text style={styles.muted}>Loading…</Text>
+            <Text style={{ color: mutedColor }}>Loading…</Text>
           ) : grades.error ? (
-            <Text style={styles.error}>{grades.error.message}</Text>
+            <Text style={{ color: dangerColor }}>{grades.error.message}</Text>
           ) : latestGrades.length === 0 ? (
-            <Text style={styles.muted}>No grades yet.</Text>
+            <Text style={{ color: mutedColor }}>No grades yet.</Text>
           ) : (
             latestGrades.map((grade) => <GradeRow key={grade.id} grade={grade} />)
           )}
 
           <Link href="/payments" asChild>
-            <Pressable style={styles.paymentsLink}>
-              <Text style={styles.paymentsLinkText}>View payments</Text>
+            <Pressable style={[styles.paymentsLink, { borderColor: tint }]}>
+              {({ pressed }) => (
+                <View style={[styles.paymentsLinkInner, pressed && { opacity: 0.6 }]}>
+                  <SymbolView name="creditcard" size={18} tintColor={tint} />
+                  <Text style={[styles.paymentsLinkText, { color: tint }]}>View payments</Text>
+                </View>
+              )}
             </Pressable>
           </Link>
         </>
@@ -74,28 +85,41 @@ export default function HomeScreen() {
   );
 }
 
-function TimetableRow({ slot }: { slot: TimetableSlot }) {
+function SectionHeader({ icon, label }: { icon: SFSymbol; label: string }) {
+  const mutedColor = useThemeColor({}, 'muted');
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowTitle}>{slot.subject}</Text>
-      <Text style={styles.rowMeta}>
-        {slot.timeLabel} · {slot.className}
-      </Text>
+    <View style={styles.sectionHeader}>
+      <SymbolView name={icon} size={13} tintColor={mutedColor} />
+      <Text style={[styles.sectionTitle, { color: mutedColor }]}>{label}</Text>
     </View>
   );
 }
 
-function GradeRow({ grade }: { grade: GradeEntry }) {
+function TimetableRow({ slot }: { slot: TimetableSlot }) {
+  const mutedColor = useThemeColor({}, 'muted');
   return (
-    <View style={styles.row}>
+    <Card style={styles.card}>
+      <Text style={styles.rowTitle}>{slot.subject}</Text>
+      <Text style={[styles.rowMeta, { color: mutedColor }]}>
+        {slot.timeLabel} · {slot.className}
+      </Text>
+    </Card>
+  );
+}
+
+function GradeRow({ grade }: { grade: GradeEntry }) {
+  const mutedColor = useThemeColor({}, 'muted');
+  const tint = useThemeColor({}, 'tint');
+  return (
+    <Card style={styles.card}>
       <View style={styles.rowHeader}>
         <Text style={styles.rowTitle}>{grade.subject}</Text>
-        <Text style={styles.score}>{grade.scoreLabel}</Text>
+        <Text style={[styles.score, { color: tint }]}>{grade.scoreLabel}</Text>
       </View>
-      <Text style={styles.rowMeta}>
+      <Text style={[styles.rowMeta, { color: mutedColor }]}>
         {grade.student} · {grade.semester}
       </Text>
-    </View>
+    </Card>
   );
 }
 
@@ -104,8 +128,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
-    padding: 20,
-    gap: 8
+    padding: 16
   },
   title: {
     fontSize: 28,
@@ -113,28 +136,23 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    opacity: 0.7
+    marginTop: 2
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 26,
+    marginBottom: 8
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
     textTransform: 'uppercase',
-    opacity: 0.6,
-    marginTop: 24,
-    marginBottom: 4
+    letterSpacing: 0.5
   },
-  muted: {
-    opacity: 0.6,
-    paddingVertical: 8
-  },
-  error: {
-    color: '#dc2626',
-    paddingVertical: 8
-  },
-  row: {
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#8884'
+  card: {
+    gap: 3
   },
   rowHeader: {
     flexDirection: 'row',
@@ -142,28 +160,29 @@ const styles = StyleSheet.create({
   },
   rowTitle: {
     fontSize: 16,
-    fontWeight: '600'
+    fontWeight: '700'
   },
   rowMeta: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginTop: 2
+    fontSize: 14
   },
   score: {
-    fontSize: 16,
-    fontWeight: '700'
+    fontSize: 18,
+    fontWeight: '800'
   },
   paymentsLink: {
     marginTop: 20,
     paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5
+  },
+  paymentsLinkInner: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#2563eb'
+    justifyContent: 'center',
+    gap: 8
   },
   paymentsLinkText: {
-    color: '#2563eb',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 15
   }
 });

@@ -11,9 +11,14 @@ const STATUSES = ['Present', 'Absent', 'Late'] as const;
 export default function AttendanceEntryScreen() {
   const router = useRouter();
   // TextInput isn't a Themed component, so it doesn't pick up dark mode's
-  // text color on its own — typed text was invisible (black on black).
+  // colors on its own — typed text was invisible (black on black) before.
   const textColor = useThemeColor({}, 'text');
-  const placeholderColor = useThemeColor({}, 'tabIconDefault');
+  const placeholderColor = useThemeColor({}, 'muted');
+  const inputBg = useThemeColor({}, 'card');
+  const borderColor = useThemeColor({}, 'border');
+  const tint = useThemeColor({}, 'tint');
+  const dangerColor = useThemeColor({}, 'danger');
+
   const [student, setStudent] = useState('');
   const [subject, setSubject] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -34,13 +39,15 @@ export default function AttendanceEntryScreen() {
     }
   }
 
+  const inputStyle = [styles.input, { color: textColor, backgroundColor: inputBg, borderColor }];
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Take attendance</Text>
 
-      <Text style={styles.label}>Student</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>Student</Text>
       <TextInput
-        style={[styles.input, { color: textColor }]}
+        style={inputStyle}
         placeholderTextColor={placeholderColor}
         value={student}
         onChangeText={setStudent}
@@ -48,42 +55,45 @@ export default function AttendanceEntryScreen() {
         autoFocus
       />
 
-      <Text style={styles.label}>Subject</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>Subject</Text>
       <TextInput
-        style={[styles.input, { color: textColor }]}
+        style={inputStyle}
         placeholderTextColor={placeholderColor}
         value={subject}
         onChangeText={setSubject}
         editable={!submitting}
       />
 
-      <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>Date (YYYY-MM-DD)</Text>
       <TextInput
-        style={[styles.input, { color: textColor }]}
+        style={inputStyle}
         placeholderTextColor={placeholderColor}
         value={date}
         onChangeText={setDate}
         editable={!submitting}
       />
 
-      <Text style={styles.label}>Status</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>Status</Text>
       <View style={styles.statusRow}>
-        {STATUSES.map((option) => (
-          <Pressable
-            key={option}
-            style={[styles.statusOption, status === option && styles.statusOptionActive]}
-            onPress={() => setStatus(option)}
-            disabled={submitting}
-          >
-            <Text style={[styles.statusText, status === option && styles.statusTextActive]}>{option}</Text>
-          </Pressable>
-        ))}
+        {STATUSES.map((option) => {
+          const active = status === option;
+          return (
+            <Pressable
+              key={option}
+              style={[styles.statusOption, { borderColor: active ? tint : borderColor, backgroundColor: active ? tint : 'transparent' }]}
+              onPress={() => setStatus(option)}
+              disabled={submitting}
+            >
+              <Text style={[styles.statusText, active && styles.statusTextActive]}>{option}</Text>
+            </Pressable>
+          );
+        })}
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: dangerColor }]}>{error}</Text> : null}
 
       <Pressable
-        style={[styles.submit, (submitting || !student || !status) && styles.submitDisabled]}
+        style={[styles.submit, { backgroundColor: tint }, (submitting || !student || !status) && styles.submitDisabled]}
         onPress={handleSubmit}
         disabled={submitting || !student || !status}
       >
@@ -101,21 +111,21 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginBottom: 12
   },
   label: {
     fontSize: 13,
-    opacity: 0.6,
-    marginTop: 12
+    fontWeight: '600',
+    marginTop: 14
   },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#8888',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 16,
+    marginTop: 4
   },
   statusRow: {
     flexDirection: 'row',
@@ -125,39 +135,32 @@ const styles = StyleSheet.create({
   statusOption: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#8888',
+    borderRadius: 10,
+    borderWidth: 1.5,
     alignItems: 'center'
-  },
-  statusOptionActive: {
-    backgroundColor: '#2563eb',
-    borderColor: '#2563eb'
   },
   statusText: {
     fontSize: 14,
-    fontWeight: '600'
+    fontWeight: '700'
   },
   statusTextActive: {
     color: '#fff'
   },
   error: {
-    color: '#dc2626',
     marginTop: 16
   },
   submit: {
     marginTop: 24,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#2563eb',
-    borderRadius: 8
+    borderRadius: 10
   },
   submitDisabled: {
     opacity: 0.5
   },
   submitText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 16
   }
 });

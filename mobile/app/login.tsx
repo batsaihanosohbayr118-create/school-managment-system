@@ -10,10 +10,16 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
   // TextInput isn't a Themed component, so it doesn't pick up dark mode's
-  // text color on its own — typed text was invisible (black on black).
+  // colors on its own — typed text was invisible (black on black) before
+  // these were added.
   const textColor = useThemeColor({}, 'text');
-  const placeholderColor = useThemeColor({}, 'tabIconDefault');
+  const placeholderColor = useThemeColor({}, 'muted');
+  const inputBg = useThemeColor({}, 'card');
+  const borderColor = useThemeColor({}, 'border');
+  const tint = useThemeColor({}, 'tint');
+  const dangerColor = useThemeColor({}, 'danger');
 
   async function handleSubmit() {
     setError(null);
@@ -25,12 +31,15 @@ export default function LoginScreen() {
     // root layout's redirect effect takes it from there.
   }
 
+  const inputStyle = [styles.input, { color: textColor, backgroundColor: inputBg, borderColor }];
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Nova Mind Academy</Text>
+      <Text style={[styles.subtitle, { color: placeholderColor }]}>Sign in to continue</Text>
 
       <TextInput
-        style={[styles.input, { color: textColor }]}
+        style={inputStyle}
         placeholder="Email"
         placeholderTextColor={placeholderColor}
         autoCapitalize="none"
@@ -41,7 +50,7 @@ export default function LoginScreen() {
         editable={!submitting}
       />
       <TextInput
-        style={[styles.input, { color: textColor }]}
+        style={inputStyle}
         placeholder="Password"
         placeholderTextColor={placeholderColor}
         secureTextEntry
@@ -50,10 +59,10 @@ export default function LoginScreen() {
         editable={!submitting}
       />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: dangerColor }]}>{error}</Text> : null}
 
       <Pressable
-        style={[styles.button, submitting && styles.buttonDisabled]}
+        style={[styles.button, { backgroundColor: tint }, submitting && styles.buttonDisabled]}
         onPress={handleSubmit}
         disabled={submitting || !email || !password}
       >
@@ -71,35 +80,37 @@ const styles = StyleSheet.create({
     gap: 12
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 26,
+    fontWeight: '800',
+    textAlign: 'center'
+  },
+  subtitle: {
+    fontSize: 15,
     textAlign: 'center',
-    marginBottom: 24
+    marginBottom: 20
   },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#8888',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 16
   },
   error: {
-    color: '#dc2626'
+    marginTop: 4
   },
   button: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: 10,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8
+    marginTop: 10
   },
   buttonDisabled: {
     opacity: 0.6
   },
   buttonText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 16
   }
 });
