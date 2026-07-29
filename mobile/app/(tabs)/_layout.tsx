@@ -4,24 +4,46 @@ import { Pressable, View } from 'react-native';
 import type { SFSymbol } from 'sf-symbols-typescript';
 import type { MobileTab } from '@shared/roles';
 import { visibleTabsByRole } from '@shared/roles';
+import type { AppCopy, Language } from '@shared/i18n-tables';
 
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { useAuth } from '@/lib/auth-context';
+import { useLanguage } from '@/lib/language-context';
 
 /**
- * MobileTab -> the file name expo-router matches it to, its label, and its
- * SF Symbol icon. "home" maps to "index" — the tab group's default route —
- * everything else is named after the tab itself.
+ * MobileTab -> the file name expo-router matches it to, and its SF Symbol
+ * icon. "home" maps to "index" — the tab group's default route — everything
+ * else is named after the tab itself.
  */
-const tabMeta: Record<MobileTab, { routeName: string; title: string; icon: SFSymbol }> = {
-  home: { routeName: 'index', title: 'Home', icon: 'house.fill' },
-  timetable: { routeName: 'timetable', title: 'Timetable', icon: 'calendar' },
-  grades: { routeName: 'grades', title: 'Grades', icon: 'chart.bar.fill' },
-  attendance: { routeName: 'attendance', title: 'Attendance', icon: 'checkmark.circle.fill' },
-  announcements: { routeName: 'announcements', title: 'Announcements', icon: 'megaphone.fill' }
+const tabMeta: Record<MobileTab, { routeName: string; icon: SFSymbol }> = {
+  home: { routeName: 'index', icon: 'house.fill' },
+  timetable: { routeName: 'timetable', icon: 'calendar' },
+  grades: { routeName: 'grades', icon: 'chart.bar.fill' },
+  attendance: { routeName: 'attendance', icon: 'checkmark.circle.fill' },
+  announcements: { routeName: 'announcements', icon: 'megaphone.fill' }
 };
+
+/**
+ * shared/i18n-tables.ts's `nav` table covers 4 of the 5 tabs directly
+ * (its keys are the wider set of web NavModule names, which happen to
+ * match these tab names exactly); "home" has no web equivalent to borrow.
+ */
+function tabTitle(tab: MobileTab, t: AppCopy, language: Language): string {
+  switch (tab) {
+    case 'home':
+      return language === 'mn' ? 'Нүүр' : 'Home';
+    case 'timetable':
+      return t.nav.timetable.label;
+    case 'grades':
+      return t.nav.grades.label;
+    case 'attendance':
+      return t.nav.attendance.label;
+    case 'announcements':
+      return t.nav.announcements.label;
+  }
+}
 
 /** Where a teacher's "+" on a tab's header should lead, if anywhere. */
 const addEntryRouteByTab: Partial<Record<MobileTab, string>> = {
@@ -33,6 +55,7 @@ const addEntryRouteByTab: Partial<Record<MobileTab, string>> = {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { session } = useAuth();
+  const { t, language } = useLanguage();
 
   // The root layout's auth gate never lets an admin session reach this
   // group, so `session` here is always a teacher/student/parent by the time
@@ -75,7 +98,7 @@ export default function TabLayout() {
             key={tab}
             name={meta.routeName}
             options={{
-              title: meta.title,
+              title: tabTitle(tab, t, language),
               tabBarIcon: ({ color }) => <SymbolView name={meta.icon} tintColor={color} size={26} />,
               headerRight: () => (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>

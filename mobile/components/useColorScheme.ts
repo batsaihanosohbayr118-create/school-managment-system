@@ -1,6 +1,6 @@
-import { useColorScheme as useColorSchemeCore } from 'react-native';
+import { useTheme } from '@/lib/theme-context';
 
+/** The effective color scheme — system, or the user's override from Settings. */
 export const useColorScheme = () => {
-  const coreScheme = useColorSchemeCore();
-  return coreScheme ?? 'light';
+  return useTheme().colorScheme;
 };

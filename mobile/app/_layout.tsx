@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -7,6 +7,8 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
+import { LanguageProvider } from '@/lib/language-context';
+import { ThemeProvider as AppThemeProvider } from '@/lib/theme-context';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -42,9 +44,13 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <AppThemeProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <RootLayoutNav />
+        </AuthProvider>
+      </LanguageProvider>
+    </AppThemeProvider>
   );
 }
 
@@ -84,7 +90,7 @@ function RootLayoutNav() {
   useAuthGate();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -95,6 +101,6 @@ function RootLayoutNav() {
         <Stack.Screen name="timetable-entry" options={{ presentation: 'modal' }} />
         <Stack.Screen name="payments" options={{ title: 'Payments', headerBackTitle: 'Home' }} />
       </Stack>
-    </ThemeProvider>
+    </NavigationThemeProvider>
   );
 }
