@@ -4305,39 +4305,64 @@ a {
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.3);
 }
 
-/* Stacked table on small screens */
+/* Card carousel on small screens */
+.um-cards {
+  display: none;
+}
+
 @media (max-width: 640px) {
-  .um-table thead {
+  .um-table-wrap {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  .um-table {
     display: none;
   }
 
-  .um-table,
-  .um-table tbody,
-  .um-table tr,
-  .um-table td {
-    display: block;
-    width: 100%;
-  }
-
-  .um-table tr {
-    padding: 12px 16px;
-    border-top: 1px solid var(--um-line);
-  }
-
-  .um-table tbody tr + tr td {
-    border-top: 0;
-  }
-
-  .um-table td {
+  .um-cards {
     display: flex;
+    gap: 14px;
+    padding: 4px 4px 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .um-cards::-webkit-scrollbar {
+    display: none;
+  }
+
+  .um-card {
+    flex: 0 0 85%;
+    scroll-snap-align: center;
+    display: grid;
+    gap: 10px;
+    padding: 16px 18px;
+    background: var(--um-surface);
+    border: 1px solid var(--um-line);
+    border-radius: 18px;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+    animation: um-card-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .um-card:nth-child(2) { animation-delay: 0.05s; }
+  .um-card:nth-child(3) { animation-delay: 0.1s; }
+  .um-card:nth-child(4) { animation-delay: 0.15s; }
+  .um-card:nth-child(n + 5) { animation-delay: 0.2s; }
+
+  .um-card-row {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 6px 0;
-    text-align: right;
   }
 
-  .um-table td::before {
-    content: attr(data-label);
+  .um-card-row > span:first-child {
     font-weight: 700;
     color: var(--um-muted);
     text-transform: uppercase;
@@ -4345,59 +4370,105 @@ a {
     letter-spacing: 0.04em;
   }
 
-  .um-row-actions {
+  .um-card-row > span:last-child {
+    text-align: right;
+    color: var(--um-ink);
+    font-size: 0.92rem;
+  }
+
+  .um-card .um-row-actions {
     justify-content: flex-end;
+    padding-top: 8px;
+    margin-top: 2px;
+    border-top: 1px solid var(--um-line);
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .um-page {
-    --um-bg: #070b16;
-    --um-surface: #0f1830;
-    --um-ink: #e8eefc;
-    --um-muted: #97a6c4;
-    --um-line: rgba(148, 163, 184, 0.18);
+@keyframes um-card-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px) scale(0.97);
   }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
 
-  .um-loading {
-    background: #070b16;
-    color: #97a6c4;
-  }
+/* Dark mode here is driven by the same Night Mode preference as the
+   dashboard (persisted via lib/theme.ts), not the OS color scheme — a
+   `.dark` class on .um-page, not a `prefers-color-scheme` media query. */
+.um-page.dark {
+  --um-bg: #070b16;
+  --um-surface: #0f1830;
+  --um-ink: #e8eefc;
+  --um-muted: #97a6c4;
+  --um-line: rgba(148, 163, 184, 0.18);
+}
 
-  .um-table thead th {
-    background: #101c39;
-  }
+.um-loading.dark {
+  background: #070b16;
+  color: #97a6c4;
+}
 
-  .um-row-actions button,
-  .um-back {
-    background: #101c39;
-  }
+.um-page.dark .um-table thead th {
+  background: #101c39;
+}
 
-  .um-banner {
-    background: rgba(120, 53, 15, 0.25);
-    border-color: rgba(234, 88, 12, 0.4);
-    color: #fdba74;
-  }
+.um-page.dark .um-row-actions button,
+.um-page.dark .um-back {
+  background: #101c39;
+}
 
-  .um-modal {
-    background: #0f1830;
-  }
+.um-page.dark .um-banner {
+  background: rgba(120, 53, 15, 0.25);
+  border-color: rgba(234, 88, 12, 0.4);
+  color: #fdba74;
+}
 
-  .um-modal-head strong {
-    color: #e8eefc;
-  }
+.um-page.dark .um-modal {
+  background: #0f1830;
+}
 
-  .um-modal-head button,
-  .um-select {
-    background: #101c39;
-    color: #e8eefc;
-    border-color: rgba(148, 163, 184, 0.2);
-  }
+.um-page.dark .um-modal-head strong {
+  color: #e8eefc;
+}
 
-  .um-modal-note,
-  .um-field > span {
-    color: #97a6c4;
-  }
+.um-page.dark .um-modal-head button,
+.um-page.dark .um-select {
+  background: #101c39;
+  color: #e8eefc;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.um-page.dark .um-modal-note,
+.um-page.dark .um-field > span {
+  color: #97a6c4;
+}
+
+.um-page.dark .ec-badge-blue {
+  color: #c7d2fe;
+  background: rgba(79, 70, 229, 0.36);
+}
+
+.um-page.dark .ec-badge-emerald {
+  color: #a7f3d0;
+  background: rgba(16, 185, 129, 0.32);
+}
+
+.um-page.dark .ec-badge-amber {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.32);
+}
+
+.um-page.dark .ec-badge-rose {
+  color: #fecdd3;
+  background: rgba(244, 63, 94, 0.32);
+}
+
+.um-page.dark .ec-badge-slate {
+  color: #dbeafe;
+  background: rgba(100, 116, 139, 0.32);
 }
 /* ==========================================================================
    Auth (login) — keep browser autofill on-theme (dark glass inputs)

@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { ROLES, dashboardPathForRole, resolveActiveSession } from "@/lib/auth-flow";
+import { getInitialDarkMode } from "@/lib/theme";
 import {
   createDemoUser,
   deleteDemoUser,
@@ -81,6 +82,13 @@ export default function AdminUsersPage() {
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
   const [modal, setModal] = useState<ModalState>(null);
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Match the Night Mode preference set in the dashboard's Settings screen
+  // instead of following the OS's color scheme independently.
+  useEffect(() => {
+    queueMicrotask(() => setDarkMode(getInitialDarkMode()));
+  }, []);
 
   // Access guard — admins only.
   useEffect(() => {
@@ -214,7 +222,7 @@ export default function AdminUsersPage() {
 
   if (!authorized) {
     return (
-      <main className="um-loading">
+      <main className={`um-loading${darkMode ? " dark" : ""}`}>
         <UserCog size={28} />
         <p>Checking access…</p>
       </main>
@@ -222,7 +230,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <main className="um-page">
+    <main className={`um-page${darkMode ? " dark" : ""}`}>
       <header className="um-header">
         <div className="um-header-left">
           <Link href="/admin/dashboard" className="um-back" aria-label="Back to dashboard">
@@ -291,40 +299,76 @@ export default function AdminUsersPage() {
             </p>
           </div>
         ) : (
-          <table className="um-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Username</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th className="um-actions-col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((user) => (
-                <tr key={user.id}>
-                  <td data-label="Name">{user.name || "—"}</td>
-                  <td data-label="Username">{user.username || "—"}</td>
-                  <td data-label="Email">{user.email}</td>
-                  <td data-label="Role"><Badge tone={roleTone[user.role]}>{roleLabels[user.role]}</Badge></td>
-                  <td data-label="Actions">
-                    <div className="um-row-actions">
-                      <button title="Edit" onClick={() => setModal({ kind: "edit", user })} type="button">
-                        <Pencil size={16} />
-                      </button>
-                      <button title="Reset password" onClick={() => setModal({ kind: "reset", user })} type="button">
-                        <KeyRound size={16} />
-                      </button>
-                      <button title="Delete" className="um-danger" onClick={() => setModal({ kind: "delete", user })} type="button">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
+          <>
+            <table className="um-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th className="um-actions-col">Actions</th>
                 </tr>
+              </thead>
+              <tbody>
+                {filtered.map((user) => (
+                  <tr key={user.id}>
+                    <td data-label="Name">{user.name || "—"}</td>
+                    <td data-label="Username">{user.username || "—"}</td>
+                    <td data-label="Email">{user.email}</td>
+                    <td data-label="Role"><Badge tone={roleTone[user.role]}>{roleLabels[user.role]}</Badge></td>
+                    <td data-label="Actions">
+                      <div className="um-row-actions">
+                        <button title="Edit" onClick={() => setModal({ kind: "edit", user })} type="button">
+                          <Pencil size={16} />
+                        </button>
+                        <button title="Reset password" onClick={() => setModal({ kind: "reset", user })} type="button">
+                          <KeyRound size={16} />
+                        </button>
+                        <button title="Delete" className="um-danger" onClick={() => setModal({ kind: "delete", user })} type="button">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="um-cards" role="list">
+              {filtered.map((user) => (
+                <article className="um-card" key={user.id} role="listitem">
+                  <div className="um-card-row">
+                    <span>Name</span>
+                    <span>{user.name || "—"}</span>
+                  </div>
+                  <div className="um-card-row">
+                    <span>Username</span>
+                    <span>{user.username || "—"}</span>
+                  </div>
+                  <div className="um-card-row">
+                    <span>Email</span>
+                    <span>{user.email}</span>
+                  </div>
+                  <div className="um-card-row">
+                    <span>Role</span>
+                    <Badge tone={roleTone[user.role]}>{roleLabels[user.role]}</Badge>
+                  </div>
+                  <div className="um-row-actions">
+                    <button title="Edit" onClick={() => setModal({ kind: "edit", user })} type="button">
+                      <Pencil size={16} />
+                    </button>
+                    <button title="Reset password" onClick={() => setModal({ kind: "reset", user })} type="button">
+                      <KeyRound size={16} />
+                    </button>
+                    <button title="Delete" className="um-danger" onClick={() => setModal({ kind: "delete", user })} type="button">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </article>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </section>
 

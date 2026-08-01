@@ -62,6 +62,7 @@ import {
   translations
 } from "@/lib/i18n";
 import { loadSubjectContent, saveSubjectContent, uploadSubjectFiles } from "@/lib/subjectContent";
+import { getInitialDarkMode, setStoredDarkMode } from "@/lib/theme";
 import {
   createSchoolResource,
   deleteSchoolResource,
@@ -839,6 +840,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const [language, setLanguage] = useState<Language>("en");
   const [query, setQuery] = useState("");
   const [darkMode, setDarkMode] = useState(false);
+  const themeLoaded = useRef(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>("create");
@@ -994,7 +996,9 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   useEffect(() => {
     queueMicrotask(() => {
       setLanguage(getInitialLanguage());
+      setDarkMode(getInitialDarkMode());
       setActivityNotifications(getInitialNotifications());
+      themeLoaded.current = true;
     });
   }, []);
 
@@ -1002,6 +1006,14 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
     document.documentElement.lang = language === "mn" ? "mn" : "en";
     window.localStorage.setItem(languageStorageKey, language);
   }, [language]);
+
+  useEffect(() => {
+    // Guarded: without this, this effect's first run (before the
+    // queueMicrotask above resolves) would fire with the useState default
+    // and overwrite the real stored preference before it's ever read.
+    if (!themeLoaded.current) return;
+    setStoredDarkMode(darkMode);
+  }, [darkMode]);
 
   useEffect(() => {
     window.localStorage.setItem(notificationStorageKey, JSON.stringify(activityNotifications.slice(0, 50)));
@@ -1322,6 +1334,9 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
             {activeModule === "teachers" ? (
               <TeachersModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
+            {activeModule === "parents" ? (
+              <ParentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+            ) : null}
             {activeModule === "subjects" ? (
               selectedSubjectContent ? (
                 <SubjectContentPanel
@@ -1349,6 +1364,12 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
                   onOpenContent={openSubjectContent}
                 />
               )
+            ) : null}
+            {activeModule === "assignments" ? (
+              <AssignmentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+            ) : null}
+            {activeModule === "materials" ? (
+              <MaterialsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
             {activeModule === "classes" ? (
               <ClassesModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
