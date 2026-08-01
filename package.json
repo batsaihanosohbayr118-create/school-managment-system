@@ -16,7 +16,6 @@
     "db:down": "docker compose down"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.108.2",
     "@tailwindcss/postcss": "^4.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

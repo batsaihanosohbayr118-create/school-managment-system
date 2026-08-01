@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { authService } from "./supabase";
+import { authService } from "./auth";
 import { resolveActiveSession, type ActiveSession } from "./session";
 
 type AuthState = {
   /** null while loading, and after loading, when there is no signed-in user. */
   session: ActiveSession | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (identifier: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   updateAvatar: (avatarUrl: string) => Promise<{ error: string | null }>;
 };
@@ -26,25 +26,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    // Keeps the app's session in sync with token refreshes and sign-out
-    // triggered elsewhere (e.g. a 401 handler clearing the stored token).
-    const {
-      data: { subscription }
-    } = authService.onAuthStateChange(() => {
-      resolveActiveSession().then((next) => {
-        if (mounted) setSession(next);
-      });
-    });
-
     return () => {
       mounted = false;
-      subscription.unsubscribe();
     };
   }, []);
 
-  async function signIn(email: string, password: string) {
-    const { error } = await authService.signIn(email, password);
-    return { error: error?.message ?? null };
+  async function signIn(identifier: string, password: string) {
+    const { error } = await authService.signIn(identifier, password);
+    if (!error) setSession(await resolveActiveSession());
+    return { error };
   }
 
   async function signOut() {
@@ -54,7 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function updateAvatar(avatarUrl: string) {
     const { error } = await authService.updateProfile({ avatarUrl });
-    return { error: error?.message ?? null };
+    if (!error) setSession(await resolveActiveSession());
+    return { error };
   }
 
   return (

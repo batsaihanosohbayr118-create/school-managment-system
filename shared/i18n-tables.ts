@@ -397,7 +397,8 @@ export const translations = {
       timePlaceholder: "e.g. 09:00-09:45",
       classPlaceholder: "e.g. Grade 8A",
       photoPermissionDenied: "Photo library access is required to change your photo.",
-      avatarUpdateFailed: "Could not update photo. Please try again."
+      avatarUpdateFailed: "Could not update photo. Please try again.",
+      invalidCredentials: "Incorrect email or password."
     },
     adminWebOnly: {
       title: "Admin tools live on the web",
@@ -691,7 +692,8 @@ export const translations = {
       timePlaceholder: "Жишээ нь: 09:00-09:45",
       classPlaceholder: "Жишээ нь: 8A анги",
       photoPermissionDenied: "Профайлын зураг солихын тулд зургийн санд хандах зөвшөөрөл шаардлагатай.",
-      avatarUpdateFailed: "Зураг шинэчилж чадсангүй. Дахин оролдоно уу."
+      avatarUpdateFailed: "Зураг шинэчилж чадсангүй. Дахин оролдоно уу.",
+      invalidCredentials: "Имэйл эсвэл нууц үг буруу байна."
     },
     adminWebOnly: {
       title: "Админы хэрэгслүүд вэб дээр байршдаг",

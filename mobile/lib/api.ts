@@ -8,7 +8,7 @@ import type {
   PaymentsResponse,
   TimetableResponse
 } from "@shared/api-types";
-import { supabase } from "./supabase";
+import { getToken } from "./auth";
 
 const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 
@@ -17,9 +17,8 @@ if (!baseUrl) {
 }
 
 async function authHeader(): Promise<HeadersInit> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  // No session means the auth gate already has the user on /login; a request
+  const token = await getToken();
+  // No token means the auth gate already has the user on /login; a request
   // fired anyway (e.g. a stale screen mid-redirect) should 401, not silently
   // hit an unauthenticated endpoint.
   return token ? { Authorization: `Bearer ${token}` } : {};

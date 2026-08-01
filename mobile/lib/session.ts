@@ -1,6 +1,5 @@
 import type { Role } from "@shared/roles";
-import { resolveRole } from "@shared/roles";
-import { supabase } from "./supabase";
+import { getToken, readToken, clearToken } from "./auth";
 
 export type ActiveSession = {
   role: Role;
@@ -10,22 +9,25 @@ export type ActiveSession = {
 };
 
 /**
- * Mirrors the web's resolveActiveSession (lib/auth-flow.ts) — same
- * user_metadata shape, same "unknown role defaults to student" rule via
- * shared/roles.ts's resolveRole, just backed by the SecureStore-persisted
- * mobile session instead of sessionStorage.
+ * Reads the stored token and decodes it — no network call. Mirrors the
+ * web's authService.getSession() (lib/auth-client.ts). An expired or
+ * corrupt token is treated as signed-out and cleared, same as a stale
+ * Supabase session used to be.
  */
 export async function resolveActiveSession(): Promise<ActiveSession | null> {
-  const { data } = await supabase.auth.getSession();
-  const session = data.session;
-  if (!session) return null;
+  const token = await getToken();
+  if (!token) return null;
 
-  const metadata = session.user.user_metadata ?? {};
+  const user = readToken(token);
+  if (!user) {
+    await clearToken();
+    return null;
+  }
 
   return {
-    role: resolveRole(metadata.role),
-    email: session.user.email ?? "",
-    name: typeof metadata.name === "string" ? metadata.name : "",
-    avatarUrl: typeof metadata.avatar_url === "string" ? metadata.avatar_url : ""
+    role: user.role,
+    email: user.email,
+    name: user.name,
+    avatarUrl: user.avatarUrl
   };
 }

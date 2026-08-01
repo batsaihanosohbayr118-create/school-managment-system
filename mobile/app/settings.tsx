@@ -50,9 +50,9 @@ export default function SettingsScreen() {
     if (result.canceled || !result.assets[0]?.base64) return;
 
     setUploadingAvatar(true);
-    // Stored as a data URI directly in Supabase auth's avatar_url metadata —
-    // same approach the web app's profile editor uses (DashboardApp.tsx),
-    // no separate storage bucket involved.
+    // Stored as a data URI directly in the account's avatar_url column
+    // (via PATCH /api/auth/profile) — same approach the web app's profile
+    // editor uses, no separate storage bucket involved.
     const dataUri = `data:image/jpeg;base64,${result.assets[0].base64}`;
     const { error } = await updateAvatar(dataUri);
     setUploadingAvatar(false);

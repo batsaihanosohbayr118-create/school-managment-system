@@ -13,9 +13,11 @@ import { SymbolView } from 'expo-symbols';
 import { Card } from '@/components/Card';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { useAuth } from '@/lib/auth-context';
+import { useLanguage } from '@/lib/language-context';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -38,9 +40,11 @@ export default function LoginScreen() {
     setSubmitting(true);
     const { error: signInError } = await signIn(email.trim(), password);
     setSubmitting(false);
-    if (signInError) setError(signInError);
-    // On success, AuthProvider's onAuthStateChange updates `session`; the
-    // root layout's redirect effect takes it from there.
+    if (signInError) {
+      setError(signInError === 'invalid-credentials' ? t.mobileForms.invalidCredentials : signInError);
+    }
+    // On success, signIn() already updated `session`; the root layout's
+    // redirect effect takes it from there.
   }
 
   const canSubmit = !submitting && !!email && !!password;

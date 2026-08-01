@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveMobileSession } from "@/lib/mobile/session";
+import { resolveRequestSession } from "@/lib/school-session-server";
 import type { SchoolRequestContext } from "@/lib/school-db";
 import { preflight, withCors } from "@/lib/cors";
 
@@ -34,7 +34,7 @@ export type MobileHandler<T> = (context: SchoolRequestContext, request: Request)
 /** Wraps a handler with session resolution, error mapping, and CORS. */
 export function mobileRoute<T>(methods: string[], handler: MobileHandler<T>) {
   return async function route(request: Request) {
-    const session = await resolveMobileSession(request);
+    const session = await resolveRequestSession(request);
 
     if (!session) {
       return withCors(NextResponse.json({ message: "Unauthorized." }, { status: 401 }), request, methods);
