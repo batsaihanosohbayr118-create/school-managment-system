@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { translateColumn, translateValue, translations } from "@shared/i18n-tables";
+import { normalizeDayName, translateColumn, translateValue, translations } from "@shared/i18n-tables";
 
 describe("translateColumn", () => {
   it("translates a known column into Mongolian", () => {
@@ -26,6 +26,25 @@ describe("translateValue", () => {
 
   it("leaves English untouched", () => {
     expect(translateValue("Present", "en")).toBe("Present");
+  });
+});
+
+describe("normalizeDayName", () => {
+  it("leaves an English weekday untouched", () => {
+    expect(normalizeDayName("Saturday")).toBe("Saturday");
+  });
+
+  it("canonicalizes a Mongolian weekday to English", () => {
+    expect(normalizeDayName("Бямба")).toBe("Saturday");
+  });
+
+  it("is case and whitespace insensitive", () => {
+    expect(normalizeDayName("  saturday  ")).toBe("Saturday");
+    expect(normalizeDayName("бямба")).toBe("Saturday");
+  });
+
+  it("passes through unrecognized input unchanged", () => {
+    expect(normalizeDayName("Mon-Fri")).toBe("Mon-Fri");
   });
 });
 

@@ -1,4 +1,5 @@
 import "react-native-url-polyfill/auto";
+import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { createClient } from "@supabase/supabase-js";
 
@@ -20,18 +21,34 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-const secureStoreAdapter = {
-  getItem: (key: string) => SecureStore.getItemAsync(key),
-  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-  removeItem: (key: string) => SecureStore.deleteItemAsync(key)
-};
+// SecureStore is Keychain/Keystore-backed and has no web implementation —
+// `getValueWithKeyAsync` doesn't exist there. Web is a dev-preview target
+// only (the shipped app is iOS/Android), so localStorage is an acceptable
+// fallback rather than plumbing a third storage strategy through the design.
+const secureStoreAdapter =
+  Platform.OS === "web"
+    ? {
+        getItem: (key: string) => Promise.resolve(window.localStorage.getItem(key)),
+        setItem: (key: string, value: string) => {
+          window.localStorage.setItem(key, value);
+          return Promise.resolve();
+        },
+        removeItem: (key: string) => {
+          window.localStorage.removeItem(key);
+          return Promise.resolve();
+        }
+      }
+    : {
+        getItem: (key: string) => SecureStore.getItemAsync(key),
+        setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
+        removeItem: (key: string) => SecureStore.deleteItemAsync(key)
+      };
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: secureStoreAdapter,
     autoRefreshToken: true,
     persistSession: true,
-    // No OAuth redirect ever lands in a URL bar on mobile.
     detectSessionInUrl: false
   }
 });
@@ -42,6 +59,16 @@ export const authService = {
   },
   async signOut() {
     return supabase.auth.signOut();
+  },
+  /**
+   * Mirrors the web app's authService.updateProfile (lib/supabase.ts) —
+   * same avatar_url metadata field, so a profile picture set from either
+   * client shows up on the other. `updateUser` fires a "USER_UPDATED"
+   * auth-state event, which AuthProvider's onAuthStateChange listener
+   * already resolves into a fresh session — no separate refresh needed here.
+   */
+  async updateProfile({ avatarUrl }: { avatarUrl: string }) {
+    return supabase.auth.updateUser({ data: { avatar_url: avatarUrl } });
   },
   async getSession() {
     return supabase.auth.getSession();

@@ -7,7 +7,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
-import { LanguageProvider } from '@/lib/language-context';
+import { LanguageProvider, useLanguage } from '@/lib/language-context';
 import { ThemeProvider as AppThemeProvider } from '@/lib/theme-context';
 
 export {
@@ -87,7 +87,12 @@ function useAuthGate() {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const { language, t } = useLanguage();
   useAuthGate();
+
+  // No web equivalent to borrow for "Home" — same fallback (tabs)/_layout.tsx
+  // uses for the tab's own title.
+  const homeLabel = language === 'mn' ? 'Нүүр' : 'Home';
 
   return (
     <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -99,7 +104,7 @@ function RootLayoutNav() {
         <Stack.Screen name="attendance-entry" options={{ presentation: 'modal' }} />
         <Stack.Screen name="grade-entry" options={{ presentation: 'modal' }} />
         <Stack.Screen name="timetable-entry" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="payments" options={{ title: 'Payments', headerBackTitle: 'Home' }} />
+        <Stack.Screen name="payments" options={{ title: t.nav.payments.label, headerBackTitle: homeLabel }} />
       </Stack>
     </NavigationThemeProvider>
   );

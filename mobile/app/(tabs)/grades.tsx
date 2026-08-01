@@ -3,13 +3,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import { FlatList, StyleSheet } from 'react-native';
 
 import { Card } from '@/components/Card';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
+import { useLanguage } from '@/lib/language-context';
 import { useApiData } from '@/lib/use-api';
 import type { GradeEntry } from '@shared/api-types';
 
 export default function GradesScreen() {
-  const { data, error, loading, refetch } = useApiData(api.grades);
+  const { data, error, loading, refetch, isOffline } = useApiData('grades', api.grades);
+  const { t } = useLanguage();
   const dangerColor = useThemeColor({}, 'danger');
   const mutedColor = useThemeColor({}, 'muted');
 
@@ -25,12 +28,12 @@ export default function GradesScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: mutedColor }}>Loading…</Text>
+        <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
       </View>
     );
   }
 
-  if (error) {
+  if (error && !isOffline) {
     return (
       <View style={styles.center}>
         <Text style={{ color: dangerColor }}>{error.message}</Text>
@@ -46,9 +49,10 @@ export default function GradesScreen() {
       keyExtractor={(grade) => grade.id}
       onRefresh={refetch}
       refreshing={loading}
+      ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
       ListEmptyComponent={
         <View style={styles.center}>
-          <Text style={{ color: mutedColor }}>No grades yet.</Text>
+          <Text style={{ color: mutedColor }}>{t.common.noGradesYet}</Text>
         </View>
       }
       renderItem={({ item }) => <GradeRow grade={item} />}
@@ -101,7 +105,8 @@ const styles = StyleSheet.create({
   rowHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    backgroundColor: 'transparent'
   },
   subject: {
     fontSize: 17,

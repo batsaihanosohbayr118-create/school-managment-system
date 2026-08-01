@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
 
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
+import { useLanguage } from '@/lib/language-context';
 import { ApiError } from '@shared/api-error';
+import { translateValue } from '@shared/i18n-tables';
 
 const STATUSES = ['Present', 'Absent', 'Late'] as const;
 
 export default function AttendanceEntryScreen() {
   const router = useRouter();
+  const { language, t } = useLanguage();
   // TextInput isn't a Themed component, so it doesn't pick up dark mode's
   // colors on its own — typed text was invisible (black on black) before.
   const textColor = useThemeColor({}, 'text');
@@ -33,7 +36,7 @@ export default function AttendanceEntryScreen() {
       await api.postAttendance({ student: student.trim(), subject: subject.trim(), date, status });
       router.back();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save attendance.');
+      setError(err instanceof ApiError ? err.message : t.mobileForms.saveFailed);
     } finally {
       setSubmitting(false);
     }
@@ -43,9 +46,10 @@ export default function AttendanceEntryScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Take attendance</Text>
+      <Stack.Screen options={{ title: t.create.attendance.title }} />
+      <Text style={styles.title}>{t.create.attendance.title}</Text>
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Student</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Student}</Text>
       <TextInput
         style={inputStyle}
         placeholderTextColor={placeholderColor}
@@ -55,7 +59,7 @@ export default function AttendanceEntryScreen() {
         autoFocus
       />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Subject</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Subject}</Text>
       <TextInput
         style={inputStyle}
         placeholderTextColor={placeholderColor}
@@ -64,7 +68,9 @@ export default function AttendanceEntryScreen() {
         editable={!submitting}
       />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Date (YYYY-MM-DD)</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>
+        {t.columns.Date} {t.mobileForms.dateFormatHint}
+      </Text>
       <TextInput
         style={inputStyle}
         placeholderTextColor={placeholderColor}
@@ -73,7 +79,7 @@ export default function AttendanceEntryScreen() {
         editable={!submitting}
       />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Status</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Status}</Text>
       <View style={styles.statusRow}>
         {STATUSES.map((option) => {
           const active = status === option;
@@ -84,7 +90,7 @@ export default function AttendanceEntryScreen() {
               onPress={() => setStatus(option)}
               disabled={submitting}
             >
-              <Text style={[styles.statusText, active && styles.statusTextActive]}>{option}</Text>
+              <Text style={[styles.statusText, active && styles.statusTextActive]}>{translateValue(option, language)}</Text>
             </Pressable>
           );
         })}
@@ -97,7 +103,7 @@ export default function AttendanceEntryScreen() {
         onPress={handleSubmit}
         disabled={submitting || !student || !status}
       >
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Save</Text>}
+        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{t.mobileForms.save}</Text>}
       </Pressable>
     </View>
   );

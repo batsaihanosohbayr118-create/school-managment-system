@@ -49,6 +49,7 @@ const valueTranslations: Record<string, string> = {
   Dark: "Харанхуй",
   Done: "Дууссан",
   English: "Англи хэл",
+  Friday: "Баасан",
   Geography: "Газар зүй",
   "Grade 7": "7-р анги",
   "Grade 7-12": "7-12-р анги",
@@ -83,9 +84,11 @@ const valueTranslations: Record<string, string> = {
   "Payment reminder": "Төлбөрийн сануулга",
   "Professional development workshop starts Friday.": "Мэргэжил дээшлүүлэх сургалт Баасан гарагт эхэлнэ.",
   Russian: "Орос хэл",
+  Saturday: "Бямба",
   "Social Studies": "Нийгмийн ухаан",
   "Spring 2026": "2026 оны хавар",
   Student: "Сурагч",
+  Sunday: "Ням",
   Students: "Сурагчид",
   "Language": "Хэл",
   Wellbeing: "Эрүүл мэнд",
@@ -284,9 +287,14 @@ export const translations = {
       filterRecords: "Filter records",
       language: "Language",
       live: "Live",
+      loading: "Loading…",
       loadingRecords: "Loading database records...",
       logout: "Logout",
       logoutHint: "You will leave the system and return to the login page.",
+      noAnnouncementsYet: "No announcements yet.",
+      noPaymentsYet: "No payments yet.",
+      noAttendanceRecordsYet: "No attendance records yet.",
+      nothingScheduledFor: (day: string) => `Nothing scheduled for ${day}.`,
       recordDeleted: "Record deleted",
       recordUpdated: "Record updated",
       recentActivities: "Recent Activities",
@@ -297,7 +305,15 @@ export const translations = {
       session: "Session",
       thisRecord: "this record",
       themeMode: "Theme mode",
-      themeModeHint: "Switch dark/light mode here on mobile."
+      themeModeHint: "Switch dark/light mode here on mobile.",
+      useSystemTheme: "Use System Setting",
+      darkMode: "Dark Mode",
+      mongolianLanguage: "Mongolian",
+      todaysClasses: "Today's classes",
+      todaysSchedule: "Today's schedule",
+      latestGrades: "Latest grades",
+      noGradesYet: "No grades yet.",
+      viewPayments: "View payments"
     },
     columns: {
       Amount: "Amount",
@@ -343,7 +359,22 @@ export const translations = {
       Title: "Title",
       Value: "Value",
       "Report title": "Report title"
-    } satisfies Record<string, string>
+    } satisfies Record<string, string>,
+    mobileForms: {
+      save: "Save",
+      dateFormatHint: "(YYYY-MM-DD)",
+      saveFailed: "Could not save. Please try again.",
+      dayPlaceholder: "e.g. Monday",
+      timePlaceholder: "e.g. 09:00-09:45",
+      classPlaceholder: "e.g. Grade 8A",
+      photoPermissionDenied: "Photo library access is required to change your photo.",
+      avatarUpdateFailed: "Could not update photo. Please try again."
+    },
+    adminWebOnly: {
+      title: "Admin tools live on the web",
+      body: "This app covers the day-to-day screens for teachers, students, and parents. Manage students, teachers, classes, and payments from the admin dashboard on the web.",
+      openDashboard: "Open the web dashboard"
+    }
   },
   mn: {
     app: {
@@ -523,9 +554,14 @@ export const translations = {
       filterRecords: "Бүртгэл шүүх",
       language: "Хэл",
       live: "Шууд",
+      loading: "Ачааллаж байна…",
       loadingRecords: "Database бүртгэлүүдийг ачаалж байна...",
       logout: "Гарах",
       logoutHint: "Системээс гараад login page руу буцна.",
+      noAnnouncementsYet: "Одоогоор зарлал алга байна.",
+      noPaymentsYet: "Одоогоор төлбөр алга байна.",
+      noAttendanceRecordsYet: "Одоогоор ирцийн бүртгэл алга байна.",
+      nothingScheduledFor: (day: string) => `${day} гарагт хичээл товлогдоогүй байна.`,
       recordDeleted: "Бүртгэл устлаа",
       recordUpdated: "Бүртгэл шинэчлэгдлээ",
       recentActivities: "Сүүлийн үйл ажиллагаа",
@@ -536,7 +572,15 @@ export const translations = {
       session: "Session",
       thisRecord: "энэ бүртгэл",
       themeMode: "Theme горим",
-      themeModeHint: "Mobile дээр эндээс dark/light mode солино."
+      themeModeHint: "Mobile дээр эндээс dark/light mode солино.",
+      useSystemTheme: "Системийн тохиргоог ашиглах",
+      darkMode: "Харанхуй горим",
+      mongolianLanguage: "Монгол хэл",
+      todaysClasses: "Өнөөдрийн хичээлүүд",
+      todaysSchedule: "Өнөөдрийн хуваарь",
+      latestGrades: "Сүүлийн дүнгүүд",
+      noGradesYet: "Одоогоор дүн алга байна.",
+      viewPayments: "Төлбөр харах"
     },
     columns: {
       Amount: "Дүн",
@@ -582,7 +626,22 @@ export const translations = {
       Title: "Гарчиг",
       Value: "Утга",
       "Report title": "Тайлангийн гарчиг"
-    } satisfies Record<string, string>
+    } satisfies Record<string, string>,
+    mobileForms: {
+      save: "Хадгалах",
+      dateFormatHint: "(YYYY-MM-DD)",
+      saveFailed: "Хадгалж чадсангүй. Дахин оролдоно уу.",
+      dayPlaceholder: "Жишээ нь: Даваа",
+      timePlaceholder: "Жишээ нь: 09:00-09:45",
+      classPlaceholder: "Жишээ нь: 8A анги",
+      photoPermissionDenied: "Профайлын зураг солихын тулд зургийн санд хандах зөвшөөрөл шаардлагатай.",
+      avatarUpdateFailed: "Зураг шинэчилж чадсангүй. Дахин оролдоно уу."
+    },
+    adminWebOnly: {
+      title: "Админы хэрэгслүүд вэб дээр байршдаг",
+      body: "Энэ апп нь багш, сурагч, эцэг эхийн өдөр тутмын дэлгэцүүдийг хамарна. Сурагч, багш, анги, төлбөрийг вэб дээрх админы хяналтын самбараас удирдана уу.",
+      openDashboard: "Вэб хяналтын самбар нээх"
+    }
   }
 };
 
@@ -591,6 +650,26 @@ export type AppCopy = (typeof translations)["en"];
 export function translateColumn(column: string, language: Language) {
   const columns = translations[language].columns as Record<string, string>;
   return columns[column] ?? column;
+}
+
+const WEEKDAYS_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
+
+/**
+ * The "Day" field on timetable entries is free text, entered in whichever
+ * language the entry screen is showing (the mn placeholder hints "Даваа").
+ * Anything that filters by day — Home's "today's schedule" — compares
+ * against the English weekday name, so free-text Mongolian input has to be
+ * canonicalized to that before storage/comparison or it silently never
+ * matches. Case/whitespace insensitive; unrecognized input passes through
+ * unchanged rather than being rejected.
+ */
+export function normalizeDayName(value: string): string {
+  const trimmed = value.trim();
+  const lower = trimmed.toLowerCase();
+  for (const day of WEEKDAYS_EN) {
+    if (day.toLowerCase() === lower || valueTranslations[day]?.toLowerCase() === lower) return day;
+  }
+  return trimmed;
 }
 
 export function translateValue(value: string, language: Language) {

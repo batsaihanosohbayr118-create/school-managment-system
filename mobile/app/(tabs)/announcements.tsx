@@ -2,25 +2,28 @@ import { FlatList, StyleSheet } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { Card } from '@/components/Card';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
+import { useLanguage } from '@/lib/language-context';
 import { useApiData } from '@/lib/use-api';
 import type { AnnouncementEntry } from '@shared/api-types';
 
 export default function AnnouncementsScreen() {
-  const { data, error, loading, refetch } = useApiData(api.announcements);
+  const { data, error, loading, refetch, isOffline } = useApiData('announcements', api.announcements);
+  const { t } = useLanguage();
   const dangerColor = useThemeColor({}, 'danger');
   const mutedColor = useThemeColor({}, 'muted');
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: mutedColor }}>Loading…</Text>
+        <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
       </View>
     );
   }
 
-  if (error) {
+  if (error && !isOffline) {
     return (
       <View style={styles.center}>
         <Text style={{ color: dangerColor }}>{error.message}</Text>
@@ -36,9 +39,10 @@ export default function AnnouncementsScreen() {
       keyExtractor={(entry) => entry.id}
       onRefresh={refetch}
       refreshing={loading}
+      ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
       ListEmptyComponent={
         <View style={styles.center}>
-          <Text style={{ color: mutedColor }}>No announcements yet.</Text>
+          <Text style={{ color: mutedColor }}>{t.common.noAnnouncementsYet}</Text>
         </View>
       }
       renderItem={({ item }) => <AnnouncementRow entry={item} />}
@@ -83,7 +87,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8
+    gap: 8,
+    backgroundColor: 'transparent'
   },
   title: {
     fontSize: 17,

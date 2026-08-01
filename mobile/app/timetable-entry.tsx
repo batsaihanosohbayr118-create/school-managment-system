@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
 
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
+import { useLanguage } from '@/lib/language-context';
 import { ApiError } from '@shared/api-error';
+import { normalizeDayName } from '@shared/i18n-tables';
 
 export default function TimetableEntryScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [subject, setSubject] = useState('');
   const [teacher, setTeacher] = useState('');
   const [className, setClassName] = useState('');
@@ -31,12 +34,12 @@ export default function TimetableEntryScreen() {
         subject: subject.trim(),
         teacher: teacher.trim(),
         class: className.trim(),
-        day: day.trim(),
+        day: normalizeDayName(day),
         time: time.trim()
       });
       router.back();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save the timetable slot.');
+      setError(err instanceof ApiError ? err.message : t.mobileForms.saveFailed);
     } finally {
       setSubmitting(false);
     }
@@ -46,42 +49,43 @@ export default function TimetableEntryScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Add timetable slot</Text>
+      <Stack.Screen options={{ title: t.create.timetable.title }} />
+      <Text style={styles.title}>{t.create.timetable.title}</Text>
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Subject</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Subject}</Text>
       <TextInput style={inputStyle} placeholderTextColor={placeholderColor} value={subject} onChangeText={setSubject} editable={!submitting} autoFocus />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Day</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Day}</Text>
       <TextInput
         style={inputStyle}
-        placeholder="e.g. Monday"
+        placeholder={t.mobileForms.dayPlaceholder}
         placeholderTextColor={placeholderColor}
         value={day}
         onChangeText={setDay}
         editable={!submitting}
       />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Time</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Time}</Text>
       <TextInput
         style={inputStyle}
-        placeholder="e.g. 09:00-09:45"
+        placeholder={t.mobileForms.timePlaceholder}
         placeholderTextColor={placeholderColor}
         value={time}
         onChangeText={setTime}
         editable={!submitting}
       />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Class</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Class}</Text>
       <TextInput
         style={inputStyle}
-        placeholder="e.g. Grade 8A"
+        placeholder={t.mobileForms.classPlaceholder}
         placeholderTextColor={placeholderColor}
         value={className}
         onChangeText={setClassName}
         editable={!submitting}
       />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Teacher</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Teacher}</Text>
       <TextInput style={inputStyle} placeholderTextColor={placeholderColor} value={teacher} onChangeText={setTeacher} editable={!submitting} />
 
       {error ? <Text style={[styles.error, { color: dangerColor }]}>{error}</Text> : null}
@@ -91,7 +95,7 @@ export default function TimetableEntryScreen() {
         onPress={handleSubmit}
         disabled={submitting || !subject || !day || !time}
       >
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Save</Text>}
+        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{t.mobileForms.save}</Text>}
       </Pressable>
     </View>
   );

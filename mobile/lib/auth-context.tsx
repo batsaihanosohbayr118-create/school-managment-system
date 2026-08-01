@@ -8,6 +8,7 @@ type AuthState = {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  updateAvatar: (avatarUrl: string) => Promise<{ error: string | null }>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -51,7 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }
 
-  return <AuthContext.Provider value={{ session, loading, signIn, signOut }}>{children}</AuthContext.Provider>;
+  async function updateAvatar(avatarUrl: string) {
+    const { error } = await authService.updateProfile({ avatarUrl });
+    return { error: error?.message ?? null };
+  }
+
+  return (
+    <AuthContext.Provider value={{ session, loading, signIn, signOut, updateAvatar }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthState {

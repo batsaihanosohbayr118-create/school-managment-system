@@ -6,10 +6,13 @@ import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
 
 import { Card } from '@/components/Card';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
+import { useLanguage } from '@/lib/language-context';
 import { useApiData } from '@/lib/use-api';
+import { normalizeDayName, translateValue } from '@shared/i18n-tables';
 import type { GradeEntry, TimetableSlot } from '@shared/api-types';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -18,12 +21,13 @@ const today = DAY_NAMES[new Date().getDay()];
 export default function HomeScreen() {
   const { session } = useAuth();
   const isTeacher = session?.role === 'teacher';
+  const { language, t } = useLanguage();
   const mutedColor = useThemeColor({}, 'muted');
   const dangerColor = useThemeColor({}, 'danger');
   const tint = useThemeColor({}, 'tint');
 
-  const timetable = useApiData(api.timetable);
-  const grades = useApiData(api.grades);
+  const timetable = useApiData('timetable', api.timetable);
+  const grades = useApiData('grades', api.grades);
 
   useFocusEffect(
     useCallback(() => {
@@ -34,7 +38,7 @@ export default function HomeScreen() {
   );
 
   const todaysSlots = (timetable.data?.slots ?? [])
-    .filter((slot) => slot.day === today)
+    .filter((slot) => normalizeDayName(slot.day) === today)
     .sort((a, b) => (a.startsAt ?? '').localeCompare(b.startsAt ?? ''));
 
   // The server already returns newest-first (created_at desc); take the top 3.
@@ -44,36 +48,41 @@ export default function HomeScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {session ? <Text style={styles.subtitle}>{session.name || session.email}</Text> : null}
 
-      <SectionHeader icon="calendar" label={isTeacher ? "Today's classes" : "Today's schedule"} />
+      {(timetable.isOffline || grades.isOffline) ? <OfflineBanner /> : null}
+
+      <SectionHeader icon="calendar" label={isTeacher ? t.common.todaysClasses : t.common.todaysSchedule} />
       {timetable.loading ? (
-        <Text style={{ color: mutedColor }}>Loading…</Text>
-      ) : timetable.error ? (
+        <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
+      ) : timetable.error && !timetable.isOffline ? (
         <Text style={{ color: dangerColor }}>{timetable.error.message}</Text>
       ) : todaysSlots.length === 0 ? (
-        <Text style={{ color: mutedColor }}>Nothing scheduled for {today}.</Text>
+        <Text style={{ color: mutedColor }}>{t.common.nothingScheduledFor(translateValue(today, language))}</Text>
       ) : (
         todaysSlots.map((slot) => <TimetableRow key={slot.id} slot={slot} />)
       )}
 
       {!isTeacher && (
         <>
-          <SectionHeader icon="chart.bar.fill" label="Latest grades" />
+          <SectionHeader icon="chart.bar.fill" label={t.common.latestGrades} />
           {grades.loading ? (
-            <Text style={{ color: mutedColor }}>Loading…</Text>
-          ) : grades.error ? (
+            <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
+          ) : grades.error && !grades.isOffline ? (
             <Text style={{ color: dangerColor }}>{grades.error.message}</Text>
           ) : latestGrades.length === 0 ? (
-            <Text style={{ color: mutedColor }}>No grades yet.</Text>
+            <Text style={{ color: mutedColor }}>{t.common.noGradesYet}</Text>
           ) : (
             latestGrades.map((grade) => <GradeRow key={grade.id} grade={grade} />)
           )}
 
           <Link href="/payments" asChild>
-            <Pressable style={[styles.paymentsLink, { borderColor: tint }]}>
+            {/* Link's web `asChild` forwards this style straight onto the underlying
+                <a> tag, bypassing react-native-web's array flattening — an array
+                (rather than one merged object) crashes react-dom's style setter. */}
+            <Pressable style={StyleSheet.flatten([styles.paymentsLink, { borderColor: tint }])}>
               {({ pressed }) => (
                 <View style={[styles.paymentsLinkInner, pressed && { opacity: 0.6 }]}>
                   <SymbolView name="creditcard" size={18} tintColor={tint} />
-                  <Text style={[styles.paymentsLinkText, { color: tint }]}>View payments</Text>
+                  <Text style={[styles.paymentsLinkText, { color: tint }]}>{t.common.viewPayments}</Text>
                 </View>
               )}
             </Pressable>
@@ -151,7 +160,8 @@ const styles = StyleSheet.create({
   },
   rowHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent'
   },
   rowTitle: {
     fontSize: 16,

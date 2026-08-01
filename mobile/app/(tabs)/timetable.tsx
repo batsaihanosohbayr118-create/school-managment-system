@@ -4,13 +4,14 @@ import { FlatList, StyleSheet } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { Card } from '@/components/Card';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { useApiData } from '@/lib/use-api';
 import type { TimetableSlot } from '@shared/api-types';
 
 export default function TimetableScreen() {
-  const { data, error, loading, refetch } = useApiData(api.timetable);
+  const { data, error, loading, refetch, isOffline } = useApiData('timetable', api.timetable);
   const dangerColor = useThemeColor({}, 'danger');
   const mutedColor = useThemeColor({}, 'muted');
 
@@ -31,7 +32,7 @@ export default function TimetableScreen() {
     );
   }
 
-  if (error) {
+  if (error && !isOffline) {
     return (
       <View style={styles.center}>
         <Text style={{ color: dangerColor }}>{error.message}</Text>
@@ -47,6 +48,7 @@ export default function TimetableScreen() {
       keyExtractor={(slot) => slot.id}
       onRefresh={refetch}
       refreshing={loading}
+      ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
       ListEmptyComponent={
         <View style={styles.center}>
           <Text style={{ color: mutedColor }}>No timetable slots yet.</Text>
@@ -97,7 +99,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 2
+    marginBottom: 2,
+    backgroundColor: 'transparent'
   },
   subject: {
     fontSize: 17,

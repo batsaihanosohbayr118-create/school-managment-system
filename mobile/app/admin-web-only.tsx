@@ -1,8 +1,10 @@
-import { Linking, Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { SymbolView } from 'expo-symbols';
+import * as WebBrowser from 'expo-web-browser';
 
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { useAuth } from '@/lib/auth-context';
+import { useLanguage } from '@/lib/language-context';
 
 // Unset until NEXT_PUBLIC_SITE_URL is set on the web deployment (see the
 // mobile design spec's prerequisites) — do not hardcode a guessed domain.
@@ -10,26 +12,24 @@ const WEB_ADMIN_URL = process.env.EXPO_PUBLIC_WEB_ADMIN_URL;
 
 export default function AdminWebOnlyScreen() {
   const { signOut } = useAuth();
+  const { t } = useLanguage();
   const tint = useThemeColor({}, 'tint');
   const mutedColor = useThemeColor({}, 'muted');
 
   return (
     <View style={styles.container}>
       <SymbolView name="desktopcomputer" size={40} tintColor={tint} />
-      <Text style={styles.title}>Admin tools live on the web</Text>
-      <Text style={[styles.body, { color: mutedColor }]}>
-        This app covers the day-to-day screens for teachers, students, and parents. Manage students, teachers,
-        classes, and payments from the admin dashboard on the web.
-      </Text>
+      <Text style={styles.title}>{t.adminWebOnly.title}</Text>
+      <Text style={[styles.body, { color: mutedColor }]}>{t.adminWebOnly.body}</Text>
 
       {WEB_ADMIN_URL ? (
-        <Pressable style={[styles.button, { backgroundColor: tint }]} onPress={() => Linking.openURL(WEB_ADMIN_URL)}>
-          <Text style={styles.buttonText}>Open the web dashboard</Text>
+        <Pressable style={[styles.button, { backgroundColor: tint }]} onPress={() => WebBrowser.openBrowserAsync(WEB_ADMIN_URL)}>
+          <Text style={styles.buttonText}>{t.adminWebOnly.openDashboard}</Text>
         </Pressable>
       ) : null}
 
       <Pressable style={styles.linkButton} onPress={() => signOut()}>
-        <Text style={[styles.linkText, { color: tint }]}>Log out</Text>
+        <Text style={[styles.linkText, { color: tint }]}>{t.common.logout}</Text>
       </Pressable>
     </View>
   );

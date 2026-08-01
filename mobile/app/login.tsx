@@ -1,6 +1,16 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput
+} from 'react-native';
+import { SymbolView } from 'expo-symbols';
 
+import { Card } from '@/components/Card';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { useAuth } from '@/lib/auth-context';
 
@@ -8,6 +18,7 @@ export default function LoginScreen() {
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -16,10 +27,11 @@ export default function LoginScreen() {
   // these were added.
   const textColor = useThemeColor({}, 'text');
   const placeholderColor = useThemeColor({}, 'muted');
-  const inputBg = useThemeColor({}, 'card');
+  const cardColor = useThemeColor({}, 'card');
   const borderColor = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
   const dangerColor = useThemeColor({}, 'danger');
+  const dangerMuted = useThemeColor({}, 'dangerMuted');
 
   async function handleSubmit() {
     setError(null);
@@ -31,82 +43,181 @@ export default function LoginScreen() {
     // root layout's redirect effect takes it from there.
   }
 
-  const inputStyle = [styles.input, { color: textColor, backgroundColor: inputBg, borderColor }];
+  const canSubmit = !submitting && !!email && !!password;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Nova Mind Academy</Text>
-      <Text style={[styles.subtitle, { color: placeholderColor }]}>Sign in to continue</Text>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Image
+            source={require('@/assets/images/logo.png')}
+            style={styles.crest}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>Nova Mind Academy</Text>
+          <Text style={[styles.subtitle, { color: placeholderColor }]}>Sign in to continue</Text>
+        </View>
 
-      <TextInput
-        style={inputStyle}
-        placeholder="Email"
-        placeholderTextColor={placeholderColor}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-        editable={!submitting}
-      />
-      <TextInput
-        style={inputStyle}
-        placeholder="Password"
-        placeholderTextColor={placeholderColor}
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        editable={!submitting}
-      />
+        <Card style={[styles.formCard, { borderColor, backgroundColor: cardColor }]}>
+          <View style={styles.field}>
+            <SymbolView name="envelope.fill" size={17} tintColor={placeholderColor} />
+            <TextInput
+              style={[styles.input, { color: textColor }]}
+              placeholder="Email"
+              placeholderTextColor={placeholderColor}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
+              editable={!submitting}
+            />
+          </View>
 
-      {error ? <Text style={[styles.error, { color: dangerColor }]}>{error}</Text> : null}
+          <View style={[styles.divider, { backgroundColor: borderColor }]} />
 
-      <Pressable
-        style={[styles.button, { backgroundColor: tint }, submitting && styles.buttonDisabled]}
-        onPress={handleSubmit}
-        disabled={submitting || !email || !password}
-      >
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Log in</Text>}
-      </Pressable>
-    </View>
+          <View style={styles.field}>
+            <SymbolView name="lock.fill" size={17} tintColor={placeholderColor} />
+            <TextInput
+              style={[styles.input, { color: textColor }]}
+              placeholder="Password"
+              placeholderTextColor={placeholderColor}
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={setPassword}
+              editable={!submitting}
+            />
+            <Pressable
+              onPress={() => setShowPassword((prev) => !prev)}
+              hitSlop={8}
+              style={styles.eyeButton}
+            >
+              <SymbolView
+                name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
+                size={17}
+                tintColor={placeholderColor}
+              />
+            </Pressable>
+          </View>
+        </Card>
+
+        {error ? (
+          <View style={[styles.errorBanner, { backgroundColor: dangerMuted }]}>
+            <SymbolView name="exclamationmark.triangle.fill" size={15} tintColor={dangerColor} />
+            <Text style={[styles.errorText, { color: dangerColor }]}>{error}</Text>
+          </View>
+        ) : null}
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            { backgroundColor: tint },
+            pressed && canSubmit && styles.buttonPressed,
+            !canSubmit && styles.buttonDisabled
+          ]}
+          onPress={handleSubmit}
+          disabled={!canSubmit}
+        >
+          {submitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.buttonText}>Log in</Text>
+              <SymbolView name="arrow.right" size={16} tintColor="#fff" />
+            </>
+          )}
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
-    padding: 24,
-    gap: 12
+    padding: 24
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
+    backgroundColor: 'transparent'
+  },
+  crest: {
+    width: 140,
+    height: 140
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
-    textAlign: 'center'
+    textAlign: 'center',
+    letterSpacing: 0.2
   },
   subtitle: {
     fontSize: 15,
     textAlign: 'center',
-    marginBottom: 20
+    marginTop: 6
+  },
+  formCard: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingVertical: 2
+  },
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    backgroundColor: 'transparent'
   },
   input: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    flex: 1,
     fontSize: 16
   },
-  error: {
-    marginTop: 4
+  eyeButton: {
+    paddingLeft: 8,
+    paddingVertical: 4
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 14
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600'
   },
   button: {
-    borderRadius: 10,
-    paddingVertical: 14,
+    borderRadius: 12,
+    paddingVertical: 15,
+    marginTop: 22,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10
+    justifyContent: 'center',
+    gap: 8,
+    boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.15)',
+    elevation: 3
+  },
+  buttonPressed: {
+    opacity: 0.85
   },
   buttonDisabled: {
-    opacity: 0.6
+    opacity: 0.5
   },
   buttonText: {
     color: '#fff',

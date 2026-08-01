@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
 
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
+import { useLanguage } from '@/lib/language-context';
 import { ApiError } from '@shared/api-error';
 
 export default function GradeEntryScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   // TextInput isn't a Themed component, so it doesn't pick up dark mode's
   // colors on its own — typed text was invisible (black on black) before.
   const textColor = useThemeColor({}, 'text');
@@ -31,7 +33,7 @@ export default function GradeEntryScreen() {
       await api.postGrade({ student: student.trim(), subject: subject.trim(), score: score.trim(), semester: semester.trim() });
       router.back();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save the grade.');
+      setError(err instanceof ApiError ? err.message : t.mobileForms.saveFailed);
     } finally {
       setSubmitting(false);
     }
@@ -41,9 +43,10 @@ export default function GradeEntryScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Enter grade</Text>
+      <Stack.Screen options={{ title: t.create.grades.title }} />
+      <Text style={styles.title}>{t.create.grades.title}</Text>
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Student</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Student}</Text>
       <TextInput
         style={inputStyle}
         placeholderTextColor={placeholderColor}
@@ -53,7 +56,7 @@ export default function GradeEntryScreen() {
         autoFocus
       />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Subject</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Subject}</Text>
       <TextInput
         style={inputStyle}
         placeholderTextColor={placeholderColor}
@@ -62,7 +65,7 @@ export default function GradeEntryScreen() {
         editable={!submitting}
       />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Score</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Score}</Text>
       <TextInput
         style={inputStyle}
         placeholderTextColor={placeholderColor}
@@ -72,7 +75,7 @@ export default function GradeEntryScreen() {
         keyboardType="numeric"
       />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>Semester</Text>
+      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Semester}</Text>
       <TextInput
         style={inputStyle}
         placeholderTextColor={placeholderColor}
@@ -88,7 +91,7 @@ export default function GradeEntryScreen() {
         onPress={handleSubmit}
         disabled={submitting || !student || !score}
       >
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Save</Text>}
+        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{t.mobileForms.save}</Text>}
       </Pressable>
     </View>
   );

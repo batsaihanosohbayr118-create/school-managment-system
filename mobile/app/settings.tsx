@@ -1,26 +1,23 @@
+import { useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Switch } from 'react-native';
 import { SymbolView } from 'expo-symbols';
-import type { SFSymbol } from 'sf-symbols-typescript';
+import * as ImagePicker from 'expo-image-picker';
 import { languages } from '@shared/i18n-tables';
 
 import { Card } from '@/components/Card';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
-import { useTheme, type ThemePreference } from '@/lib/theme-context';
-
-const THEME_OPTIONS: { value: ThemePreference; label: string; icon: SFSymbol }[] = [
-  { value: 'system', label: 'System', icon: 'circle.lefthalf.filled' },
-  { value: 'light', label: 'Light', icon: 'sun.max.fill' },
-  { value: 'dark', label: 'Dark', icon: 'moon.fill' }
-];
+import { useTheme } from '@/lib/theme-context';
 
 export default function SettingsScreen() {
-  const { session, signOut } = useAuth();
+  const { session, signOut, updateAvatar } = useAuth();
   const { preference, setPreference } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
   const dangerColor = useThemeColor({}, 'danger');
@@ -30,6 +27,38 @@ export default function SettingsScreen() {
   const name = session?.name || session?.email || '';
   const initial = name.trim().charAt(0).toUpperCase() || '?';
 
+  const isDark = preference === 'dark';
+  const secondLanguage = languages[1] ?? languages[0];
+  const firstLanguage = languages[0];
+  const isSecondLanguage = language === secondLanguage.id;
+
+  async function handlePickAvatar() {
+    setAvatarError(null);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setAvatarError(t.mobileForms.photoPermissionDenied);
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true
+    });
+    if (result.canceled || !result.assets[0]?.base64) return;
+
+    setUploadingAvatar(true);
+    // Stored as a data URI directly in Supabase auth's avatar_url metadata —
+    // same approach the web app's profile editor uses (DashboardApp.tsx),
+    // no separate storage bucket involved.
+    const dataUri = `data:image/jpeg;base64,${result.assets[0].base64}`;
+    const { error } = await updateAvatar(dataUri);
+    setUploadingAvatar(false);
+    if (error) setAvatarError(t.mobileForms.avatarUpdateFailed);
+  }
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: t.nav.settings.label }} />
@@ -37,9 +66,22 @@ export default function SettingsScreen() {
 
       {session ? (
         <Card style={styles.accountCard}>
-          <View style={[styles.avatar, { backgroundColor: tint }]}>
-            <Text style={styles.avatarText}>{initial}</Text>
-          </View>
+          <Pressable onPress={handlePickAvatar} disabled={uploadingAvatar}>
+            {session.avatarUrl ? (
+              <Image source={{ uri: session.avatarUrl }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: tint }]}>
+                <Text style={styles.avatarText}>{initial}</Text>
+              </View>
+            )}
+            <View style={[styles.avatarEdit, { backgroundColor: tint, borderColor: cardColor }]}>
+              {uploadingAvatar ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <SymbolView name="pencil" size={11} tintColor="#fff" />
+              )}
+            </View>
+          </Pressable>
           <View style={styles.accountInfo}>
             <Text style={styles.value}>{name}</Text>
             <Text style={[styles.role, { color: tint }]}>{session.role}</Text>
@@ -47,42 +89,39 @@ export default function SettingsScreen() {
         </Card>
       ) : null}
 
+      {avatarError ? <Text style={[styles.avatarError, { color: dangerColor }]}>{avatarError}</Text> : null}
+
       <Text style={[styles.sectionTitle, { color: mutedColor }]}>{t.common.appearance}</Text>
-      <View style={[styles.segmented, { borderColor, backgroundColor: cardColor }]}>
-        {THEME_OPTIONS.map((option) => {
-          const active = preference === option.value;
-          return (
-            <Pressable
-              key={option.value}
-              style={[styles.segment, active && { backgroundColor: tint }]}
-              onPress={() => setPreference(option.value)}
-            >
-              <SymbolView name={option.icon} size={16} tintColor={active ? '#fff' : mutedColor} />
-              <Text style={[styles.segmentText, { color: active ? '#fff' : mutedColor }]}>{option.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <Card style={[styles.toggleRow, { borderColor, backgroundColor: cardColor }]}>
+        <View style={styles.toggleLabel}>
+          <SymbolView name={isDark ? 'moon.fill' : 'sun.max.fill'} size={17} tintColor={mutedColor} />
+          <Text style={styles.toggleText}>{isDark ? 'Dark' : 'Light'}</Text>
+        </View>
+        <Switch
+          value={isDark}
+          onValueChange={(value) => setPreference(value ? 'dark' : 'light')}
+          trackColor={{ false: borderColor, true: tint }}
+          thumbColor="#fff"
+        />
+      </Card>
 
       <Text style={[styles.sectionTitle, { color: mutedColor }]}>{t.common.language}</Text>
-      <View style={[styles.segmented, { borderColor, backgroundColor: cardColor }]}>
-        {languages.map((option) => {
-          const active = language === option.id;
-          return (
-            <Pressable
-              key={option.id}
-              style={[styles.segment, active && { backgroundColor: tint }]}
-              onPress={() => setLanguage(option.id)}
-            >
-              <Text style={[styles.segmentText, { color: active ? '#fff' : mutedColor }]}>{option.name}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <Card style={[styles.toggleRow, { borderColor, backgroundColor: cardColor }]}>
+        <View style={styles.toggleLabel}>
+          <SymbolView name="globe" size={17} tintColor={mutedColor} />
+          <Text style={styles.toggleText}>{isSecondLanguage ? secondLanguage.name : firstLanguage.name}</Text>
+        </View>
+        <Switch
+          value={isSecondLanguage}
+          onValueChange={(value) => setLanguage(value ? secondLanguage.id : firstLanguage.id)}
+          trackColor={{ false: borderColor, true: tint }}
+          thumbColor="#fff"
+        />
+      </Card>
 
-      <Pressable style={[styles.signOut, { borderColor: dangerColor }]} onPress={() => signOut()}>
-        <SymbolView name="rectangle.portrait.and.arrow.right" size={17} tintColor={dangerColor} />
-        <Text style={[styles.signOutText, { color: dangerColor }]}>{t.common.logout}</Text>
+      <Pressable style={[styles.signOut, { borderColor: dangerColor, backgroundColor: dangerColor }]} onPress={() => signOut()}>
+        <SymbolView name="rectangle.portrait.and.arrow.right" size={17} tintColor="#fff" />
+        <Text style={[styles.signOutText, { color: '#fff' }]}>{t.common.logout}</Text>
       </Pressable>
 
       <StatusBar style={Platform.OS === 'ios' ? 'light' : 'auto'} />
@@ -119,9 +158,26 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800'
   },
+  avatarEdit: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  avatarError: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4
+  },
   accountInfo: {
     flex: 1,
-    gap: 2
+    gap: 2,
+    backgroundColor: 'transparent'
   },
   value: {
     fontSize: 17,
@@ -140,24 +196,24 @@ const styles = StyleSheet.create({
     marginTop: 22,
     marginBottom: 8
   },
-  segmented: {
+  toggleRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-    padding: 4,
-    gap: 4
+    paddingVertical: 12,
+    paddingHorizontal: 14
   },
-  segment: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 9,
+  toggleLabel: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4
+    gap: 10,
+    backgroundColor: 'transparent'
   },
-  segmentText: {
-    fontSize: 13,
-    fontWeight: '700'
+  toggleText: {
+    fontSize: 15,
+    fontWeight: '600'
   },
   signOut: {
     marginTop: 32,

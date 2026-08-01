@@ -4,13 +4,17 @@ import { FlatList, StyleSheet } from 'react-native';
 
 import { Badge, statusTone } from '@/components/Badge';
 import { Card } from '@/components/Card';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
+import { useLanguage } from '@/lib/language-context';
 import { useApiData } from '@/lib/use-api';
+import { translateValue } from '@shared/i18n-tables';
 import type { AttendanceEntry } from '@shared/api-types';
 
 export default function AttendanceScreen() {
-  const { data, error, loading, refetch } = useApiData(api.attendance);
+  const { data, error, loading, refetch, isOffline } = useApiData('attendance', api.attendance);
+  const { t } = useLanguage();
   const dangerColor = useThemeColor({}, 'danger');
   const mutedColor = useThemeColor({}, 'muted');
 
@@ -26,12 +30,12 @@ export default function AttendanceScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: mutedColor }}>Loading…</Text>
+        <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
       </View>
     );
   }
 
-  if (error) {
+  if (error && !isOffline) {
     return (
       <View style={styles.center}>
         <Text style={{ color: dangerColor }}>{error.message}</Text>
@@ -47,9 +51,10 @@ export default function AttendanceScreen() {
       keyExtractor={(entry) => entry.id}
       onRefresh={refetch}
       refreshing={loading}
+      ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
       ListEmptyComponent={
         <View style={styles.center}>
-          <Text style={{ color: mutedColor }}>No attendance records yet.</Text>
+          <Text style={{ color: mutedColor }}>{t.common.noAttendanceRecordsYet}</Text>
         </View>
       }
       renderItem={({ item }) => <AttendanceRow entry={item} />}
@@ -58,13 +63,14 @@ export default function AttendanceScreen() {
 }
 
 function AttendanceRow({ entry }: { entry: AttendanceEntry }) {
+  const { language } = useLanguage();
   const mutedColor = useThemeColor({}, 'muted');
 
   return (
     <Card style={styles.card}>
       <View style={styles.rowHeader}>
         <Text style={styles.subject}>{entry.subject}</Text>
-        <Badge label={entry.status} tone={statusTone(entry.status)} />
+        <Badge label={translateValue(entry.status, language)} tone={statusTone(entry.status)} />
       </View>
       <Text style={[styles.meta, { color: mutedColor }]}>
         {entry.student} · {entry.date}
@@ -92,7 +98,8 @@ const styles = StyleSheet.create({
   rowHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    backgroundColor: 'transparent'
   },
   subject: {
     fontSize: 17,
