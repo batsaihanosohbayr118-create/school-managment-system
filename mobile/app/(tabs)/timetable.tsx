@@ -7,11 +7,14 @@ import { Card } from '@/components/Card';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
+import { useLanguage } from '@/lib/language-context';
 import { useApiData } from '@/lib/use-api';
+import { translateValue } from '@shared/i18n-tables';
 import type { TimetableSlot } from '@shared/api-types';
 
 export default function TimetableScreen() {
   const { data, error, loading, refetch, isOffline } = useApiData('timetable', api.timetable);
+  const { t } = useLanguage();
   const dangerColor = useThemeColor({}, 'danger');
   const mutedColor = useThemeColor({}, 'muted');
 
@@ -27,7 +30,7 @@ export default function TimetableScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: mutedColor }}>Loading…</Text>
+        <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
       </View>
     );
   }
@@ -51,7 +54,7 @@ export default function TimetableScreen() {
       ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
       ListEmptyComponent={
         <View style={styles.center}>
-          <Text style={{ color: mutedColor }}>No timetable slots yet.</Text>
+          <Text style={{ color: mutedColor }}>{t.common.noTimetableSlotsYet}</Text>
         </View>
       }
       renderItem={({ item }) => <SlotRow slot={item} />}
@@ -60,6 +63,7 @@ export default function TimetableScreen() {
 }
 
 function SlotRow({ slot }: { slot: TimetableSlot }) {
+  const { language } = useLanguage();
   const tint = useThemeColor({}, 'tint');
   const mutedColor = useThemeColor({}, 'muted');
 
@@ -70,7 +74,7 @@ function SlotRow({ slot }: { slot: TimetableSlot }) {
         <Text style={styles.subject}>{slot.subject}</Text>
       </View>
       <Text style={[styles.meta, { color: mutedColor }]}>
-        {slot.day} · {slot.timeLabel}
+        {translateValue(slot.day, language)} · {slot.timeLabel}
       </Text>
       <Text style={[styles.meta, { color: mutedColor }]}>
         {slot.teacher} · {slot.className}

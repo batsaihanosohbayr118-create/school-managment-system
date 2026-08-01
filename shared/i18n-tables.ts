@@ -294,7 +294,9 @@ export const translations = {
       noAnnouncementsYet: "No announcements yet.",
       noPaymentsYet: "No payments yet.",
       noAttendanceRecordsYet: "No attendance records yet.",
+      noTimetableSlotsYet: "No timetable slots yet.",
       nothingScheduledFor: (day: string) => `Nothing scheduled for ${day}.`,
+      offlineShowingSavedData: "Offline — showing saved data",
       recordDeleted: "Record deleted",
       recordUpdated: "Record updated",
       recentActivities: "Recent Activities",
@@ -374,6 +376,11 @@ export const translations = {
       title: "Admin tools live on the web",
       body: "This app covers the day-to-day screens for teachers, students, and parents. Manage students, teachers, classes, and payments from the admin dashboard on the web.",
       openDashboard: "Open the web dashboard"
+    },
+    notFound: {
+      title: "Oops!",
+      body: "This screen doesn't exist.",
+      goHome: "Go to home screen!"
     }
   },
   mn: {
@@ -561,7 +568,9 @@ export const translations = {
       noAnnouncementsYet: "Одоогоор зарлал алга байна.",
       noPaymentsYet: "Одоогоор төлбөр алга байна.",
       noAttendanceRecordsYet: "Одоогоор ирцийн бүртгэл алга байна.",
+      noTimetableSlotsYet: "Одоогоор хичээлийн цаг алга байна.",
       nothingScheduledFor: (day: string) => `${day} гарагт хичээл товлогдоогүй байна.`,
+      offlineShowingSavedData: "Офлайн — хадгалагдсан мэдээллийг харуулж байна",
       recordDeleted: "Бүртгэл устлаа",
       recordUpdated: "Бүртгэл шинэчлэгдлээ",
       recentActivities: "Сүүлийн үйл ажиллагаа",
@@ -641,6 +650,11 @@ export const translations = {
       title: "Админы хэрэгслүүд вэб дээр байршдаг",
       body: "Энэ апп нь багш, сурагч, эцэг эхийн өдөр тутмын дэлгэцүүдийг хамарна. Сурагч, багш, анги, төлбөрийг вэб дээрх админы хяналтын самбараас удирдана уу.",
       openDashboard: "Вэб хяналтын самбар нээх"
+    },
+    notFound: {
+      title: "Уучлаарай!",
+      body: "Энэ дэлгэц олдсонгүй.",
+      goHome: "Нүүр хуудас руу очих!"
     }
   }
 };

@@ -2,16 +2,18 @@ import { StyleSheet } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { Text, View, useThemeColor } from './Themed';
+import { useLanguage } from '@/lib/language-context';
 
 /** Shown above cached data when the last refresh failed because the device is offline. */
 export function OfflineBanner() {
+  const { t } = useLanguage();
   const mutedColor = useThemeColor({}, 'muted');
   const borderColor = useThemeColor({}, 'border');
 
   return (
     <View style={[styles.banner, { borderColor }]}>
       <SymbolView name="wifi.slash" size={14} tintColor={mutedColor} />
-      <Text style={[styles.text, { color: mutedColor }]}>Offline — showing saved data</Text>
+      <Text style={[styles.text, { color: mutedColor }]}>{t.common.offlineShowingSavedData}</Text>
     </View>
   );
 }
