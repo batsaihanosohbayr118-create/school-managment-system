@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import type { NavModule, Role } from "@/lib/types";
-import { subjectCatalog } from "@/lib/subjects";
+import { defaultStudentSubjects, defaultStudentSubjectsValue, subjectCatalog } from "@/lib/subjects";
+import { AccountConflictError, createAccount, setAccountPassword } from "@/lib/auth-db";
 import type { SchoolSession } from "./school-session";
 
 export type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
@@ -40,18 +41,18 @@ declare global {
 }
 
 const resourceColumns: Record<SchoolResource, string[]> = {
-  students: ["Name", "Email", "Class", "Subjects", "Attendance", "GPA", "Payment", "Parent Email"],
-  teachers: ["Name", "Email", "Subject", "Experience", "Salary", "Contact", "Classes"],
+  students: ["Name", "Email", "Subjects", "Attendance", "GPA", "Payment", "Parent Email"],
+  teachers: ["Name", "Email", "Subject", "Experience", "Salary", "Contact"],
   parents: ["Name", "Email", "Student", "Phone", "Occupation"],
   subjects: ["Name", "Code", "Description", "Teacher", "Category", "Grade Levels"],
   assignments: ["Subject", "Title", "Type", "Due Date", "Max Score", "Description"],
   materials: ["Subject", "Title", "File Type", "Uploaded By"],
-  classes: ["Class", "Section", "Teacher", "Students", "Schedule"],
   attendance: ["Student", "Subject", "Date", "Status"],
   grades: ["Student", "Subject", "Score", "Semester"],
   payments: ["Student", "Amount", "Status", "Due Date"],
   timetable: ["Subject", "Day", "Time", "Teacher", "Class"],
-  announcements: ["Title", "Content", "Audience", "Date"]
+  announcements: ["Title", "Content", "Audience", "Date"],
+  wellbeing: ["Question", "Category", "Note", "Date"]
 };
 
 const localStoreRoot = process.env.VERCEL ? path.join(tmpdir(), "educore") : path.join(process.cwd(), ".local-data");
@@ -73,12 +74,12 @@ const localSeedData: LocalStore = {
   })),
   assignments: [],
   materials: [],
-  classes: [],
   attendance: [],
   grades: [],
   payments: [],
   timetable: [],
-  announcements: []
+  announcements: [],
+  wellbeing: []
 };
 
 function getDatabaseUrl() {
@@ -180,16 +181,6 @@ async function initializeSchoolDatabase() {
       PRIMARY KEY (student_id, subject_id)
     );
 
-    CREATE TABLE IF NOT EXISTS class_rooms (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      section TEXT NOT NULL DEFAULT '',
-      teacher TEXT NOT NULL DEFAULT '',
-      students INTEGER NOT NULL DEFAULT 0,
-      schedule TEXT NOT NULL DEFAULT '',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
     CREATE TABLE IF NOT EXISTS attendance_records (
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL DEFAULT '',
@@ -281,37 +272,36 @@ async function initializeSchoolDatabase() {
       date TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS wellbeing_prompts (
+      id TEXT PRIMARY KEY,
+      question TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'General',
+      note TEXT NOT NULL DEFAULT '',
+      date TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   await seedIfEmpty();
 }
 
+/**
+ * Seeds the subject catalogue from `subjectCatalog`, which is the single source
+ * of truth. Do NOT re-add a hardcoded list here: this runs on every server
+ * start, so anything listed is resurrected after an administrator deletes it.
+ */
 async function seedIfEmpty() {
   const pool = getPool();
 
-  await pool.query(`
-    INSERT INTO subjects (id, code, name, description, category, grade_levels)
-    VALUES
-      ('SB-MATH', 'MATH', 'Mathematics', 'Core mathematics curriculum', 'Core', 'Grade 7-12'),
-      ('SB-MN-LANG', 'MNLANG', 'Mongolian Language', 'National language study', 'Core', 'Grade 7-12'),
-      ('SB-MN-LIT', 'MNLIT', 'Mongolian Literature', 'Literature and composition', 'Core', 'Grade 7-12'),
-      ('SB-EN', 'ENG', 'English', 'English language and communication', 'Language', 'Grade 7-12'),
-      ('SB-RU', 'RUS', 'Russian', 'Russian language basics', 'Language', 'Grade 7-12'),
-      ('SB-HIST', 'HIST', 'History', 'Historical study and inquiry', 'Social Science', 'Grade 7-12'),
-      ('SB-SOC', 'SOC', 'Social Studies', 'Society, culture, and civics', 'Social Science', 'Grade 7-12'),
-      ('SB-GEO', 'GEO', 'Geography', 'Physical and human geography', 'Social Science', 'Grade 7-12'),
-      ('SB-PHY', 'PHY', 'Physics', 'Physics concepts and lab work', 'Science', 'Grade 8-12'),
-      ('SB-CHEM', 'CHEM', 'Chemistry', 'Matter, reactions, and lab skills', 'Science', 'Grade 8-12'),
-      ('SB-BIO', 'BIO', 'Biology', 'Life science and ecosystems', 'Science', 'Grade 7-12'),
-      ('SB-CS', 'CS', 'Computer Science', 'Programming and digital literacy', 'Technology', 'Grade 7-12'),
-      ('SB-PE', 'PE', 'Physical Education', 'Physical health and movement', 'Wellbeing', 'Grade 7-12'),
-      ('SB-ART', 'ART', 'Art', 'Creative visual expression', 'Arts', 'Grade 7-12'),
-      ('SB-MUSIC', 'MUSIC', 'Music', 'Music theory and performance', 'Arts', 'Grade 7-12'),
-      ('SB-TECH', 'TECH', 'Technology', 'Applied technology and design', 'Technology', 'Grade 7-12'),
-      ('SB-HEALTH', 'HEALTH', 'Health', 'Personal and community health', 'Wellbeing', 'Grade 7-12'),
-      ('SB-CIVIC', 'CIVIC', 'Civic Education', 'Citizenship and civic responsibility', 'Social Science', 'Grade 7-12')
-    ON CONFLICT (id) DO NOTHING;
-  `);
+  for (const subject of subjectCatalog) {
+    await pool.query(
+      `INSERT INTO subjects (id, code, name, description, category, grade_levels)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (id) DO NOTHING`,
+      [subject.id, subject.code, subject.name, subject.description, subject.category, subject.gradeLevels]
+    );
+  }
 }
 
 function stringValue(value: unknown) {
@@ -421,8 +411,7 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
       return [
         values.Name,
         values.Email || `${Date.now().toString().slice(-6)}@educore.mn`,
-        values.Class,
-        values.Subjects ?? "",
+        values.Subjects?.trim() || defaultStudentSubjectsValue,
         values.Attendance ?? "0%",
         values.GPA ?? "0",
         values.Payment || "Unpaid",
@@ -435,8 +424,7 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
         values.Subject,
         values.Experience,
         values.Salary,
-        phoneValue(values.Contact),
-        values.Classes
+        phoneValue(values.Contact)
       ].map(stringValue);
     case "parents":
       return [
@@ -452,8 +440,6 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
       return [values.Subject, values.Title, values.Type ?? "Homework", values["Due Date"] ?? "", values["Max Score"] ?? "100", values.Description ?? ""].map(stringValue);
     case "materials":
       return [values.Subject, values.Title, values["File Type"] ?? "", values["Uploaded By"] ?? ""].map(stringValue);
-    case "classes":
-      return [values.Class, values.Section ?? "", values.Teacher ?? "", values.Students ?? "0", values.Schedule ?? ""].map(stringValue);
     case "attendance":
       return [values.Student, values.Subject, values.Date || new Date().toISOString().slice(0, 10), values.Status || "Present"].map(stringValue);
     case "grades":
@@ -464,6 +450,8 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
       return [values.Subject, values.Day, values.Time ?? "", values.Teacher ?? "", values.Class ?? ""].map(stringValue);
     case "announcements":
       return [values.Title, values.Content ?? "", values.Audience || "All", values.Date ?? new Date().toISOString().slice(0, 10)].map(stringValue);
+    case "wellbeing":
+      return [values.Question, values.Category || "General", values.Note ?? "", values.Date || new Date().toISOString().slice(0, 10)].map(stringValue);
   }
 }
 
@@ -500,6 +488,14 @@ async function deleteLocalResource(resource: SchoolResource, id: string) {
   return toResourceTable(resource, store[resource]);
 }
 
+/**
+ * A rule the caller broke — a duplicate parent, a missing subject. Unlike a
+ * dropped connection this must never fall through to the local file store:
+ * doing so writes the rejected row anyway and answers 201, which is how a
+ * student ended up with two parents.
+ */
+class ValidationError extends Error {}
+
 function logDatabaseFallback(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   console.warn(`PostgreSQL unavailable; using local file store at ${localStorePath}.`, message);
@@ -508,9 +504,9 @@ function logDatabaseFallback(error: unknown) {
 function rowToArray(resource: SchoolResource, row: QueryRow | DbRow | LocalResourceRow) {
   switch (resource) {
     case "students":
-      return [row.full_name, row.email, row.class_name, row.subjects, `${row.attendance}%`, row.gpa, row.payment_status, row.parent_email].map(stringValue);
+      return [row.full_name, row.email, row.subjects, `${row.attendance}%`, row.gpa, row.payment_status, row.parent_email].map(stringValue);
     case "teachers":
-      return [row.name, row.email, row.subject, row.experience, row.salary, phoneValue(row.contact), row.classes].map(stringValue);
+      return [row.name, row.email, row.subject, row.experience, row.salary, phoneValue(row.contact)].map(stringValue);
     case "parents":
       return [row.name, row.email, row.student, row.phone, row.occupation].map(stringValue);
     case "subjects":
@@ -519,8 +515,6 @@ function rowToArray(resource: SchoolResource, row: QueryRow | DbRow | LocalResou
       return [row.subject, row.title, row.type, row.due_date, row.max_score, row.description].map(stringValue);
     case "materials":
       return [row.subject, row.title, row.file_type, row.uploaded_by_name || row.uploaded_by].map(stringValue);
-    case "classes":
-      return [row.name, row.section, row.teacher, row.students, row.schedule].map(stringValue);
     case "attendance":
       return [row.student, row.subject, row.date, row.status].map(stringValue);
     case "grades":
@@ -531,6 +525,8 @@ function rowToArray(resource: SchoolResource, row: QueryRow | DbRow | LocalResou
       return [row.subject, row.day, row.time, row.teacher, row.class_name].map(stringValue);
     case "announcements":
       return [row.title, row.content, row.audience, row.date].map(stringValue);
+    case "wellbeing":
+      return [row.question, row.category, row.note, row.date].map(stringValue);
   }
 }
 
@@ -542,12 +538,12 @@ function tableName(resource: SchoolResource) {
     subjects: "subjects",
     assignments: "assignments",
     materials: "learning_materials",
-    classes: "class_rooms",
     attendance: "attendance_records",
     grades: "grade_records",
     payments: "payment_records",
     timetable: "timetable_slots",
-    announcements: "announcements"
+    announcements: "announcements",
+    wellbeing: "wellbeing_prompts"
   };
 
   return names[resource];
@@ -855,9 +851,9 @@ function manageRolesFor(resource: SchoolResource) {
     case "teachers":
     case "parents":
     case "subjects":
-    case "classes":
     case "payments":
     case "announcements":
+    case "wellbeing":
       return new Set<Role>(["admin"]);
     case "attendance":
     case "grades":
@@ -968,8 +964,13 @@ function subjectNamesFromTokens(tokens: string[]) {
   return tokens.map((token) => token.trim()).filter(Boolean);
 }
 
+/**
+ * Falls back to the school-wide default set. A student with no subjects can see
+ * nothing at all, so an empty field is never what the administrator meant.
+ */
 function getRequestedSubjects(values: Record<string, string>) {
-  return subjectNamesFromTokens(csvList(values.Subjects));
+  const requested = subjectNamesFromTokens(csvList(values.Subjects));
+  return requested.length > 0 ? requested : [...defaultStudentSubjects];
 }
 
 async function replaceStudentSubjects(pool: Pool, studentId: string, subjectPairs: { id: string; name: string }[]) {
@@ -1001,15 +1002,58 @@ async function ensureTeacherSubject(pool: Pool, context: SchoolRequestContext | 
 
   const assignedSubject = await getAssignedSubjectNameForTeacher(pool, context.session.email);
   if (!assignedSubject) {
-    throw new Error("Teacher does not have an assigned subject.");
+    throw new ValidationError("Teacher does not have an assigned subject.");
   }
 
   const requestedSubject = stringValue(subjectToken).trim();
   if (requestedSubject && normalizedToken(requestedSubject) !== normalizedToken(assignedSubject)) {
-    throw new Error("Teachers can only manage their assigned subject.");
+    throw new ValidationError("Teachers can only manage their assigned subject.");
   }
 
   return assignedSubject;
+}
+
+/**
+ * A school record does not by itself let that person sign in — the login lives
+ * in `app_users`. When the administrator supplies a password we provision both.
+ *
+ * The two must share an email. Row-level access looks the session email up in
+ * `students.email` (a student) or `parents.email` (a parent), so a mismatch
+ * signs them into an app with nothing in it.
+ *
+ * `create` refuses an email that is already taken; `set` also accepts an
+ * existing account and just changes its password, which is how someone added
+ * before this field existed finally gets a login.
+ */
+async function applyLogin(
+  mode: "create" | "set",
+  role: Extract<Role, "student" | "parent" | "teacher">,
+  values: Record<string, string>,
+  /** What the account is tied to: a parent's child, or a teacher's subject. */
+  link?: { studentEmail?: string; subject?: string }
+) {
+  const password = values.Password?.trim();
+  if (!password) return;
+
+  const email = values.Email?.trim();
+  if (!email) {
+    throw new ValidationError("Email is required when you set a password.");
+  }
+
+  const account = { email, password, name: values.Name?.trim() || email, role, ...link };
+
+  try {
+    if (mode === "create") {
+      await createAccount(account);
+    } else {
+      await setAccountPassword(account);
+    }
+  } catch (error) {
+    if (error instanceof AccountConflictError) {
+      throw new ValidationError(`An account with this ${error.field} already exists.`);
+    }
+    throw error;
+  }
 }
 
 export async function createResource(resource: SchoolResource, values: Record<string, string>, context?: SchoolRequestContext) {
@@ -1018,6 +1062,10 @@ export async function createResource(resource: SchoolResource, values: Record<st
   // still returns success. A permission denial must never be caught by that
   // path, or any role could write by tripping the fallback.
   requireManageAccess(resource, context?.session.role ?? "admin");
+
+  if (resource === "students") {
+    await applyLogin("create", "student", values);
+  }
 
   try {
     await ensureSchoolDatabase();
@@ -1030,10 +1078,10 @@ export async function createResource(resource: SchoolResource, values: Record<st
         const subjects = getRequestedSubjects(values);
         await pool.query(
           `
-          INSERT INTO students (id, email, full_name, phone, gender, birth_date, address, parent_name, parent_email, class_name, roll_number, attendance, gpa, payment_status, subjects)
-          VALUES ($1, $2, $3, $4, 'Unknown', '', '', $5, $6, $7, $8, 0, 0, $9, $10)
+          INSERT INTO students (id, email, full_name, phone, gender, birth_date, address, parent_name, parent_email, roll_number, attendance, gpa, payment_status, subjects)
+          VALUES ($1, $2, $3, $4, 'Unknown', '', '', $5, $6, $7, 0, 0, $8, $9)
         `,
-          [id, values.Email || `${id.toLowerCase()}@educore.mn`, values.Name, values.Phone ?? "", values["Parent name"] ?? "", values["Parent Email"] ?? "", values.Class ?? "", id, values.Payment ?? "Unpaid", subjects.join(", ")]
+          [id, values.Email || `${id.toLowerCase()}@educore.mn`, values.Name, values.Phone ?? "", values["Parent name"] ?? "", values["Parent Email"] ?? "", id, values.Payment ?? "Unpaid", subjects.join(", ")]
         );
         const subjectPairs = await Promise.all(subjects.map(async (subjectToken) => {
           const subject = await resolveSubjectByToken(pool, subjectToken);
@@ -1044,23 +1092,27 @@ export async function createResource(resource: SchoolResource, values: Record<st
       }
       case "teachers": {
         const subject = await resolveSubjectByToken(pool, values.Subject);
-        if (!subject) throw new Error("Subject is required.");
+        if (!subject) throw new ValidationError("Subject is required.");
         const existingTeacher = await pool.query<QueryRow>(`SELECT id, subject_id FROM teachers WHERE subject_id = $1 AND id <> $2 LIMIT 1`, [subject.id, id]);
-        if (existingTeacher.rows.length > 0) throw new Error("That subject already has a teacher.");
+        if (existingTeacher.rows.length > 0) throw new ValidationError("That subject already has a teacher.");
+        await applyLogin("create", "teacher", values, { subject: stringValue(subject.name) });
         await pool.query(
           `
-          INSERT INTO teachers (id, email, name, subject, subject_id, experience, salary, contact, classes)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          INSERT INTO teachers (id, email, name, subject, subject_id, experience, salary, contact)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `,
-          [id, values.Email || `${id.toLowerCase()}@educore.mn`, values.Name, stringValue(subject.name), stringValue(subject.id), values.Experience ?? "", values.Salary ?? "", phoneValue(values.Contact), values.Classes ?? ""]
+          [id, values.Email || `${id.toLowerCase()}@educore.mn`, values.Name, stringValue(subject.name), stringValue(subject.id), values.Experience ?? "", values.Salary ?? "", phoneValue(values.Contact)]
         );
         await pool.query(`UPDATE subjects SET teacher_id = $1, teacher = $2 WHERE id = $3`, [id, values.Name, subject.id]);
         break;
       }
       case "parents": {
         const student = await resolveStudentByToken(pool, values.Student);
-        if (!student) throw new Error("Student is required.");
-        if (stringValue((student as DbRow).parent_id)) throw new Error("This student already has a parent account.");
+        if (!student) throw new ValidationError("Student is required.");
+        if (stringValue((student as DbRow).parent_id)) throw new ValidationError("This student already has a parent account.");
+        // Before the INSERT: a taken email must fail without leaving a parent
+        // row that nobody can sign in as.
+        await applyLogin("create", "parent", values, { studentEmail: stringValue((student as DbRow).email) });
         await pool.query(
           `
           INSERT INTO parents (id, email, name, student, student_email, student_id, phone, occupation)
@@ -1073,7 +1125,7 @@ export async function createResource(resource: SchoolResource, values: Record<st
       }
       case "subjects": {
         const teacher = values.Teacher ? await resolveTeacherByToken(pool, values.Teacher) : null;
-        if (teacher && stringValue((teacher as DbRow).subject_id)) throw new Error("That teacher is already assigned to another subject.");
+        if (teacher && stringValue((teacher as DbRow).subject_id)) throw new ValidationError("That teacher is already assigned to another subject.");
         await pool.query(
           `
           INSERT INTO subjects (id, code, name, description, teacher, category, grade_levels, teacher_id)
@@ -1111,23 +1163,16 @@ export async function createResource(resource: SchoolResource, values: Record<st
         );
         break;
       }
-      case "classes":
-        await pool.query(
-          `INSERT INTO class_rooms (id, name, section, teacher, students, schedule)
-           VALUES ($1, $2, $3, $4, 0, '')`,
-          [id, values.Class, values.Section ?? "", values.Teacher ?? ""]
-        );
-        break;
       case "attendance": {
         const subject = values.Subject ? await resolveSubjectByToken(pool, values.Subject) : null;
         const subjectName = subject ? stringValue(subject.name) : values.Subject;
         const student = await resolveStudentByToken(pool, values.Student);
         await pool.query(
           `
-          INSERT INTO attendance_records (id, student_id, subject_id, student, subject, class_name, date, status, recorded_by)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          INSERT INTO attendance_records (id, student_id, subject_id, student, subject, date, status, recorded_by)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `,
-          [id, stringValue((student as DbRow | null)?.id), subject ? stringValue(subject.id) : "", values.Student, subjectName, values.Class ?? "", values.Date ?? new Date().toISOString().slice(0, 10), values.Status ?? "Present", context?.session.email ?? ""]
+          [id, stringValue((student as DbRow | null)?.id), subject ? stringValue(subject.id) : "", values.Student, subjectName, values.Date ?? new Date().toISOString().slice(0, 10), values.Status ?? "Present", context?.session.email ?? ""]
         );
         break;
       }
@@ -1168,10 +1213,18 @@ export async function createResource(resource: SchoolResource, values: Record<st
           [id, values.Title, values.Content ?? "", values.Audience ?? "All", values.Date ?? new Date().toISOString().slice(0, 10)]
         );
         break;
+      case "wellbeing":
+        await pool.query(
+          `INSERT INTO wellbeing_prompts (id, question, category, note, date)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [id, values.Question, values.Category || "General", values.Note ?? "", values.Date || new Date().toISOString().slice(0, 10)]
+        );
+        break;
     }
 
-    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "demo" }, mode: "summary" });
+    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "neon" }, mode: "summary" });
   } catch (error) {
+    if (error instanceof ValidationError) throw error;
     logDatabaseFallback(error);
     return createLocalResource(resource, values);
   }
@@ -1182,9 +1235,26 @@ export async function deleteResource(resource: SchoolResource, id: string, conte
 
   try {
     await ensureSchoolDatabase();
+
+    // Deleting a parent has to release the student too. students.parent_id is
+    // what blocks a second parent, so leaving it set would strand that student:
+    // they could never be attached to anyone again.
+    if (resource === "parents") {
+      await getPool().query(
+        `UPDATE students SET parent_id = NULL, parent_email = '', parent_name = '' WHERE parent_id = $1`,
+        [id]
+      );
+    }
+
+    // Likewise a subject must not keep showing a teacher who no longer exists.
+    if (resource === "teachers") {
+      await getPool().query(`UPDATE subjects SET teacher_id = NULL, teacher = '' WHERE teacher_id = $1`, [id]);
+    }
+
     await getPool().query(`DELETE FROM ${tableName(resource)} WHERE id = $1`, [id]);
-    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "demo" }, mode: "summary" });
+    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "neon" }, mode: "summary" });
   } catch (error) {
+    if (error instanceof ValidationError) throw error;
     logDatabaseFallback(error);
     return deleteLocalResource(resource, id);
   }
@@ -1193,6 +1263,10 @@ export async function deleteResource(resource: SchoolResource, id: string, conte
 export async function updateResource(resource: SchoolResource, id: string, values: Record<string, string>, context?: SchoolRequestContext) {
   requireManageAccess(resource, context?.session.role ?? "admin");
 
+  if (resource === "students") {
+    await applyLogin("set", "student", values);
+  }
+
   try {
     await ensureSchoolDatabase();
     const pool = getPool();
@@ -1200,13 +1274,15 @@ export async function updateResource(resource: SchoolResource, id: string, value
     switch (resource) {
       case "students": {
         const subjects = getRequestedSubjects(values);
+        // COALESCE on the fields the edit dialog does not show: passing "" for a
+        // key the form never sent would erase a value the admin cannot even see.
         await pool.query(
           `
           UPDATE students
-          SET full_name = $1, email = $2, class_name = $3, subjects = $4, attendance = $5, gpa = $6, payment_status = $7, parent_email = $8, parent_name = $9
-          WHERE id = $10
+          SET full_name = $1, email = $2, subjects = $3, attendance = $4, gpa = $5, payment_status = $6, parent_email = $7, parent_name = COALESCE($8, parent_name)
+          WHERE id = $9
         `,
-          [values.Name, values.Email ?? "", values.Class ?? "", subjects.join(", "), numberValue(values.Attendance), numberValue(values.GPA), values.Payment ?? "Unpaid", values["Parent Email"] ?? "", values["Parent name"] ?? "", id]
+          [values.Name, values.Email ?? "", subjects.join(", "), numberValue(values.Attendance), numberValue(values.GPA), values.Payment ?? "Unpaid", values["Parent Email"] ?? "", values["Parent name"] ?? null, id]
         );
         const subjectPairs = await Promise.all(subjects.map(async (subjectToken) => {
           const subject = await resolveSubjectByToken(pool, subjectToken);
@@ -1217,32 +1293,34 @@ export async function updateResource(resource: SchoolResource, id: string, value
       }
       case "teachers": {
         const subject = await resolveSubjectByToken(pool, values.Subject);
-        if (!subject) throw new Error("Subject is required.");
+        if (!subject) throw new ValidationError("Subject is required.");
         const conflictingTeacher = await pool.query<QueryRow>(`SELECT id FROM teachers WHERE subject_id = $1 AND id <> $2 LIMIT 1`, [subject.id, id]);
-        if (conflictingTeacher.rows.length > 0) throw new Error("That subject already has a teacher.");
+        if (conflictingTeacher.rows.length > 0) throw new ValidationError("That subject already has a teacher.");
+        await applyLogin("set", "teacher", values, { subject: stringValue(subject.name) });
         await pool.query(
           `
           UPDATE teachers
-          SET name = $1, email = $2, subject = $3, subject_id = $4, experience = $5, salary = $6, contact = $7, classes = $8
-          WHERE id = $9
+          SET name = $1, email = $2, subject = $3, subject_id = $4, experience = COALESCE($5, experience), salary = $6, contact = $7
+          WHERE id = $8
         `,
-          [values.Name, values.Email ?? "", stringValue(subject.name), stringValue(subject.id), values.Experience ?? "", values.Salary ?? "", phoneValue(values.Contact), values.Classes ?? "", id]
+          [values.Name, values.Email ?? "", stringValue(subject.name), stringValue(subject.id), values.Experience ?? null, values.Salary ?? "", phoneValue(values.Contact), id]
         );
         await pool.query(`UPDATE subjects SET teacher_id = $1, teacher = $2 WHERE id = $3`, [id, values.Name, subject.id]);
         break;
       }
       case "parents": {
         const student = await resolveStudentByToken(pool, values.Student);
-        if (!student) throw new Error("Student is required.");
+        if (!student) throw new ValidationError("Student is required.");
         const conflictingParent = await pool.query<QueryRow>(`SELECT id FROM parents WHERE student_id = $1 AND id <> $2 LIMIT 1`, [stringValue((student as DbRow).id), id]);
-        if (conflictingParent.rows.length > 0) throw new Error("This student already has a parent account.");
+        if (conflictingParent.rows.length > 0) throw new ValidationError("This student already has a parent account.");
+        await applyLogin("set", "parent", values, { studentEmail: stringValue((student as DbRow).email) });
         await pool.query(
           `
           UPDATE parents
-          SET name = $1, email = $2, student = $3, student_email = $4, student_id = $5, phone = $6, occupation = $7
+          SET name = $1, email = $2, student = $3, student_email = $4, student_id = $5, phone = $6, occupation = COALESCE($7, occupation)
           WHERE id = $8
         `,
-          [values.Name, values.Email ?? "", stringValue((student as DbRow).full_name), stringValue((student as DbRow).email), stringValue((student as DbRow).id), values.Phone ?? "", values.Occupation ?? "", id]
+          [values.Name, values.Email ?? "", stringValue((student as DbRow).full_name), stringValue((student as DbRow).email), stringValue((student as DbRow).id), values.Phone ?? "", values.Occupation ?? null, id]
         );
         await pool.query(`UPDATE students SET parent_id = $1, parent_email = $2, parent_name = $3 WHERE id = $4`, [id, values.Email ?? "", values.Name, stringValue((student as DbRow).id)]);
         break;
@@ -1250,7 +1328,7 @@ export async function updateResource(resource: SchoolResource, id: string, value
       case "subjects": {
         const teacher = values.Teacher ? await resolveTeacherByToken(pool, values.Teacher) : null;
         if (teacher && stringValue((teacher as DbRow).subject_id) && stringValue((teacher as DbRow).subject_id) !== id) {
-          throw new Error("That teacher is already assigned to another subject.");
+          throw new ValidationError("That teacher is already assigned to another subject.");
         }
         await pool.query(
           `
@@ -1289,24 +1367,16 @@ export async function updateResource(resource: SchoolResource, id: string, value
         );
         break;
       }
-      case "classes":
-        await pool.query(
-          `UPDATE class_rooms
-           SET name = $1, section = $2, teacher = $3, students = $4, schedule = $5
-           WHERE id = $6`,
-          [values.Class, values.Section ?? "", values.Teacher ?? "", numberValue(values.Students), values.Schedule ?? "", id]
-        );
-        break;
       case "attendance": {
         const subject = values.Subject ? await resolveSubjectByToken(pool, values.Subject) : null;
         const student = await resolveStudentByToken(pool, values.Student);
         await pool.query(
           `
           UPDATE attendance_records
-          SET student_id = $1, subject_id = $2, student = $3, subject = $4, class_name = $5, date = $6, status = $7, recorded_by = $8
-          WHERE id = $9
+          SET student_id = $1, subject_id = $2, student = $3, subject = $4, date = $5, status = $6, recorded_by = $7
+          WHERE id = $8
         `,
-          [stringValue((student as DbRow | null)?.id), subject ? stringValue(subject.id) : "", values.Student, subject ? stringValue(subject.name) : values.Subject, values.Class ?? "", values.Date ?? "", values.Status ?? "Present", context?.session.email ?? "", id]
+          [stringValue((student as DbRow | null)?.id), subject ? stringValue(subject.id) : "", values.Student, subject ? stringValue(subject.name) : values.Subject, values.Date ?? "", values.Status ?? "Present", context?.session.email ?? "", id]
         );
         break;
       }
@@ -1351,10 +1421,19 @@ export async function updateResource(resource: SchoolResource, id: string, value
           [values.Title, values.Content, values.Audience, values.Date, id]
         );
         break;
+      case "wellbeing":
+        await pool.query(
+          `UPDATE wellbeing_prompts
+           SET question = $1, category = $2, note = $3, date = $4
+           WHERE id = $5`,
+          [values.Question, values.Category, values.Note, values.Date, id]
+        );
+        break;
     }
 
-    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "demo" }, mode: "summary" });
+    return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "neon" }, mode: "summary" });
   } catch (error) {
+    if (error instanceof ValidationError) throw error;
     logDatabaseFallback(error);
     return updateLocalResource(resource, id, values);
   }

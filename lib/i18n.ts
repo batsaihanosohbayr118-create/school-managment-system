@@ -14,15 +14,14 @@ export {
 
 export const languageStorageKey = "educore_language";
 
+/**
+ * Mongolian is the school's working language, so it is the default for
+ * everyone. Browser locale is deliberately ignored — English-locale Windows is
+ * common here and would otherwise flip Mongolian users to English. Only an
+ * explicit choice, saved from the language switcher, overrides it.
+ */
 export function getInitialLanguage(): import("@shared/i18n-tables").Language {
-  if (typeof window !== "undefined") {
-    const stored = getStoredLanguage();
-    if (stored) return stored;
-
-    const browserLang = navigator.language.split("-")[0];
-    if (browserLang === "mn") return "mn";
-  }
-  return "en";
+  return getStoredLanguage() ?? "mn";
 }
 
 export function getStoredLanguage(): import("@shared/i18n-tables").Language | null {

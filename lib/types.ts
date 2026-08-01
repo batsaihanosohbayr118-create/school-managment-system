@@ -10,12 +10,12 @@ export type NavModule =
   | "subjects"
   | "assignments"
   | "materials"
-  | "classes"
   | "attendance"
   | "grades"
   | "payments"
   | "timetable"
   | "announcements"
+  | "wellbeing"
   | "settings";
 
 export type NavItem = {
@@ -35,7 +35,6 @@ export type Student = {
   address: string;
   parentName: string;
   parentEmail: string;
-  className: string;
   rollNumber: string;
   attendance: number;
   gpa: number;
@@ -62,15 +61,6 @@ export type Parent = {
   student: string;
   phone: string;
   occupation: string;
-};
-
-export type ClassRoom = {
-  id: string;
-  name: string;
-  section: string;
-  teacher: string;
-  students: number;
-  schedule: string;
 };
 
 export type SubjectTopic = {
@@ -179,5 +169,14 @@ export type Announcement = {
   title: string;
   content: string;
   audience: "All" | "Teachers" | "Students";
+  date: string;
+};
+
+/** A reflection prompt the school psychologist publishes to the student corner. */
+export type WellbeingPrompt = {
+  id: string;
+  question: string;
+  category: string;
+  note: string;
   date: string;
 };

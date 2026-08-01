@@ -7,7 +7,7 @@ import {
   updateResource,
   type SchoolRequestContext
 } from "@/lib/school-db";
-import { resolveRequestSession } from "@/lib/school-session";
+import { resolveRequestSession } from "@/lib/school-session-server";
 import { preflight, withCors } from "@/lib/cors";
 
 export const runtime = "nodejs";
@@ -33,6 +33,7 @@ function errorStatus(error: unknown) {
 
   if (message.includes("unauthorized")) return 401;
   if (message.includes("permission") || message.includes("not allowed")) return 403;
+  if (message.includes("already exists") || message.includes("already has")) return 409;
   if (message.includes("required") || message.includes("invalid")) return 400;
 
   return 500;

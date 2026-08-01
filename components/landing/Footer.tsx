@@ -52,13 +52,13 @@ export function Footer({ dict }: FooterProps) {
 
   return (
     <footer id="contact" className="relative border-t border-white/10 bg-[#0B1226]">
-      <div className="mx-auto w-full max-w-7xl px-5 py-16 sm:px-8">
-        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto w-full max-w-7xl px-5 py-16 sm:px-8 lg:py-20">
+        <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4 lg:gap-10">
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2.5">
               <span className="grid h-11 w-11 place-items-center overflow-hidden rounded-xl bg-linear-to-br from-[#2563EB] to-[#38BDF8]">
-                <Image src={BRAND.logo} alt={BRAND.name} width={559} height={534} className="h-7 w-7 object-contain" />
+                <Image src={BRAND.logo} alt={BRAND.name} width={BRAND.logoWidth} height={BRAND.logoHeight} className="h-6 w-auto object-contain" />
               </span>
               <span className="leading-tight">
                 <strong className="block text-[16px] font-extrabold text-white">{BRAND.name}</strong>
@@ -67,8 +67,8 @@ export function Footer({ dict }: FooterProps) {
                 </small>
               </span>
             </div>
-            <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-slate-400">{footer.tagline}</p>
-            <div className="mt-5 flex gap-3">
+            <p className="mt-5 max-w-xs text-[14px] leading-relaxed text-slate-400">{footer.tagline}</p>
+            <div className="mt-6 flex gap-3">
               {SOCIALS.map((social) => {
                 const Icon = SOCIAL_ICONS[social.id as keyof typeof SOCIAL_ICONS];
                 return (
@@ -88,7 +88,7 @@ export function Footer({ dict }: FooterProps) {
           {/* Quick links */}
           <div>
             <h3 className="text-[14px] font-bold uppercase tracking-wider text-white">{footer.quickLinksTitle}</h3>
-            <ul className="mt-4 space-y-3">
+            <ul className="mt-5 space-y-3.5">
               {footer.quickLinks.map((link) => (
                 <li key={link.id}>
                   <a href={link.href} className="text-[14px] text-slate-400 transition hover:text-[#38BDF8]">
@@ -102,7 +102,7 @@ export function Footer({ dict }: FooterProps) {
           {/* Contact */}
           <div>
             <h3 className="text-[14px] font-bold uppercase tracking-wider text-white">{footer.contactTitle}</h3>
-            <ul className="mt-4 space-y-3.5 text-[14px] text-slate-400">
+            <ul className="mt-5 space-y-3.5 text-[14px] text-slate-400">
               <li className="flex items-center gap-3">
                 <Phone size={16} className="text-[#38BDF8]" />
                 <a href={`tel:${footer.phone.replace(/\s/g, "")}`} className="transition hover:text-white">
@@ -126,7 +126,7 @@ export function Footer({ dict }: FooterProps) {
           <div>
             <h3 className="text-[14px] font-bold uppercase tracking-wider text-white">{footer.followTitle}</h3>
             <form
-              className="mt-4"
+              className="mt-5"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (email.trim()) setSent(true);
@@ -157,7 +157,7 @@ export function Footer({ dict }: FooterProps) {
           </div>
         </div>
 
-        <div className="mt-12 border-t border-white/10 pt-6 text-center text-[13px] text-slate-500">
+        <div className="mt-14 border-t border-white/10 pt-7 text-center text-[13px] text-slate-500">
           © {new Date().getFullYear()} {BRAND.name} {BRAND.suffix}. {footer.rights}
         </div>
       </div>

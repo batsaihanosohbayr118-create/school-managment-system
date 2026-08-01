@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,16 +17,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { getToken } from "@/lib/auth-client";
 import { ROLES, dashboardPathForRole, resolveActiveSession } from "@/lib/auth-flow";
 import { getInitialDarkMode } from "@/lib/theme";
-import {
-  createDemoUser,
-  deleteDemoUser,
-  listDemoUsers,
-  resetDemoUserPassword,
-  updateDemoUser
-} from "@/lib/demo-auth";
+import { subjectOptions } from "@/lib/subjects";
 import type { Role } from "@/lib/types";
 
 type ManagedUser = {
@@ -35,7 +29,14 @@ type ManagedUser = {
   username: string;
   email: string;
   role: Role;
+  subject: string;
+  studentEmail: string;
   createdAt: string;
+};
+
+type StudentOption = {
+  name: string;
+  email: string;
 };
 
 type ModalState =
@@ -65,10 +66,9 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
-async function getAccessToken() {
-  if (!supabase) return "";
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? "";
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export default function AdminUsersPage() {
@@ -89,6 +89,7 @@ export default function AdminUsersPage() {
   useEffect(() => {
     queueMicrotask(() => setDarkMode(getInitialDarkMode()));
   }, []);
+  const [students, setStudents] = useState<StudentOption[]>([]);
 
   // Access guard — admins only.
   useEffect(() => {
@@ -110,31 +111,43 @@ export default function AdminUsersPage() {
     };
   }, [router]);
 
+  /**
+   * Populates the "guardian for" picker. Reuses the school resource API, whose
+   * students table returns Name in column 0 and Email in column 1.
+   */
+  const loadStudents = useCallback(async () => {
+    try {
+      const response = await fetch("/api/school/students", { headers: authHeaders() });
+      if (!response.ok) return;
+
+      const payload = (await response.json()) as { columns?: string[]; rows?: string[][] };
+      const nameIndex = payload.columns?.findIndex((c) => c.toLowerCase() === "name") ?? 0;
+      const emailIndex = payload.columns?.findIndex((c) => c.toLowerCase() === "email") ?? 1;
+
+      setStudents(
+        (payload.rows ?? [])
+          .map((row) => ({ name: row[nameIndex] ?? "", email: (row[emailIndex] ?? "").trim() }))
+          .filter((student) => student.email)
+      );
+    } catch {
+      // A failed lookup only empties the picker; the server still enforces the rule.
+    }
+  }, []);
+
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setError("");
     setNotice("");
 
-    if (!isSupabaseConfigured) {
-      setUsers(listDemoUsers());
-      setLoading(false);
-      return;
-    }
-
     try {
-      const token = await getAccessToken();
-      const response = await fetch("/api/admin/users", { headers: { Authorization: `Bearer ${token}` } });
+      const response = await fetch("/api/admin/users", { headers: authHeaders() });
       const payload = (await response.json().catch(() => null)) as { users?: ManagedUser[]; message?: string } | null;
 
-      if (response.status === 501) {
-        setNotice(payload?.message ?? "User provisioning is not configured.");
-        setUsers([]);
-        return;
-      }
       if (!response.ok) {
         throw new Error(payload?.message ?? "Failed to load users.");
       }
       setUsers(payload?.users ?? []);
+      await loadStudents();
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load users.");
       setUsers([]);
@@ -170,60 +183,57 @@ export default function AdminUsersPage() {
     });
   }, [users, query, roleFilter]);
 
-  const provisioningDisabled = isSupabaseConfigured && Boolean(notice);
+  /**
+   * Students still available to be linked — anyone already claimed by a parent
+   * account is left out, so the picker only ever offers students who do not
+   * have a guardian yet. When editing a parent, their own student stays in the
+   * list, otherwise the current value would disappear from the dropdown.
+   */
+  const selectableStudents = useMemo(() => {
+    const editingId = modal?.kind === "edit" ? modal.user.id : null;
+    const taken = new Set(
+      users
+        .filter((user) => user.role === "parent" && user.studentEmail && user.id !== editingId)
+        .map((user) => user.studentEmail.toLowerCase())
+    );
 
-  // --- Mutations (route through the API in Supabase mode, the demo store otherwise) ---
+    return students.filter((student) => !taken.has(student.email.toLowerCase()));
+  }, [students, users, modal]);
+
+  const provisioningDisabled = Boolean(notice);
+
+  // --- Mutations (all go through the Neon-backed admin API) ---
 
   async function apiWrite(method: "POST" | "PATCH" | "DELETE", body?: Record<string, unknown>, search = "") {
-    const token = await getAccessToken();
     const response = await fetch(`/api/admin/users${search}`, {
       method,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: body ? JSON.stringify(body) : undefined
     });
     const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-    if (!response.ok) throw new Error(payload?.message ?? "Request failed.");
+    if (!response.ok) throw new Error(mapApiError(payload?.message));
   }
 
   async function handleCreate(input: UserFormValues) {
-    if (!isSupabaseConfigured) {
-      const result = createDemoUser(input);
-      if ("error" in result) throw new Error(mapDemoError(result.error));
-      return;
-    }
     await apiWrite("POST", input);
   }
 
   async function handleUpdate(id: string, input: UserFormValues) {
-    if (!isSupabaseConfigured) {
-      const result = updateDemoUser(id, input);
-      if ("error" in result) throw new Error(mapDemoError(result.error));
-      return;
-    }
     await apiWrite("PATCH", { id, ...input });
   }
 
   async function handleReset(id: string, password: string) {
-    if (!isSupabaseConfigured) {
-      const result = resetDemoUserPassword(id, password);
-      if ("error" in result) throw new Error(mapDemoError(result.error));
-      return;
-    }
     await apiWrite("PATCH", { id, password });
   }
 
   async function handleDelete(id: string) {
-    if (!isSupabaseConfigured) {
-      deleteDemoUser(id);
-      return;
-    }
     await apiWrite("DELETE", undefined, `?id=${encodeURIComponent(id)}`);
   }
 
   if (!authorized) {
     return (
       <main className={`um-loading${darkMode ? " dark" : ""}`}>
-        <UserCog size={28} />
+        <span className="ec-spinner" style={{ "--ec-spinner-size": "34px", "--ec-spinner-width": "3px" } as CSSProperties} />
         <p>Checking access…</p>
       </main>
     );
@@ -284,6 +294,7 @@ export default function AdminUsersPage() {
         {error ? <p className="um-error">{error}</p> : null}
         {loading ? (
           <div className="um-empty">
+            <span className="ec-spinner" style={{ "--ec-spinner-size": "30px", "--ec-spinner-width": "3px" } as CSSProperties} />
             <p>Loading users…</p>
           </div>
         ) : filtered.length === 0 ? (
@@ -376,6 +387,8 @@ export default function AdminUsersPage() {
         <UserFormModal
           mode={modal.kind}
           user={modal.kind === "edit" ? modal.user : undefined}
+          students={selectableStudents}
+          totalStudents={students.length}
           onClose={() => setModal(null)}
           onSubmit={async (values) => {
             if (modal.kind === "edit") {
@@ -427,16 +440,24 @@ type UserFormValues = {
   email: string;
   role: Role;
   password: string;
+  subject: string;
+  studentEmail: string;
 };
 
 function UserFormModal({
   mode,
   user,
+  students,
+  totalStudents,
   onClose,
   onSubmit
 }: {
   mode: "create" | "edit";
   user?: ManagedUser;
+  /** Only students without a guardian yet (plus this parent's own, when editing). */
+  students: StudentOption[];
+  /** Everyone on file, used to tell "none exist" apart from "all taken". */
+  totalStudents: number;
   onClose: () => void;
   onSubmit: (values: UserFormValues) => Promise<void>;
 }) {
@@ -445,6 +466,8 @@ function UserFormModal({
   const [email, setEmail] = useState(user?.email ?? "");
   const [role, setRole] = useState<Role>(user?.role ?? "student");
   const [password, setPassword] = useState("");
+  const [subject, setSubject] = useState(user?.subject ?? "");
+  const [studentEmail, setStudentEmail] = useState(user?.studentEmail ?? "");
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -464,10 +487,18 @@ function UserFormModal({
       setFormError(`Password must be at least ${MIN_PASSWORD} characters.`);
       return;
     }
+    if (role === "teacher" && !subject.trim()) {
+      setFormError("Choose or type the subject this teacher teaches.");
+      return;
+    }
+    if (role === "parent" && !studentEmail.trim()) {
+      setFormError("Select the student this parent is a guardian for.");
+      return;
+    }
 
     setBusy(true);
     try {
-      await onSubmit({ name, username, email, role, password });
+      await onSubmit({ name, username, email, role, password, subject, studentEmail });
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : "Something went wrong.");
     } finally {
@@ -503,6 +534,52 @@ function UserFormModal({
             ))}
           </select>
         </label>
+        {/* Free text on purpose — a teacher may be hired for a subject that is
+            not in the catalogue yet, so this is never checked against the DB. */}
+        {role === "teacher" ? (
+          <label className="um-field">
+            <span>Subject taught</span>
+            <Input
+              list="um-subject-options"
+              value={subject}
+              onChange={(event) => setSubject(event.target.value)}
+              placeholder="Mathematics"
+              required
+            />
+            <datalist id="um-subject-options">
+              {subjectOptions.map((option) => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
+          </label>
+        ) : null}
+
+        {/* Must resolve to a real student — the server rejects anything else. */}
+        {role === "parent" ? (
+          <label className="um-field">
+            <span>Guardian for</span>
+            <select
+              className="um-select"
+              value={studentEmail}
+              onChange={(event) => setStudentEmail(event.target.value)}
+              required
+            >
+              <option value="">
+                {students.length > 0
+                  ? "Select a student…"
+                  : totalStudents === 0
+                    ? "No students in the database yet"
+                    : "Every student already has a guardian"}
+              </option>
+              {students.map((student) => (
+                <option key={student.email} value={student.email}>
+                  {student.name ? `${student.name} — ${student.email}` : student.email}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
         <label className="um-field">
           <span>{mode === "edit" ? "New password (leave blank to keep)" : "Password"}</span>
           <Input
@@ -626,15 +703,24 @@ function ConfirmDeleteModal({
   );
 }
 
-function mapDemoError(code: string) {
+/** Turns the API's error codes into something an admin can act on. */
+function mapApiError(code: string | undefined) {
   switch (code) {
     case "email-exists":
       return "A user with that email already exists.";
     case "username-exists":
       return "A user with that username already exists.";
-    case "not-found":
-      return "User not found.";
+    case "subject-required":
+      return "A teacher account needs a subject.";
+    case "student-required":
+      return "A parent account must be linked to a student.";
+    case "student-not-found":
+      return "That student is not in the database — add the student first.";
+    case "last-admin":
+      return "This is the only admin account — promote someone else first.";
+    case "cannot-delete-self":
+      return "You cannot delete the account you are signed in with.";
     default:
-      return "Something went wrong.";
+      return code ?? "Something went wrong.";
   }
 }

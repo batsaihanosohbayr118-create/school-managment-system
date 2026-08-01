@@ -1,5 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  AccountConflictError,
+  countAdmins,
+  createAccount,
+  deleteAccount,
+  findAccountById,
+  isRole,
+  listAccounts,
+  studentExists,
+  updateAccount
+} from "@/lib/auth-db";
+import { verifyToken, type TokenPayload } from "@/lib/auth-token";
 import type { Role } from "@/lib/types";
 import { preflight, withCors } from "@/lib/cors";
 
@@ -10,124 +21,83 @@ const METHODS = ["GET", "POST", "PATCH", "DELETE"];
 export const OPTIONS = preflight(METHODS);
 
 /**
- * Admin-only user provisioning API.
+ * Role-specific requirements when provisioning an account:
  *
- * Security model:
- *  - Requires the Supabase service-role key (server-only env var) to call the
- *    Supabase Admin API. Without it the endpoint reports 501 with guidance.
- *  - Every request must carry the caller's access token (Authorization: Bearer).
- *    The token is verified server-side and the caller's role must be "admin",
- *    so no non-admin can create, edit, delete, or reset accounts.
+ *  - teacher — must name the subject they teach. Free text on purpose: a school
+ *    may hire for a subject before it exists in the catalogue, so this is NOT
+ *    checked against the database.
+ *  - parent  — must be linked to a student, and that student MUST already exist
+ *    in the students table. A guardian for nobody is always a mistake.
+ *
+ * Returns an error code, or null when the link is acceptable.
+ */
+async function checkRoleLink(
+  role: Role,
+  subject: string | undefined,
+  studentEmail: string | undefined
+): Promise<string | null> {
+  if (role === "teacher") {
+    return subject?.trim() ? null : "subject-required";
+  }
+
+  if (role === "parent") {
+    const email = studentEmail?.trim();
+    if (!email) return "student-required";
+    return (await studentExists(email)) ? null : "student-not-found";
+  }
+
+  return null;
+}
+
+/**
+ * Admin-only account management, backed by Neon.
+ *
+ * Every request must carry the caller's signed token, and the caller's role
+ * must be "admin" — no non-admin can list, create, edit or delete accounts.
  */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+type Guarded = { caller: TokenPayload } | { response: NextResponse };
 
-const ROLES: Role[] = ["admin", "teacher", "student", "parent"];
-
-function isRole(value: unknown): value is Role {
-  return typeof value === "string" && (ROLES as string[]).includes(value);
-}
-
-function getAdminClient(): SupabaseClient | null {
-  if (!supabaseUrl || !serviceRoleKey) return null;
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-}
-
-function bearerToken(request: Request) {
+function requireAdmin(request: Request): Guarded {
   const header = request.headers.get("authorization") ?? "";
-  return header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
+  if (!header.toLowerCase().startsWith("bearer ")) {
+    return { response: NextResponse.json({ message: "Missing authorization token." }, { status: 401 }) };
+  }
+
+  const caller = verifyToken(header.slice(7).trim());
+  if (!caller) {
+    return { response: NextResponse.json({ message: "Invalid session." }, { status: 401 }) };
+  }
+  if (caller.role !== "admin") {
+    return { response: NextResponse.json({ message: "Admin access required." }, { status: 403 }) };
+  }
+
+  return { caller };
 }
 
-type Guarded = { admin: SupabaseClient } | { response: NextResponse };
-
-async function requireAdmin(request: Request): Promise<Guarded> {
-  const admin = getAdminClient();
-  if (!admin) {
-    return {
-      response: withCors(
-        NextResponse.json(
-          {
-            message:
-              "User provisioning is not configured. Set SUPABASE_SERVICE_ROLE_KEY in the server environment to enable admin user management.",
-            code: "not-configured"
-          },
-          { status: 501 }
-        ),
-        request,
-        METHODS
-      )
-    };
+function fail(error: unknown) {
+  if (error instanceof AccountConflictError) {
+    return NextResponse.json({ message: error.message }, { status: 409 });
   }
-
-  const token = bearerToken(request);
-  if (!token) {
-    return {
-      response: withCors(NextResponse.json({ message: "Missing authorization token." }, { status: 401 }), request, METHODS)
-    };
-  }
-
-  const { data, error } = await admin.auth.getUser(token);
-  if (error || !data.user) {
-    return { response: withCors(NextResponse.json({ message: "Invalid session." }, { status: 401 }), request, METHODS) };
-  }
-  if (!isRole(data.user.user_metadata?.role) || data.user.user_metadata.role !== "admin") {
-    return {
-      response: withCors(NextResponse.json({ message: "Admin access required." }, { status: 403 }), request, METHODS)
-    };
-  }
-
-  return { admin };
-}
-
-type ApiUser = {
-  id: string;
-  email: string;
-  name: string;
-  username: string;
-  role: Role;
-  createdAt: string;
-};
-
-function mapUser(user: {
-  id: string;
-  email?: string | null;
-  created_at?: string;
-  user_metadata?: Record<string, unknown> | null;
-}): ApiUser {
-  const metadata = user.user_metadata ?? {};
-  return {
-    id: user.id,
-    email: user.email ?? "",
-    name: typeof metadata.name === "string" ? metadata.name : "",
-    username: typeof metadata.username === "string" ? metadata.username : "",
-    role: isRole(metadata.role) ? metadata.role : "student",
-    createdAt: user.created_at ?? ""
-  };
+  return NextResponse.json(
+    { message: error instanceof Error ? error.message : "Request failed." },
+    { status: 500 }
+  );
 }
 
 export async function GET(request: Request) {
-  const guard = await requireAdmin(request);
+  const guard = requireAdmin(request);
   if ("response" in guard) return guard.response;
 
   try {
-    const { data, error } = await guard.admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    if (error) throw error;
-    const users = data.users.map(mapUser).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    return withCors(NextResponse.json({ users }), request, METHODS);
+    return NextResponse.json({ users: await listAccounts() });
   } catch (error) {
-    return withCors(
-      NextResponse.json({ message: error instanceof Error ? error.message : "Failed to list users." }, { status: 500 }),
-      request,
-      METHODS
-    );
+    return fail(error);
   }
 }
 
 export async function POST(request: Request) {
-  const guard = await requireAdmin(request);
+  const guard = requireAdmin(request);
   if ("response" in guard) return guard.response;
 
   const body = (await request.json().catch(() => null)) as {
@@ -136,6 +106,8 @@ export async function POST(request: Request) {
     name?: string;
     username?: string;
     role?: string;
+    subject?: string;
+    studentEmail?: string;
   } | null;
 
   if (!body?.email || !body.password || !isRole(body.role)) {
@@ -147,25 +119,28 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { data, error } = await guard.admin.auth.admin.createUser({
-      email: body.email.trim(),
+    const linkError = await checkRoleLink(body.role, body.subject, body.studentEmail);
+    if (linkError) {
+      return NextResponse.json({ message: linkError }, { status: 400 });
+    }
+
+    const user = await createAccount({
+      email: body.email,
       password: body.password,
-      email_confirm: true,
-      user_metadata: { name: body.name?.trim() ?? "", username: body.username?.trim() ?? "", role: body.role }
+      name: body.name,
+      username: body.username,
+      role: body.role,
+      subject: body.subject,
+      studentEmail: body.studentEmail
     });
-    if (error) throw error;
-    return withCors(NextResponse.json({ user: mapUser(data.user) }, { status: 201 }), request, METHODS);
+    return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
-    return withCors(
-      NextResponse.json({ message: error instanceof Error ? error.message : "Failed to create user." }, { status: 500 }),
-      request,
-      METHODS
-    );
+    return fail(error);
   }
 }
 
 export async function PATCH(request: Request) {
-  const guard = await requireAdmin(request);
+  const guard = requireAdmin(request);
   if ("response" in guard) return guard.response;
 
   const body = (await request.json().catch(() => null)) as {
@@ -175,59 +150,77 @@ export async function PATCH(request: Request) {
     name?: string;
     username?: string;
     role?: string;
+    subject?: string;
+    studentEmail?: string;
   } | null;
 
   if (!body?.id) {
     return withCors(NextResponse.json({ message: "id is required." }, { status: 400 }), request, METHODS);
   }
 
-  const attributes: {
-    email?: string;
-    password?: string;
-    user_metadata?: Record<string, unknown>;
-  } = {};
-
-  if (typeof body.email === "string" && body.email.trim()) attributes.email = body.email.trim();
-  if (typeof body.password === "string" && body.password.length > 0) attributes.password = body.password;
-
-  const metadata: Record<string, unknown> = {};
-  if (typeof body.name === "string") metadata.name = body.name.trim();
-  if (typeof body.username === "string") metadata.username = body.username.trim();
-  if (isRole(body.role)) metadata.role = body.role;
-  if (Object.keys(metadata).length > 0) attributes.user_metadata = metadata;
+  // Demoting the last admin would leave nobody able to manage accounts.
+  if (isRole(body.role) && body.role !== "admin" && (await countAdmins(body.id)) === 0) {
+    return NextResponse.json({ message: "last-admin" }, { status: 409 });
+  }
 
   try {
-    const { data, error } = await guard.admin.auth.admin.updateUserById(body.id, attributes);
-    if (error) throw error;
-    return withCors(NextResponse.json({ user: mapUser(data.user) }), request, METHODS);
+    // A password-only reset carries no role fields; skip the link check so it
+    // does not trip over values the caller never sent.
+    const touchesRoleFields =
+      isRole(body.role) || typeof body.subject === "string" || typeof body.studentEmail === "string";
+
+    if (touchesRoleFields) {
+      const existing = await findAccountById(body.id);
+      if (!existing) return NextResponse.json({ message: "Account not found." }, { status: 404 });
+
+      const nextRole = isRole(body.role) ? body.role : existing.role;
+      const linkError = await checkRoleLink(
+        nextRole,
+        body.subject ?? existing.subject,
+        body.studentEmail ?? existing.studentEmail
+      );
+      if (linkError) {
+        return NextResponse.json({ message: linkError }, { status: 400 });
+      }
+    }
+
+    const user = await updateAccount(body.id, {
+      email: body.email,
+      password: body.password,
+      name: body.name,
+      username: body.username,
+      role: isRole(body.role) ? body.role : undefined,
+      subject: body.subject,
+      studentEmail: body.studentEmail
+    });
+
+    if (!user) return NextResponse.json({ message: "Account not found." }, { status: 404 });
+    return NextResponse.json({ user });
   } catch (error) {
-    return withCors(
-      NextResponse.json({ message: error instanceof Error ? error.message : "Failed to update user." }, { status: 500 }),
-      request,
-      METHODS
-    );
+    return fail(error);
   }
 }
 
 export async function DELETE(request: Request) {
-  const guard = await requireAdmin(request);
+  const guard = requireAdmin(request);
   if ("response" in guard) return guard.response;
 
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
+  const id = new URL(request.url).searchParams.get("id");
   if (!id) {
     return withCors(NextResponse.json({ message: "id is required." }, { status: 400 }), request, METHODS);
   }
+  if (id === guard.caller.sub) {
+    return NextResponse.json({ message: "cannot-delete-self" }, { status: 409 });
+  }
+  if ((await countAdmins(id)) === 0) {
+    return NextResponse.json({ message: "last-admin" }, { status: 409 });
+  }
 
   try {
-    const { error } = await guard.admin.auth.admin.deleteUser(id);
-    if (error) throw error;
-    return withCors(NextResponse.json({ ok: true }), request, METHODS);
+    const removed = await deleteAccount(id);
+    if (!removed) return NextResponse.json({ message: "Account not found." }, { status: 404 });
+    return NextResponse.json({ ok: true });
   } catch (error) {
-    return withCors(
-      NextResponse.json({ message: error instanceof Error ? error.message : "Failed to delete user." }, { status: 500 }),
-      request,
-      METHODS
-    );
+    return fail(error);
   }
 }

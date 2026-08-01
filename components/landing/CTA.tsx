@@ -23,13 +23,13 @@ const STARS = [
 export function CTA({ dict }: CTAProps) {
   const { cta } = dict;
   return (
-    <section className="relative mx-auto w-full max-w-7xl px-5 pb-24 pt-8 sm:px-8">
+    <section className="relative mx-auto w-full max-w-7xl px-5 pb-24 pt-4 sm:px-8 lg:pb-32">
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 30 }}
-        whileInView={{ opacity: 1, scale: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.4 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="relative overflow-hidden rounded-[2.5rem] bg-[radial-gradient(120%_120%_at_0%_0%,#1e3a8a_0%,#111c44_45%,#0b1226_100%)] px-6 py-14 shadow-[0_30px_80px_rgba(2,6,23,0.55)] ring-1 ring-white/10 sm:px-14"
+        initial={{ opacity: 0, scale: 0.94, y: 36, filter: "blur(10px)" }}
+        whileInView={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
+        viewport={{ once: true, amount: 0.35 }}
+        transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+        className="relative overflow-hidden rounded-[2.5rem] bg-[radial-gradient(120%_120%_at_0%_0%,#1e3a8a_0%,#111c44_45%,#0b1226_100%)] px-6 py-14 shadow-[0_30px_80px_rgba(2,6,23,0.55)] ring-1 ring-white/10 sm:px-14 lg:py-16"
       >
         {/* Stars */}
         {STARS.map((star, i) => (
@@ -55,7 +55,7 @@ export function CTA({ dict }: CTAProps) {
               {cta.title}{" "}
               <span className="bg-linear-to-r from-[#7dd3fc] to-[#a78bfa] bg-clip-text text-transparent">{cta.highlight}</span>
             </h2>
-            <p className="mx-auto mt-3 max-w-lg text-[1.02rem] text-slate-300">{cta.subtitle}</p>
+            <p className="mx-auto mt-4 max-w-lg text-[1.02rem] leading-relaxed text-slate-300">{cta.subtitle}</p>
           </div>
 
           <Link

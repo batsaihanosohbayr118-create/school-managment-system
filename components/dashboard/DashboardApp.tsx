@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -18,13 +18,10 @@ import {
   House,
   LogOut,
   Menu,
-  Moon,
   Pencil,
   Plus,
   Printer,
   Search,
-  Settings as SettingsIcon,
-  Sun,
   Trash2,
   UserCog,
   Video,
@@ -46,8 +43,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { WellbeingCorner } from "@/components/dashboard/WellbeingCorner";
 import {
-  chartData,
   navItems,
   subjects
 } from "@/lib/demo-data";
@@ -67,13 +64,14 @@ import {
   createSchoolResource,
   deleteSchoolResource,
   listSchoolResource,
-  updateSchoolResource
+  updateSchoolResource,
+  type SchoolResourceRequestOptions
 } from "@/lib/school-api";
-import { authService, isSupabaseConfigured } from "@/lib/supabase";
-import { dashboardPathForRole, isRole } from "@/lib/auth-flow";
-import { subjectOptions } from "@/lib/subjects";
+import { authService } from "@/lib/auth-client";
+import { dashboardPathForRole } from "@/lib/auth-flow";
+import { defaultStudentSubjectsValue, subjectOptions } from "@/lib/subjects";
 import type { NavModule, Role, SubjectAssignment, SubjectContent, SubjectLesson } from "@/lib/types";
-import type { SchoolResource } from "@/lib/school-supabase";
+import type { SchoolResource } from "@/lib/school-db";
 
 type ResourceTableData = {
   columns: string[];
@@ -104,37 +102,150 @@ type SubjectContentTarget = {
   name: string;
 } | null;
 
-const pieData = [
-  { name: "Present", value: 76, color: "#10b981" },
-  { name: "Late", value: 12, color: "#f59e0b" },
-  { name: "Absent", value: 12, color: "#ef4444" }
-];
+type RevenuePoint = { month: string; revenue: number };
+type AttendanceSlice = { name: string; value: number; color: string };
+
+const attendanceStatusColors: Record<string, string> = {
+  present: "#10b981",
+  late: "#f59e0b",
+  absent: "#ef4444",
+  excused: "#38bdf8"
+};
+
+const shortMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** Resources each role's dashboard derives its metrics and charts from. */
+const dashboardResources: Record<Role, SchoolResource[]> = {
+  admin: ["students", "teachers", "payments", "attendance"],
+  teacher: ["attendance", "grades", "timetable", "assignments"],
+  student: ["grades", "attendance", "payments", "timetable"],
+  parent: ["attendance", "grades", "payments", "announcements"]
+};
+
+const emptyTable: ResourceTableData = { columns: [], ids: [], rows: [] };
+
+function cellValues(table: ResourceTableData, name: string) {
+  const index = table.columns.findIndex((column) => column.toLowerCase() === name.toLowerCase());
+  if (index < 0) return [];
+  return table.rows.map((row) => (row[index] ?? "").trim());
+}
+
+function countMatching(table: ResourceTableData, name: string, expected: string) {
+  return cellValues(table, name).filter((value) => value.toLowerCase() === expected.toLowerCase()).length;
+}
+
+function parseAmount(value: string | undefined) {
+  const parsed = parseFloat((value ?? "").replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function averageScore(table: ResourceTableData) {
+  const scores = cellValues(table, "Score")
+    .map((value) => parseFloat(value.replace(/[^\d.-]/g, "")))
+    .filter((value) => Number.isFinite(value));
+
+  if (scores.length === 0) return null;
+  return scores.reduce((sum, value) => sum + value, 0) / scores.length;
+}
+
+function attendancePercent(table: ResourceTableData) {
+  const total = table.rows.length;
+  if (total === 0) return { percent: 0, present: 0, total: 0 };
+  const present = countMatching(table, "Status", "Present");
+  return { percent: Math.round((present / total) * 100), present, total };
+}
+
+/** Dates arrive as free-form TEXT, so accept ISO first and fall back to Date parsing. */
+function toDate(value: string | undefined) {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function monthKey(value: string | undefined) {
+  const iso = /^(\d{4})-(\d{2})/.exec((value ?? "").trim());
+  if (iso) return `${iso[1]}-${iso[2]}`;
+  const parsed = toDate(value);
+  if (!parsed) return null;
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Safe across a 6-month window: no month name can repeat inside it. */
+function monthLabel(key: string, language: Language) {
+  const monthNumber = Number(key.slice(5, 7));
+  if (!monthNumber) return key;
+  return language === "mn" ? `${monthNumber}-р сар` : shortMonthNames[monthNumber - 1];
+}
+
+/** Paid invoices grouped by due-date month, most recent six months. */
+function buildRevenueSeries(payments: ResourceTableData, language: Language): RevenuePoint[] {
+  const dueDates = cellValues(payments, "Due Date");
+  const amounts = cellValues(payments, "Amount");
+  const statuses = cellValues(payments, "Status");
+  if (dueDates.length === 0 || amounts.length === 0) return [];
+
+  const totals = new Map<string, number>();
+
+  dueDates.forEach((dueDate, index) => {
+    if (statuses[index] && statuses[index].toLowerCase() !== "paid") return;
+    const key = monthKey(dueDate);
+    if (!key) return;
+    totals.set(key, (totals.get(key) ?? 0) + parseAmount(amounts[index]));
+  });
+
+  return [...totals.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-6)
+    .map(([key, revenue]) => ({ month: monthLabel(key, language), revenue }));
+}
+
+function buildAttendanceMix(attendance: ResourceTableData, language: Language): AttendanceSlice[] {
+  const counts = new Map<string, number>();
+
+  for (const status of cellValues(attendance, "Status")) {
+    if (!status) continue;
+    counts.set(status, (counts.get(status) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .sort(([, a], [, b]) => b - a)
+    .map(([status, value]) => ({
+      name: translateValue(status, language),
+      value,
+      color: attendanceStatusColors[status.toLowerCase()] ?? "#6366f1"
+    }));
+}
 
 const createConfig: Record<NavModule, { fields: string[] }> = {
   dashboard: { fields: ["Report title", "Date range"] },
-  students: { fields: ["Name", "Email", "Class", "Subjects", "Parent name", "Phone", "Payment", "Parent Email"] },
-  teachers: { fields: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"] },
-  parents: { fields: ["Name", "Student", "Phone", "Occupation", "Email"] },
+  // "Password" provisions the student's login account; the class is set later
+  // from the Students table, where it can be changed without a password reset.
+  students: { fields: ["Name", "Email", "Password", "Subjects", "Parent name", "Phone", "Payment", "Parent Email"] },
+  // "Password" provisions the teacher's login, as it does for students and parents.
+  teachers: { fields: ["Name", "Subject", "Email", "Password", "Salary", "Contact"] },
+  // "Password" provisions the parent's login, the same way it does for students.
+  parents: { fields: ["Name", "Student", "Phone", "Password", "Email"] },
   subjects: { fields: ["Name", "Code", "Description", "Teacher", "Category", "Grade Levels"] },
   assignments: { fields: ["Subject", "Title", "Type", "Due Date", "Max Score", "Description"] },
   materials: { fields: ["Subject", "Title", "File Type", "File URL"] },
-  classes: { fields: ["Class", "Section", "Teacher"] },
-  attendance: { fields: ["Student", "Subject", "Class", "Date", "Status"] },
+  attendance: { fields: ["Student", "Subject", "Date", "Status"] },
   grades: { fields: ["Student", "Subject", "Score", "Semester"] },
   payments: { fields: ["Student", "Amount", "Status", "Due Date"] },
   timetable: { fields: ["Day", "Time", "Subject", "Teacher", "Class"] },
   announcements: { fields: ["Title", "Audience", "Content"] },
+  wellbeing: { fields: ["Question", "Category", "Note", "Date"] },
   settings: { fields: ["Setting name", "Value"] }
 };
 
 const visibleModulesByRole: Record<Role, NavModule[]> = {
-  admin: ["dashboard", "students", "teachers", "parents", "subjects", "assignments", "materials", "payments", "timetable", "announcements", "settings"],
-  teacher: ["dashboard", "students", "subjects", "assignments", "materials", "classes", "attendance", "grades", "timetable", "announcements", "settings"],
-  student: ["dashboard", "subjects", "assignments", "materials", "attendance", "grades", "payments", "timetable", "announcements", "settings"],
-  parent: ["dashboard", "subjects", "assignments", "materials", "attendance", "grades", "payments", "timetable", "announcements", "settings"]
+  admin: ["dashboard", "students", "teachers", "parents", "subjects", "assignments", "materials", "payments", "timetable", "announcements", "wellbeing"],
+  teacher: ["dashboard", "students", "subjects", "assignments", "materials", "attendance", "timetable", "announcements"],
+  student: ["dashboard", "subjects", "assignments", "materials", "attendance", "payments", "timetable", "announcements"],
+  parent: ["dashboard", "subjects", "assignments", "materials", "attendance", "payments", "timetable", "announcements"]
 };
 
-const demoSessionKey = "educore_session";
 const notificationStorageKey = "educore_activity_notifications";
 const parentScopedResources = new Set<SchoolResource>(["attendance", "grades", "payments", "assignments", "materials", "timetable"]);
 
@@ -175,6 +286,7 @@ function statusOptionsFor(resource: NavModule, field: string) {
   if (resource === "students" && field === "Payment") return ["Unpaid", "Partial", "Paid"];
   if (resource === "payments" && field === "Status") return ["Unpaid", "Partial", "Paid"];
   if (resource === "attendance" && field === "Status") return ["Present", "Late", "Absent"];
+  if (resource === "wellbeing" && field === "Category") return ["General", "Mood", "Stress", "Sleep", "Friendship", "Family", "Focus"];
   return null;
 }
 
@@ -250,6 +362,26 @@ function escapeHtml(value: string) {
 
     return entities[character] ?? character;
   });
+}
+
+/**
+ * Edit dialogs mirror the resource's table columns. Students are the exception:
+ * the class slot carries the password field instead, so an admin can set or
+ * reset a student's sign-in from the same place they edit the record.
+ */
+function editFieldsFor(module: NavModule, columns: string[]) {
+  // A parent's occupation and a teacher's experience are not editable here;
+  // those slots set the person's password instead.
+  if (module === "parents") return columns.map((column) => (column === "Occupation" ? "Password" : column));
+  if (module === "teachers") return columns.map((column) => (column === "Experience" ? "Password" : column));
+  if (module !== "students") return columns;
+
+  // Password is not a table column, so it has no slot of its own — put it
+  // beside the email it belongs to.
+  const fields = [...columns];
+  const emailIndex = fields.indexOf("Email");
+  fields.splice(emailIndex < 0 ? fields.length : emailIndex + 1, 0, "Password");
+  return fields;
 }
 
 function mergeSubmittedValues(
@@ -352,13 +484,13 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
   switch (resource) {
     case "students":
       return {
-        columns: ["Name", "Class", "Attendance", "GPA", "Payment", "Parent Email"],
+        columns: ["Name", "Attendance", "GPA", "Payment", "Parent Email"],
         ids: [],
         rows: []
       };
     case "teachers":
       return {
-        columns: ["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"],
+        columns: ["Name", "Subject", "Email", "Experience", "Salary", "Contact"],
         ids: [],
         rows: []
       };
@@ -383,12 +515,6 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
     case "materials":
       return {
         columns: ["Subject", "Title", "File Type", "Uploaded By"],
-        ids: [],
-        rows: []
-      };
-    case "classes":
-      return {
-        columns: ["Class", "Section", "Teacher", "Students", "Schedule"],
         ids: [],
         rows: []
       };
@@ -422,6 +548,12 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
         ids: [],
         rows: []
       };
+    case "wellbeing":
+      return {
+        columns: ["Question", "Category", "Note", "Date"],
+        ids: [],
+        rows: []
+      };
   }
 }
 
@@ -434,9 +566,53 @@ async function fetchFallbackResource(resource: SchoolResource) {
   }
 }
 
-async function loadResourceData(resource: SchoolResource) {
+type StudentOption = { value: string; label: string };
+
+/**
+ * Students an admin can still attach a parent to. The server rejects any
+ * student that already has one, so listing them would only produce an error
+ * after the admin picked a name.
+ *
+ * `keepStudent` is the parent's current student when editing — without it the
+ * dropdown could not display the value it already holds.
+ */
+async function loadUnlinkedStudents(keepStudent: string): Promise<StudentOption[]> {
+  const [studentResult, parentResult] = await Promise.all([
+    loadResourceData("students"),
+    loadResourceData("parents")
+  ]);
+
+  const nameAt = studentResult.data.columns.indexOf("Name");
+  const emailAt = studentResult.data.columns.indexOf("Email");
+  const linkedAt = parentResult.data.columns.indexOf("Student");
+  if (nameAt < 0) return [];
+
+  const keep = keepStudent.trim().toLowerCase();
+  const linked = new Set(
+    (linkedAt < 0 ? [] : parentResult.data.rows.map((row) => (row[linkedAt] ?? "").trim().toLowerCase()))
+      .filter((name) => name && name !== keep)
+  );
+
+  return studentResult.data.rows
+    .map((row) => ({ name: (row[nameAt] ?? "").trim(), email: emailAt < 0 ? "" : (row[emailAt] ?? "").trim() }))
+    .filter((student) => student.name && !linked.has(student.name.toLowerCase()))
+    .map((student) => ({
+      value: student.name,
+      label: student.email ? `${student.name} — ${student.email}` : student.name
+    }));
+}
+
+type SubjectScopeOption = { id: string; name: string };
+
+/** Resources a student or parent may only read one subject at a time. */
+const subjectScopedResources = new Set<SchoolResource>(["assignments", "materials"]);
+
+async function loadResourceData(resource: SchoolResource, options?: SchoolResourceRequestOptions) {
   try {
-    return { data: await listSchoolResource(resource, { mode: "summary" }), needsLocalParentFilter: false };
+    return {
+      data: await listSchoolResource(resource, options ?? { mode: "summary" }),
+      needsLocalParentFilter: false
+    };
   } catch (error) {
     console.warn("School resource unavailable; using local school data fallback.", error);
   }
@@ -481,12 +657,15 @@ async function deleteResourceData(resource: SchoolResource, recordId: string) {
 }
 
 function StatusDropdown({
+  labels,
   language,
   onChange,
   options,
   placeholder,
   value
 }: {
+  /** Display text per option, for lists whose value is not self-explanatory. */
+  labels?: Record<string, string>;
   language: Language;
   onChange: (value: string) => void;
   options: string[];
@@ -494,7 +673,8 @@ function StatusDropdown({
   value: string;
 }) {
   const [open, setOpen] = useState(false);
-  const selectedLabel = value ? translateValue(value, language) : placeholder;
+  const optionLabel = (option: string) => labels?.[option] ?? translateValue(option, language);
+  const selectedLabel = value ? optionLabel(value) : placeholder;
 
   return (
     <div
@@ -532,7 +712,7 @@ function StatusDropdown({
                 role="option"
                 type="button"
               >
-                <span>{translateValue(option, language)}</span>
+                <span>{optionLabel(option)}</span>
                 {selected ? <Check aria-hidden="true" size={16} /> : null}
               </button>
             );
@@ -694,13 +874,11 @@ function AssignmentTypeDropdown({
 function DatePicker({
   value,
   onChange,
-  placeholder,
-  darkMode
+  placeholder
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  darkMode?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(() => value ? parseInt(value.split("-")[0]) : new Date().getFullYear());
@@ -778,7 +956,7 @@ function DatePicker({
     : "";
 
   const popup = open ? createPortal(
-    <div className={`ec-datepicker-popup${darkMode ? " dark" : ""}`} style={menuStyle}>
+    <div className="ec-datepicker-popup dark" style={menuStyle}>
       <div className="ec-datepicker-header">
         <button type="button" onClick={prevMonth}><ChevronLeft size={16} /></button>
         <span>{MONTHS[viewMonth]} {viewYear}</span>
@@ -837,7 +1015,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const router = useRouter();
   const [activeModule, setActiveModule] = useState<NavModule>("dashboard");
   const [role, setRole] = useState<Role>(lockedRole);
-  const [language, setLanguage] = useState<Language>("en");
+  const [language, setLanguage] = useState<Language>("mn");
   const [query, setQuery] = useState("");
   const [darkMode, setDarkMode] = useState(false);
   const themeLoaded = useRef(false);
@@ -858,6 +1036,11 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const [notificationPageOpen, setNotificationPageOpen] = useState(false);
   const [activityNotifications, setActivityNotifications] = useState<ActivityNotification[]>([]);
   const [selectedSubjectContent, setSelectedSubjectContent] = useState<SubjectContentTarget>(null);
+  // null while the parent dialog is still loading the student list.
+  const [studentOptions, setStudentOptions] = useState<StudentOption[] | null>(null);
+  // Students and parents browse assignments/materials one subject at a time.
+  const [subjectScopeOptions, setSubjectScopeOptions] = useState<SubjectScopeOption[]>([]);
+  const [subjectScope, setSubjectScope] = useState("");
 
   const activeNav = navItems.find((item) => item.id === activeModule) ?? navItems[0];
   const visibleNavItems = navItems.filter((item) => visibleModulesByRole[role].includes(item.id));
@@ -865,7 +1048,10 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const dashboard = copy.dashboards[role];
   const createCopy = copy.create[activeModule];
   const activeResource: SchoolResource | null = activeModule === "dashboard" || activeModule === "settings" ? null : activeModule;
-  const modalFields = modalMode === "edit" && resourceData ? resourceData.columns : createConfig[activeModule].fields;
+  const needsSubjectScope = role === "student" || role === "parent";
+  const scopeThisResource = needsSubjectScope && activeResource !== null && subjectScopedResources.has(activeResource);
+  const activeSubjectName = subjectScopeOptions.find((option) => option.id === subjectScope)?.name ?? "";
+  const modalFields = modalMode === "edit" && resourceData ? editFieldsFor(activeModule, resourceData.columns) : createConfig[activeModule].fields;
   const modalTitle = modalMode === "edit" ? `${copy.common.edit} ${copy.recordLabel[activeModule]}` : createCopy.title;
   const modalAction = modalMode === "edit" ? copy.common.saveChanges : createCopy.action;
   const unreadNotifications = activityNotifications.filter((item) => !item.read).length;
@@ -873,32 +1059,24 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const canManageActiveModule = activeModule === "attendance" ? canManageAttendance : role === "admin";
 
   async function logout() {
-    window.localStorage.removeItem(demoSessionKey);
-    window.sessionStorage.removeItem(demoSessionKey);
-    await authService.signOut();
+    authService.signOut();
     router.push("/login");
   }
 
   async function saveProfile({ name, email, avatarUrl }: { name: string; email: string; avatarUrl: string }) {
-    if (isSupabaseConfigured) {
-      const { error } = await authService.updateProfile({ name, email, avatarUrl });
+    const result = await authService.updateProfile({ name, email, avatarUrl });
 
-      if (error) {
-        setToast(language === "mn" ? "Профайл хадгалахад алдаа гарлаа" : "Could not save profile");
-        return false;
-      }
-    } else {
-      try {
-        const demoSession = window.sessionStorage.getItem(demoSessionKey);
-        const parsedSession = demoSession ? (JSON.parse(demoSession) as Record<string, unknown>) : {};
-
-        window.sessionStorage.setItem(
-          demoSessionKey,
-          JSON.stringify({ ...parsedSession, email, name, avatarUrl })
-        );
-      } catch {
-        // Ignore demo session persistence errors; local state below still updates.
-      }
+    if ("error" in result) {
+      setToast(
+        result.error === "email-exists"
+          ? language === "mn"
+            ? "Энэ и-мэйл өөр хэрэглэгчид бүртгэлтэй байна"
+            : "That email is already taken"
+          : language === "mn"
+            ? "Профайл хадгалахад алдаа гарлаа"
+            : "Could not save profile"
+      );
+      return false;
     }
 
     setCurrentUserEmail(email);
@@ -927,12 +1105,12 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
       students: { en: "Student", mn: "Сурагч" },
       teachers: { en: "Teacher", mn: "Багш" },
       subjects: { en: "Subject", mn: "Хичээл" },
-      classes: { en: "Class", mn: "Анги" },
       attendance: { en: "Attendance", mn: "Ирц" },
       grades: { en: "Grade", mn: "Дүн" },
       payments: { en: "Payment", mn: "Төлбөр" },
       timetable: { en: "Timetable", mn: "Хуваарь" },
-      announcements: { en: "Announcement", mn: "Зарлал" }
+      announcements: { en: "Announcement", mn: "Зарлал" },
+      wellbeing: { en: "Wellbeing question", mn: "Сэтгэл зүйн асуулт" }
     };
     const actionCopy = {
       created: {
@@ -1024,20 +1202,47 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
 
     setModalMode("create");
     setEditingRecordId(null);
-    setFormValues({});
+    // Pre-fill the school-wide subject set so a new student can see their
+    // assignments and grades without the admin typing catalogue names by hand.
+    setFormValues(activeModule === "students" ? { Subjects: defaultStudentSubjectsValue } : {});
     setModalOpen(true);
+
+    if (activeModule === "parents") {
+      void refreshStudentOptions("");
+    }
+  }
+
+  /** Opening the parent dialog is an event, so the fetch belongs here. */
+  async function refreshStudentOptions(keepStudent: string) {
+    setStudentOptions(null);
+
+    try {
+      setStudentOptions(await loadUnlinkedStudents(keepStudent));
+    } catch {
+      setStudentOptions([]);
+    }
   }
 
   function openEditModal(recordId: string, row: string[], columns: string[]) {
     setModalMode("edit");
     setEditingRecordId(recordId);
-    setFormValues(
-      columns.reduce<Record<string, string>>((current, column, index) => {
-        current[column] = row[index] ?? "";
-        return current;
-      }, {})
-    );
+
+    const values = columns.reduce<Record<string, string>>((current, column, index) => {
+      current[column] = row[index] ?? "";
+      return current;
+    }, {});
+
+    // An existing student saved before the default existed has this blank.
+    if (activeModule === "students" && !values.Subjects?.trim()) {
+      values.Subjects = defaultStudentSubjectsValue;
+    }
+
+    setFormValues(values);
     setModalOpen(true);
+
+    if (activeModule === "parents") {
+      void refreshStudentOptions(values.Student ?? "");
+    }
   }
 
   function requestDeleteRecord(recordId: string, row: string[]) {
@@ -1078,72 +1283,28 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
     let ignore = false;
 
     async function checkAuth() {
-      if (isSupabaseConfigured) {
-        const { data } = await authService.getSession();
+      await Promise.resolve();
+      if (ignore) return;
 
-        if (!ignore) {
-          if (!data.session) {
-            router.replace("/login");
-            return;
-          }
-
-          const sessionRole = data.session.user.user_metadata?.role;
-          const nextRole = isRole(sessionRole) ? sessionRole : "student";
-
-          // Route protection: a signed-in user may only view the dashboard that
-          // matches their role. Anyone else is bounced to their own dashboard.
-          if (nextRole !== lockedRole) {
-            router.replace(dashboardPathForRole(nextRole));
-            return;
-          }
-
-          setCurrentUserEmail(data.session.user.email ?? "");
-          setCurrentUserName(typeof data.session.user.user_metadata?.name === "string" ? data.session.user.user_metadata.name : "");
-          setCurrentUserAvatar(typeof data.session.user.user_metadata?.avatar_url === "string" ? data.session.user.user_metadata.avatar_url : "");
-          setRole(nextRole);
-          setActiveModule((currentModule) => (visibleModulesByRole[nextRole].includes(currentModule) ? currentModule : "dashboard"));
-
-          setAuthChecked(true);
-        }
-
+      const user = authService.getSession();
+      if (!user) {
+        router.replace("/login");
         return;
       }
 
-      await Promise.resolve();
-
-      if (!ignore) {
-        window.localStorage.removeItem(demoSessionKey);
-        const demoSession = window.sessionStorage.getItem(demoSessionKey);
-
-        if (!demoSession) {
-          router.replace("/login");
-          return;
-        }
-
-        try {
-          const parsedSession = JSON.parse(demoSession) as { email?: unknown; role?: unknown; name?: unknown; avatarUrl?: unknown };
-          const nextRole = isRole(parsedSession.role) ? parsedSession.role : "student";
-
-          // Route protection (demo mode): enforce that the session role matches
-          // the dashboard being rendered.
-          if (nextRole !== lockedRole) {
-            router.replace(dashboardPathForRole(nextRole));
-            return;
-          }
-
-          setCurrentUserEmail(typeof parsedSession.email === "string" ? parsedSession.email : "");
-          setCurrentUserName(typeof parsedSession.name === "string" ? parsedSession.name : "");
-          setCurrentUserAvatar(typeof parsedSession.avatarUrl === "string" ? parsedSession.avatarUrl : "");
-          setRole(nextRole);
-          setActiveModule((currentModule) => (visibleModulesByRole[nextRole].includes(currentModule) ? currentModule : "dashboard"));
-        } catch {
-          // Corrupt session payload — treat as unauthenticated.
-          router.replace("/login");
-          return;
-        }
-
-        setAuthChecked(true);
+      // Route protection: a signed-in user may only view the dashboard that
+      // matches their role. Anyone else is bounced to their own dashboard.
+      if (user.role !== lockedRole) {
+        router.replace(dashboardPathForRole(user.role));
+        return;
       }
+
+      setCurrentUserEmail(user.email);
+      setCurrentUserName(user.name);
+      setCurrentUserAvatar(user.avatarUrl);
+      setRole(user.role);
+      setActiveModule((currentModule) => (visibleModulesByRole[user.role].includes(currentModule) ? currentModule : "dashboard"));
+      setAuthChecked(true);
     }
 
     checkAuth();
@@ -1152,6 +1313,36 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
       ignore = true;
     };
   }, [router, lockedRole]);
+
+  // Pull the subjects this student/parent is enrolled in — they become the tabs
+  // above assignments and materials.
+  useEffect(() => {
+    // Nothing to clear on the way out: the tabs only render for the roles that
+    // need them, and the role is fixed for the lifetime of the dashboard.
+    if (!authChecked || !needsSubjectScope) return;
+
+    let ignore = false;
+
+    listSchoolResource("subjects", { mode: "summary" })
+      .then((table) => {
+        if (ignore) return;
+
+        const nameIndex = table.columns.findIndex((column) => column.toLowerCase() === "name");
+        const options = table.rows
+          .map((row, rowIndex) => ({ id: table.ids[rowIndex] ?? "", name: row[nameIndex >= 0 ? nameIndex : 0] ?? "" }))
+          .filter((option) => option.id && option.name);
+
+        setSubjectScopeOptions(options);
+        setSubjectScope((current) => (options.some((o) => o.id === current) ? current : (options[0]?.id ?? "")));
+      })
+      .catch(() => {
+        if (!ignore) setSubjectScopeOptions([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [authChecked, needsSubjectScope]);
 
   useEffect(() => {
     let ignore = false;
@@ -1165,11 +1356,22 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
         return;
       }
 
+      // Wait for the subject tabs before asking for a scoped resource — the
+      // server rejects a page request that carries no subject.
+      if (scopeThisResource && !subjectScope) {
+        setResourceData({ columns: [], ids: [], rows: [] });
+        setResourceLoading(false);
+        return;
+      }
+
       setResourceLoading(true);
       setResourceError("");
 
       try {
-        const result = await loadResourceData(activeResource);
+        const result = await loadResourceData(
+          activeResource,
+          scopeThisResource ? { mode: "page", subjectId: subjectScope } : { mode: "summary" }
+        );
         let data = result.data;
 
         if (result.needsLocalParentFilter && role === "parent" && currentUserEmail && parentScopedResources.has(activeResource)) {
@@ -1199,26 +1401,27 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
     return () => {
       ignore = true;
     };
-  }, [activeResource, authChecked, copy.common.databaseOffline, currentUserEmail, role]);
+  }, [activeResource, authChecked, copy.common.databaseOffline, currentUserEmail, role, scopeThisResource, subjectScope]);
 
   if (!authChecked) {
     return (
-      <main className={`educore-shell auth-check${darkMode ? " dark" : ""}`}>
+      <main className="educore-shell auth-check dark">
         <div className="auth-loading">
-          <Image className="ec-loading-logo" src="/data/subjects/download.png" alt="Nova Mind Academy" width={559} height={534} priority />
+          <Image className="ec-loading-logo" src="/logo-mark.png" alt="Nova Mind Academy" width={544} height={420} priority />
           <strong>{copy.app.loadingSession}</strong>
+          <span className="ec-spinner" style={{ "--ec-spinner-size": "18px", "--ec-spinner-width": "2px" } as CSSProperties} />
         </div>
       </main>
     );
   }
 
   return (
-    <main className={`educore-shell${darkMode ? " dark" : ""}`}>
+    <main className="educore-shell dark">
       <button className={`ec-backdrop${mobileOpen ? " show" : ""}`} onClick={() => setMobileOpen(false)} type="button" />
       <aside className={`ec-sidebar${mobileOpen ? " open" : ""}`}>
         <div className="ec-brand">
           <span className="ec-brand-logo">
-            <Image src="/data/subjects/download.png" alt="Nova Mind Academy" width={559} height={534} priority />
+            <Image src="/logo-mark.png" alt="Nova Mind Academy" width={544} height={420} priority />
           </span>
           <div>
             <strong>Nova Mind</strong>
@@ -1280,9 +1483,6 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               <Check size={16} />
             </div>
           </div>
-          <button className="ec-icon-button theme-toggle" onClick={() => setDarkMode((value) => !value)} type="button">
-            {darkMode ? <Sun size={19} /> : <Moon size={19} />}
-          </button>
           <button
             className={`ec-icon-button notification-toggle${notificationPageOpen ? " active" : ""}`}
             onClick={() => {
@@ -1341,7 +1541,6 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               selectedSubjectContent ? (
                 <SubjectContentPanel
                   canManage={role === "admin" || role === "teacher"}
-                  darkMode={darkMode}
                   language={language}
                   subject={selectedSubjectContent}
                   onBack={() => setSelectedSubjectContent(null)}
@@ -1365,14 +1564,17 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
                 />
               )
             ) : null}
-            {activeModule === "assignments" ? (
-              <AssignmentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
-            ) : null}
-            {activeModule === "materials" ? (
-              <MaterialsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
-            ) : null}
-            {activeModule === "classes" ? (
-              <ClassesModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+            {activeModule === "assignments" || activeModule === "materials" ? (
+              <>
+                {scopeThisResource ? (
+                  <SubjectScopeTabs language={language} onChange={setSubjectScope} options={subjectScopeOptions} value={subjectScope} />
+                ) : null}
+                {subjectScopeOptions.length === 0 && scopeThisResource ? null : activeModule === "assignments" ? (
+                  <AssignmentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
+                ) : (
+                  <MaterialsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
+                )}
+              </>
             ) : null}
             {activeModule === "attendance" ? (
               <AttendanceModule apiData={resourceData} canManage={canManageAttendance} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
@@ -1389,18 +1591,19 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
             {activeModule === "announcements" ? (
               <AnnouncementsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
+            {activeModule === "wellbeing" ? (
+              <WellbeingModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+            ) : null}
             {activeModule === "settings" ? (
               <SettingsModule
                 copy={copy}
                 currentUserAvatar={currentUserAvatar}
                 currentUserEmail={currentUserEmail}
                 currentUserName={currentUserName}
-                darkMode={darkMode}
                 language={language}
                 logout={logout}
                 onSaveProfile={saveProfile}
                 role={role}
-                setDarkMode={setDarkMode}
                 setLanguage={setLanguage}
               />
             ) : null}
@@ -1430,6 +1633,8 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
           </>
         )}
       </section>
+
+      {role === "student" ? <WellbeingCorner copy={copy} /> : null}
 
       {modalOpen ? (
         <div className="modal-layer">
@@ -1466,26 +1671,37 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               </button>
             </div>
             {modalFields.map((field, index) => {
-              const options = statusOptionsFor(activeModule, field);
+              // A parent is attached to a student who does not have one yet, so
+              // that field is a live list rather than a typed name.
+              const picksStudent = activeModule === "parents" && field === "Student";
+              const options = picksStudent
+                ? (studentOptions ?? []).map((student) => student.value)
+                : statusOptionsFor(activeModule, field);
 
               return options ? (
                 <div className="record-field" key={field}>
                   <span>{translateColumn(field, language)}</span>
                   <StatusDropdown
+                    labels={picksStudent ? Object.fromEntries((studentOptions ?? []).map((s) => [s.value, s.label])) : undefined}
                     language={language}
                     onChange={(value) => setFormValues((current) => ({ ...current, [field]: value }))}
                     options={options}
-                    placeholder={translateColumn(field, language)}
+                    placeholder={picksStudent && studentOptions === null ? copy.common.loadingStudents : translateColumn(field, language)}
                     value={formValues[field] ?? ""}
                   />
+                  {picksStudent && studentOptions?.length === 0 ? (
+                    <small className="record-hint">{copy.common.noUnlinkedStudents}</small>
+                  ) : null}
                 </div>
               ) : (
                 <label className="record-field" key={field}>
                   <span>{translateColumn(field, language)}</span>
                   <Input
+                    autoComplete={field === "Password" ? "new-password" : undefined}
                     onChange={(event) => setFormValues((current) => ({ ...current, [field]: event.target.value }))}
                     placeholder={translateColumn(field, language)}
                     required={index === 0}
+                    type={field === "Password" ? "password" : "text"}
                     value={formValues[field] ?? ""}
                   />
                 </label>
@@ -1552,16 +1768,6 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
           <Bell size={20} />
           {unreadNotifications > 0 ? <span className="notification-count">{unreadNotifications}</span> : null}
           <span>{language === "mn" ? "Мэдэгдэл" : "Notification"}</span>
-        </button>
-        <button
-          className={!notificationPageOpen && activeModule === "settings" ? "active" : ""}
-          onClick={() => {
-            openModule("settings");
-          }}
-          type="button"
-        >
-          <SettingsIcon size={20} />
-          <span>{copy.nav.settings.label}</span>
         </button>
       </nav>
     </main>
@@ -1634,120 +1840,147 @@ function NotificationsPage({
 
 function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; currentUserEmail: string; language: Language; role: Role }) {
   const dashboard = copy.dashboards[role];
-  const localizedPieData = pieData.map((entry) => ({ ...entry, name: translateValue(entry.name, language) }));
   const [liveStats, setLiveStats] = useState<string[][] | null>(null);
+  const [revenueSeries, setRevenueSeries] = useState<RevenuePoint[]>([]);
+  const [attendanceMix, setAttendanceMix] = useState<AttendanceSlice[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchCounts() {
+      const s = dashboard.stats;
+      const mn = language === "mn";
+      const stat = (index: number, value: string, helper: string) => [s[index]?.[0] ?? "", value, helper];
+
       try {
-        const s = dashboard.stats;
+        const resources = dashboardResources[role];
+        const loaded = await Promise.all(resources.map((resource) => loadResourceData(resource)));
+        if (cancelled) return;
+
+        const tables = new Map<SchoolResource, ResourceTableData>(
+          resources.map((resource, index) => [resource, loaded[index].data])
+        );
+        const table = (resource: SchoolResource) => tables.get(resource) ?? emptyTable;
+
+        const payments = table("payments");
+        const attendance = table("attendance");
+        const grades = table("grades");
+
+        const series = buildRevenueSeries(payments, language);
+        setRevenueSeries(series);
+        setAttendanceMix(buildAttendanceMix(attendance, language));
+
+        const { percent: attPct, present, total: attTotal } = attendancePercent(attendance);
+        const attendanceHelper = attTotal > 0
+          ? (mn ? `${attTotal} бүртгэлээс ${present}` : `${present} of ${attTotal} records`)
+          : (mn ? "Бүртгэл алга" : "No records yet");
+
+        const statuses = cellValues(payments, "Status");
+        const amounts = cellValues(payments, "Amount");
+        const sumWhereStatus = (expected: string) =>
+          amounts.reduce((sum, amount, index) => (statuses[index]?.toLowerCase() === expected ? sum + parseAmount(amount) : sum), 0);
+        const paidTotal = sumWhereStatus("paid");
+        const unpaidCount = countMatching(payments, "Status", "Unpaid");
+
+        const semesters = cellValues(grades, "Semester").filter(Boolean);
+        const latestSemester = semesters.length > 0 ? semesters[semesters.length - 1] : "";
+        const gradeHelper = latestSemester || (mn ? `${grades.rows.length} дүн` : `${grades.rows.length} grades`);
+        const avg = averageScore(grades);
+        const gpa = avg === null ? "0.0" : (avg / 25).toFixed(1);
 
         if (role === "admin") {
-          const [studentData, teacherData, paymentData, attendanceData] = await Promise.all([
-            loadResourceData("students"),
-            loadResourceData("teachers"),
-            loadResourceData("payments"),
-            loadResourceData("attendance")
-          ]);
-          const studentCount = studentData.data.rows.length;
-          const teacherCount = teacherData.data.rows.length;
-          const paidCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const amountCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "amount");
-          const revenue = paymentData.data.rows
-            .filter((row) => row[paidCol]?.toLowerCase() === "paid")
-            .reduce((sum, row) => sum + (parseFloat((row[amountCol] ?? "").replace(/[^\d.]/g, "")) || 0), 0);
-          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
-          const totalAtt = attendanceData.data.rows.length;
-          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
+          const students = table("students");
+          const teachers = table("teachers");
+          const withLogin = countMatching(students, "Payment", "Paid");
+          const subjectCount = new Set(
+            cellValues(teachers, "Subject").flatMap((value) => value.split(",").map((item) => item.trim())).filter(Boolean)
+          ).size;
+
+          // Month-over-month revenue change, only claimed when two months exist.
+          const previous = series.length >= 2 ? series[series.length - 2].revenue : 0;
+          const current = series.length >= 1 ? series[series.length - 1].revenue : 0;
+          const revenueHelper = series.length >= 2 && previous > 0
+            ? `${current >= previous ? "+" : ""}${(((current - previous) / previous) * 100).toFixed(1)}%${mn ? " өмнөх сараас" : " vs last month"}`
+            : (mn ? `${countMatching(payments, "Status", "Paid")} төлөгдсөн` : `${countMatching(payments, "Status", "Paid")} paid`);
+
           setLiveStats([
-            [s[0]?.[0] ?? "", studentCount.toString(), s[0]?.[2] ?? ""],
-            [s[1]?.[0] ?? "", teacherCount.toString(), s[1]?.[2] ?? ""],
-            [s[2]?.[0] ?? "", `$${revenue.toLocaleString()}`, s[2]?.[2] ?? ""],
-            [s[3]?.[0] ?? "", `${attPct}%`, s[3]?.[2] ?? ""]
+            stat(0, students.rows.length.toString(), mn ? `${withLogin} төлсөн` : `${withLogin} paid`),
+            stat(1, teachers.rows.length.toString(), mn ? `${subjectCount} хичээл` : `${subjectCount} subjects`),
+            stat(2, `$${paidTotal.toLocaleString()}`, revenueHelper),
+            stat(3, `${attPct}%`, attendanceHelper)
           ]);
         }
 
         if (role === "teacher") {
-          const [attendanceData, gradesData] = await Promise.all([
-            loadResourceData("attendance"),
-            loadResourceData("grades")
-          ]);
-          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
-          const totalAtt = attendanceData.data.rows.length;
-          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
-          const scoreCol = gradesData.data.columns.findIndex((c) => c.toLowerCase() === "score");
-          const scores = gradesData.data.rows.map((row) => parseFloat((row[scoreCol] ?? "").replace(/[^\d.]/g, ""))).filter((v) => !isNaN(v));
-          const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+          const timetable = table("timetable");
+          const assignments = table("assignments");
+          const today = weekdayNames[new Date().getDay()];
+          const todayClasses = countMatching(timetable, "Day", today);
+          const dueDates = cellValues(assignments, "Due Date");
+          const startOfToday = new Date();
+          startOfToday.setHours(0, 0, 0, 0);
+          const pastDue = dueDates.filter((value) => {
+            const due = toDate(value);
+            return due !== null && due < startOfToday;
+          }).length;
+
           setLiveStats([
-            [s[0]?.[0] ?? "", s[0]?.[1] ?? "", s[0]?.[2] ?? ""],
-            [s[1]?.[0] ?? "", `${attPct}%`, s[1]?.[2] ?? ""],
-            [s[2]?.[0] ?? "", gradesData.data.rows.length.toString(), s[2]?.[2] ?? ""],
-            [s[3]?.[0] ?? "", `${avgScore}%`, s[3]?.[2] ?? ""]
+            stat(0, todayClasses.toString(), mn ? `${timetable.rows.length} долоо хоногт` : `${timetable.rows.length} weekly`),
+            stat(1, `${attPct}%`, attendanceHelper),
+            stat(2, assignments.rows.length.toString(), mn ? `${pastDue} хугацаа хэтэрсэн` : `${pastDue} past due`),
+            stat(3, avg === null ? "0%" : `${Math.round(avg)}%`, gradeHelper)
           ]);
         }
 
         if (role === "student") {
-          const [gradesData, attendanceData, paymentData] = await Promise.all([
-            loadResourceData("grades"),
-            loadResourceData("attendance"),
-            loadResourceData("payments")
-          ]);
-          const scoreCol = gradesData.data.columns.findIndex((c) => c.toLowerCase() === "score");
-          const scores = gradesData.data.rows.map((row) => parseFloat((row[scoreCol] ?? "").replace(/[^\d.]/g, ""))).filter((v) => !isNaN(v));
-          const avgGpa = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length / 25).toFixed(1) : "0.0";
-          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
-          const totalAtt = attendanceData.data.rows.length;
-          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
-          const statusCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const unpaidCount = paymentData.data.rows.filter((row) => row[statusCol]?.toLowerCase() === "unpaid").length;
-          const payStatus = unpaidCount === 0
-            ? (language === "mn" ? "Төлсөн" : "Paid")
-            : (language === "mn" ? `${unpaidCount} төлөөгүй` : `${unpaidCount} unpaid`);
+          const timetable = table("timetable");
+          const today = weekdayNames[new Date().getDay()];
+          const todayClasses = countMatching(timetable, "Day", today);
+          const payStatus = payments.rows.length === 0
+            ? (mn ? "Нэхэмжлэх алга" : "No invoices")
+            : unpaidCount === 0
+              ? (mn ? "Төлсөн" : "Paid")
+              : (mn ? `${unpaidCount} төлөөгүй` : `${unpaidCount} unpaid`);
+
           setLiveStats([
-            [s[0]?.[0] ?? "", avgGpa, s[0]?.[2] ?? ""],
-            [s[1]?.[0] ?? "", `${attPct}%`, s[1]?.[2] ?? ""],
-            [s[2]?.[0] ?? "", s[2]?.[1] ?? "", s[2]?.[2] ?? ""],
-            [s[3]?.[0] ?? "", payStatus, s[3]?.[2] ?? ""]
+            stat(0, gpa, gradeHelper),
+            stat(1, `${attPct}%`, attendanceHelper),
+            stat(2, todayClasses.toString(), mn ? `${today} өдөр` : today),
+            stat(3, payStatus, mn ? `${payments.rows.length} нэхэмжлэх` : `${payments.rows.length} invoices`)
           ]);
         }
 
         if (role === "parent") {
-          const [attendanceData, gradesData, paymentData, announcementData] = await Promise.all([
-            loadResourceData("attendance"),
-            loadResourceData("grades"),
-            loadResourceData("payments"),
-            loadResourceData("announcements")
-          ]);
-          const presentCol = attendanceData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const presentCount = attendanceData.data.rows.filter((row) => row[presentCol]?.toLowerCase() === "present").length;
-          const totalAtt = attendanceData.data.rows.length;
-          const attPct = totalAtt > 0 ? Math.round((presentCount / totalAtt) * 100) : 0;
-          const scoreCol = gradesData.data.columns.findIndex((c) => c.toLowerCase() === "score");
-          const scores = gradesData.data.rows.map((row) => parseFloat((row[scoreCol] ?? "").replace(/[^\d.]/g, ""))).filter((v) => !isNaN(v));
-          const avgGpa = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length / 25).toFixed(1) : "0.0";
-          const statusCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "status");
-          const amountCol = paymentData.data.columns.findIndex((c) => c.toLowerCase() === "amount");
-          const openPayments = paymentData.data.rows
-            .filter((row) => row[statusCol]?.toLowerCase() === "unpaid")
-            .reduce((sum, row) => sum + (parseFloat((row[amountCol] ?? "").replace(/[^\d.]/g, "")) || 0), 0);
+          const announcements = table("announcements");
+          const weekAgo = new Date();
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          const recent = cellValues(announcements, "Date").filter((value) => {
+            const posted = toDate(value);
+            return posted !== null && posted >= weekAgo;
+          }).length;
+          const openPayments = sumWhereStatus("unpaid");
+
           setLiveStats([
-            [s[0]?.[0] ?? "", `${attPct}%`, s[0]?.[2] ?? ""],
-            [s[1]?.[0] ?? "", avgGpa, s[1]?.[2] ?? ""],
-            [s[2]?.[0] ?? "", `$${openPayments.toLocaleString()}`, s[2]?.[2] ?? ""],
-            [s[3]?.[0] ?? "", announcementData.data.rows.length.toString(), s[3]?.[2] ?? ""]
+            stat(0, `${attPct}%`, attendanceHelper),
+            stat(1, gpa, gradeHelper),
+            stat(2, `$${openPayments.toLocaleString()}`, mn ? `${unpaidCount} төлөөгүй` : `${unpaidCount} unpaid`),
+            stat(3, announcements.rows.length.toString(), mn ? `${recent} шинэ` : `${recent} this week`)
           ]);
         }
       } catch {
-        // fallback to i18n hardcoded values
+        // Leave the neutral placeholders from i18n in place rather than inventing numbers.
       }
     }
+
     fetchCounts();
+
+    return () => {
+      cancelled = true;
+    };
   }, [role, language, dashboard.stats]);
 
   const displayStats = liveStats ?? dashboard.stats;
+  const attendanceTotal = attendanceMix.reduce((sum, slice) => sum + slice.value, 0);
 
   return (
     <>
@@ -1767,39 +2000,63 @@ function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; 
             <Badge tone="blue">{copy.common.live}</Badge>
           </CardHeader>
           <CardContent className="chart-box">
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="revenue" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.32)" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.3)", borderRadius: 14, color: "#e5eefc" }} />
-                <Area dataKey="revenue" fill="url(#revenue)" stroke="#4f46e5" strokeWidth={3} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {revenueSeries.length === 0 ? (
+              <div className="table-empty">
+                <strong>{language === "mn" ? "Төлбөрийн бүртгэл алга" : "No payment records yet"}</strong>
+                <p>
+                  {language === "mn"
+                    ? "Төлөгдсөн нэхэмжлэх бүртгэгдсэний дараа сарын орлого энд харагдана."
+                    : "Monthly revenue appears here once paid invoices are recorded."}
+                </p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={revenueSeries}>
+                  <defs>
+                    <linearGradient id="revenue" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.32)" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.3)", borderRadius: 14, color: "#e5eefc" }} />
+                  <Area dataKey="revenue" fill="url(#revenue)" stroke="#4f46e5" strokeWidth={3} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
             <CardTitle>{language === "mn" ? "Ирцийн бүтэц" : "Attendance Mix"}</CardTitle>
-            <Badge tone="emerald">{translateValue("Today", language)}</Badge>
+            <Badge tone="emerald">
+              {attendanceTotal} {language === "mn" ? "бүртгэл" : attendanceTotal === 1 ? "record" : "records"}
+            </Badge>
           </CardHeader>
           <CardContent className="chart-box">
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={localizedPieData} dataKey="value" innerRadius={62} outerRadius={90} paddingAngle={5}>
-                  {localizedPieData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.3)", borderRadius: 14, color: "#e5eefc" }} />
-              </PieChart>
-            </ResponsiveContainer>
+            {attendanceMix.length === 0 ? (
+              <div className="table-empty">
+                <strong>{language === "mn" ? "Ирцийн бүртгэл алга" : "No attendance records yet"}</strong>
+                <p>
+                  {language === "mn"
+                    ? "Ирц бүртгэж эхэлмэгц ирсэн, хоцорсон, тасалсны харьцаа энд харагдана."
+                    : "The present, late and absent split shows up here once attendance is marked."}
+                </p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie data={attendanceMix} dataKey="value" innerRadius={62} outerRadius={90} paddingAngle={5}>
+                    {attendanceMix.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.3)", borderRadius: 14, color: "#e5eefc" }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </section>
@@ -1816,7 +2073,7 @@ function StudentsModule({ apiData, copy, error, language, loading, ...controls }
       language={language}
       loading={loading}
       title={copy.tables.students}
-      columns={["Name", "Email", "Class", "Subjects", "Attendance", "GPA", "Payment", "Parent Email"]}
+      columns={["Name", "Email", "Subjects", "Attendance", "GPA", "Payment", "Parent Email"]}
       rows={[]}
       {...controls}
     />
@@ -1832,7 +2089,7 @@ function TeachersModule({ apiData, copy, error, language, loading, ...controls }
       language={language}
       loading={loading}
       title={copy.tables.teachers}
-      columns={["Name", "Subject", "Email", "Experience", "Salary", "Contact", "Classes"]}
+      columns={["Name", "Email", "Subject", "Experience", "Salary", "Contact"]}
       rows={[]}
       {...controls}
     />
@@ -1881,7 +2138,54 @@ function SubjectsModule({
   );
 }
 
-function AssignmentsModule({ apiData, copy, error, language, loading, ...controls }: ModuleApiProps) {
+/** Subject picker shown to students and parents above scoped resources. */
+function SubjectScopeTabs({
+  options,
+  value,
+  onChange,
+  language
+}: {
+  options: SubjectScopeOption[];
+  value: string;
+  onChange: (id: string) => void;
+  language: Language;
+}) {
+  if (options.length === 0) {
+    return (
+      <Card>
+        <CardContent>
+          <div className="table-empty">
+            <strong>{language === "mn" ? "Хичээл олдсонгүй" : "No subjects yet"}</strong>
+            <p>
+              {language === "mn"
+                ? "Та ямар нэг хичээлд бүртгэгдсэний дараа энд харагдана."
+                : "Once you are enrolled in a subject it will show up here."}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="subject-scope-tabs" role="tablist">
+      {options.map((option) => (
+        <button
+          aria-selected={option.id === value}
+          className={option.id === value ? "active" : ""}
+          key={option.id}
+          onClick={() => onChange(option.id)}
+          role="tab"
+          type="button"
+        >
+          {translateValue(option.name, language)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AssignmentsModule({ apiData, copy, error, language, loading, scopeLabel, ...controls }: ModuleApiProps & { scopeLabel?: string }) {
   return (
     <ModuleTable
       apiData={apiData}
@@ -1889,7 +2193,7 @@ function AssignmentsModule({ apiData, copy, error, language, loading, ...control
       error={error}
       language={language}
       loading={loading}
-      title={copy.tables.assignments}
+      title={scopeLabel ? `${copy.tables.assignments} — ${translateValue(scopeLabel, language)}` : copy.tables.assignments}
       columns={["Subject", "Title", "Type", "Due Date", "Max Score", "Description"]}
       rows={[]}
       {...controls}
@@ -1897,7 +2201,7 @@ function AssignmentsModule({ apiData, copy, error, language, loading, ...control
   );
 }
 
-function MaterialsModule({ apiData, copy, error, language, loading, ...controls }: ModuleApiProps) {
+function MaterialsModule({ apiData, copy, error, language, loading, scopeLabel, ...controls }: ModuleApiProps & { scopeLabel?: string }) {
   return (
     <ModuleTable
       apiData={apiData}
@@ -1905,7 +2209,7 @@ function MaterialsModule({ apiData, copy, error, language, loading, ...controls 
       error={error}
       language={language}
       loading={loading}
-      title={copy.tables.materials}
+      title={scopeLabel ? `${copy.tables.materials} — ${translateValue(scopeLabel, language)}` : copy.tables.materials}
       columns={["Subject", "Title", "File Type", "Uploaded By"]}
       rows={[]}
       {...controls}
@@ -1915,14 +2219,12 @@ function MaterialsModule({ apiData, copy, error, language, loading, ...controls 
 
 function SubjectContentPanel({
   canManage,
-  darkMode,
   language,
   subject,
   onBack,
   onSaved
 }: {
   canManage: boolean;
-  darkMode: boolean;
   language: Language;
   subject: Exclude<SubjectContentTarget, null>;
   onBack: () => void;
@@ -2521,7 +2823,8 @@ function SubjectContentPanel({
       {loading ? (
         <Card>
           <CardContent>
-            <div className="table-empty">
+            <div className="ec-loading-panel">
+              <span className="ec-spinner" style={{ "--ec-spinner-size": "30px", "--ec-spinner-width": "3px" } as CSSProperties} />
               <strong>{language === "mn" ? "Агуулга ачаалж байна..." : "Loading content..."}</strong>
             </div>
           </CardContent>
@@ -2715,7 +3018,6 @@ function SubjectContentPanel({
                   <form className="subject-inline-form subject-lesson-form" onSubmit={addAssignment}>
                     <Input onChange={(event) => setAssignmentForm((current) => ({ ...current, title: event.target.value }))} placeholder={language === "mn" ? "Даалгаврын нэр" : "Assignment title"} required value={assignmentForm.title} />
                     <DatePicker
-                      darkMode={darkMode}
                       onChange={(val) => setAssignmentForm((current) => ({ ...current, dueDate: val }))}
                       placeholder={language === "mn" ? "Дуусах огноо" : "Due date"}
                       value={assignmentForm.dueDate}
@@ -3118,22 +3420,6 @@ function SubjectContentPanel({
   );
 }
 
-function ClassesModule({ apiData, copy, error, language, loading, ...controls }: ModuleApiProps) {
-  return (
-    <ModuleTable
-      apiData={apiData}
-      copy={copy}
-      error={error}
-      language={language}
-      loading={loading}
-      title={copy.tables.classes}
-      columns={["Class", "Section", "Teacher", "Students", "Schedule"]}
-      rows={[]}
-      {...controls}
-    />
-  );
-}
-
 function AttendanceModule({ apiData, copy, error, language, loading, ...controls }: ModuleApiProps) {
   return (
     <ModuleTable
@@ -3214,29 +3500,41 @@ function AnnouncementsModule({ apiData, copy, error, language, loading, ...contr
   );
 }
 
+function WellbeingModule({ apiData, copy, error, language, loading, ...controls }: ModuleApiProps) {
+  return (
+    <ModuleTable
+      apiData={apiData}
+      copy={copy}
+      error={error}
+      language={language}
+      loading={loading}
+      title={copy.tables.wellbeing}
+      columns={["Question", "Category", "Note", "Date"]}
+      rows={[]}
+      {...controls}
+    />
+  );
+}
+
 function SettingsModule({
   copy,
   currentUserAvatar,
   currentUserEmail,
   currentUserName,
-  darkMode,
   language,
   logout,
   onSaveProfile,
   role,
-  setDarkMode,
   setLanguage
 }: {
   copy: AppCopy;
   currentUserAvatar: string;
   currentUserEmail: string;
   currentUserName: string;
-  darkMode: boolean;
   language: Language;
   logout: () => void;
   onSaveProfile: (values: { name: string; email: string; avatarUrl: string }) => Promise<boolean>;
   role: Role;
-  setDarkMode: (value: boolean) => void;
   setLanguage: (value: Language) => void;
 }) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
@@ -3366,21 +3664,6 @@ function SettingsModule({
               <ChevronRight size={18} />
             </button>
 
-            <button className="mobile-setting-row" onClick={() => setDarkMode(!darkMode)} type="button">
-              <span>
-                {darkMode
-                  ? language === "mn"
-                    ? "Гэрэлтэй горим"
-                    : "Light Mode"
-                  : language === "mn"
-                    ? "Шөнийн горим"
-                    : "Night Mode"}
-              </span>
-              <span className={`mobile-switch${darkMode ? " active" : ""}`} aria-hidden="true">
-                <span />
-              </span>
-            </button>
-
             <button className="mobile-setting-row" onClick={() => setLanguage(language === "mn" ? "en" : "mn")} type="button">
               <span>{language === "mn" ? "Монгол хэл" : "English"}</span>
               <span className={`mobile-switch${language === "mn" ? " active" : ""}`} aria-hidden="true">
@@ -3432,6 +3715,34 @@ function SettingsModule({
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+const SKELETON_ROW_COUNT = 5;
+const SKELETON_BAR_WIDTHS = ["78%", "60%", "88%", "52%", "72%", "66%"];
+
+/** Placeholder rows shown while a resource loads for the first time. */
+function TableSkeletonRows({ columns, gridColumns, language }: { columns: string[]; gridColumns: string; language: Language }) {
+  return (
+    <>
+      {Array.from({ length: SKELETON_ROW_COUNT }, (_, rowIndex) => (
+        <div aria-hidden className="ec-table-row is-skeleton" key={`skeleton-row-${rowIndex}`} style={{ gridTemplateColumns: gridColumns }}>
+          {columns.map((column, columnIndex) => (
+            <span data-label={translateColumn(column, language)} key={column}>
+              <span
+                className="ec-skeleton ec-skeleton-bar"
+                style={
+                  {
+                    "--ec-bar-width": SKELETON_BAR_WIDTHS[(rowIndex + columnIndex) % SKELETON_BAR_WIDTHS.length],
+                    "--ec-skeleton-delay": `${rowIndex * 0.12}s`
+                  } as CSSProperties
+                }
+              />
+            </span>
+          ))}
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -3498,7 +3809,18 @@ function ModuleTable({
       <CardHeader>
         <div>
           <CardTitle>{title}</CardTitle>
-          {loading || error ? <p className="table-subtitle">{loading ? copy.common.loadingRecords : error}</p> : null}
+          {loading || error ? (
+            <p className="table-subtitle">
+              {loading ? (
+                <>
+                  <span className="ec-spinner" style={{ "--ec-spinner-size": "13px", "--ec-spinner-width": "2px" } as CSSProperties} />
+                  {copy.common.loadingRecords}
+                </>
+              ) : (
+                error
+              )}
+            </p>
+          ) : null}
         </div>
         <div className="table-actions">
           <Input value={filterQuery} onChange={(event) => setFilterQuery(event.target.value)} placeholder={copy.common.filterRecords} />
@@ -3518,7 +3840,9 @@ function ModuleTable({
             ))}
             {showActions ? <span className="table-action-title">{copy.common.actions}</span> : null}
           </div>
-          {filteredRows.length > 0 ? (
+          {loading && displayRows.length === 0 ? (
+            <TableSkeletonRows columns={displayColumns} gridColumns={gridColumns} language={language} />
+          ) : filteredRows.length > 0 ? (
             filteredRows.map(({ id, row }) => (
               <div className="ec-table-row" key={id ?? row.join("-")} style={{ gridTemplateColumns: gridColumns }}>
                 {row.map((cell, index) => (

@@ -14,12 +14,14 @@ import { Footer } from "@/components/landing/Footer";
 export default function LandingPage() {
   // Default to Mongolian (the school's primary language); respect a stored choice.
   const [lang, setLang] = useState<LandingLang>("mn");
+  const [restored, setRestored] = useState(false);
   const dict = LANDING_CONTENT[lang];
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const stored = getStoredLanguage();
       if (stored) setLang(stored);
+      setRestored(true);
     }, 0);
 
     return () => window.clearTimeout(timer);
@@ -27,8 +29,10 @@ export default function LandingPage() {
 
   useEffect(() => {
     document.documentElement.lang = lang;
-    window.localStorage.setItem(languageStorageKey, lang);
-  }, [lang]);
+    // Only persist once the stored choice has been read back, otherwise the
+    // default would overwrite it before it is ever applied.
+    if (restored) window.localStorage.setItem(languageStorageKey, lang);
+  }, [lang, restored]);
 
   const toggleLang = () => setLang((current) => (current === "mn" ? "en" : "mn"));
 
