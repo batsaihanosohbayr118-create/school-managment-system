@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { AccountConflictError, authenticate, findAccountById, updateAccount } from "@/lib/auth-db";
 import { issueToken, verifyToken } from "@/lib/auth-token";
+import { preflight, withCors } from "@/lib/cors";
 
 export const runtime = "nodejs";
+
+const METHODS = ["PATCH"];
+
+export const OPTIONS = preflight(METHODS);
 
 function callerFrom(request: Request) {
   const header = request.headers.get("authorization") ?? "";
@@ -14,7 +19,7 @@ function callerFrom(request: Request) {
 export async function PATCH(request: Request) {
   const caller = callerFrom(request);
   if (!caller) {
-    return NextResponse.json({ message: "Not signed in." }, { status: 401 });
+    return withCors(NextResponse.json({ message: "Not signed in." }, { status: 401 }), request, METHODS);
   }
 
   const body = (await request.json().catch(() => null)) as {
@@ -26,7 +31,7 @@ export async function PATCH(request: Request) {
   } | null;
 
   if (!body) {
-    return NextResponse.json({ message: "Invalid request body." }, { status: 400 });
+    return withCors(NextResponse.json({ message: "Invalid request body." }, { status: 400 }), request, METHODS);
   }
 
   try {
@@ -34,11 +39,17 @@ export async function PATCH(request: Request) {
     // alone cannot lock the real owner out.
     if (body.newPassword) {
       const existing = await findAccountById(caller.sub);
-      if (!existing) return NextResponse.json({ message: "Account not found." }, { status: 404 });
+      if (!existing) {
+        return withCors(NextResponse.json({ message: "Account not found." }, { status: 404 }), request, METHODS);
+      }
 
       const confirmed = await authenticate(existing.email, body.currentPassword ?? "");
       if (!confirmed) {
-        return NextResponse.json({ message: "current-password-invalid" }, { status: 403 });
+        return withCors(
+          NextResponse.json({ message: "current-password-invalid" }, { status: 403 }),
+          request,
+          METHODS
+        );
       }
     }
 
@@ -49,7 +60,9 @@ export async function PATCH(request: Request) {
       password: body.newPassword
     });
 
-    if (!account) return NextResponse.json({ message: "Account not found." }, { status: 404 });
+    if (!account) {
+      return withCors(NextResponse.json({ message: "Account not found." }, { status: 404 }), request, METHODS);
+    }
 
     // The token carries name/email/avatar, so re-issue it after an edit.
     const token = issueToken({
@@ -60,14 +73,18 @@ export async function PATCH(request: Request) {
       avatarUrl: account.avatarUrl
     });
 
-    return NextResponse.json({ token, user: account });
+    return withCors(NextResponse.json({ token, user: account }), request, METHODS);
   } catch (error) {
     if (error instanceof AccountConflictError) {
-      return NextResponse.json({ message: error.message }, { status: 409 });
+      return withCors(NextResponse.json({ message: error.message }, { status: 409 }), request, METHODS);
     }
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Update failed." },
-      { status: 500 }
+    return withCors(
+      NextResponse.json(
+        { message: error instanceof Error ? error.message : "Update failed." },
+        { status: 500 }
+      ),
+      request,
+      METHODS
     );
   }
 }
