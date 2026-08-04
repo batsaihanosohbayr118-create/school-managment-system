@@ -76,9 +76,7 @@ export async function verifyPassword(password: string, stored: string) {
 
 /** Accounts shipped so the app is usable immediately — one per role. */
 const seedAccounts: { email: string; username: string; name: string; role: Role; password: string }[] = [
-  { email: "admin@novamind.mn", username: "demo.admin", name: "Demo Admin", role: "admin", password: "NovaLead@2026!" },
-  { email: "student@novamind.mn", username: "demo.student", name: "Demo Student", role: "student", password: "NovaStudy@2026!" },
-  { email: "parent@novamind.mn", username: "demo.parent", name: "Demo Parent", role: "parent", password: "NovaParent@2026!" }
+  { email: "admin@novamind.mn", username: "demo.admin", name: "Demo Admin", role: "admin", password: "NovaLead@2026!" }
 ];
 
 async function initialize() {
