@@ -19,3 +19,4 @@ data/*.db-*
 *.tsbuildinfo
 
 .vercel
+.env*
