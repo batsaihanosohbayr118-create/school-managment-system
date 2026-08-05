@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://www.nova-edu.mn",
+        "EXPO_PUBLIC_WEB_ADMIN_URL": "https://www.nova-edu.mn/admin/dashboard"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://www.nova-edu.mn",
+        "EXPO_PUBLIC_WEB_ADMIN_URL": "https://www.nova-edu.mn/admin/dashboard"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://www.nova-edu.mn",
+        "EXPO_PUBLIC_WEB_ADMIN_URL": "https://www.nova-edu.mn/admin/dashboard"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
