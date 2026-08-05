@@ -1,11 +1,12 @@
 import { Link, Stack } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
-import { Text, View } from '@/components/Themed';
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { useLanguage } from '@/lib/language-context';
 
 export default function NotFoundScreen() {
   const { t } = useLanguage();
+  const tint = useThemeColor({}, 'tint');
 
   return (
     <>
@@ -14,7 +15,7 @@ export default function NotFoundScreen() {
         <Text style={styles.title}>{t.notFound.body}</Text>
 
         <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>{t.notFound.goHome}</Text>
+          <Text style={[styles.linkText, { color: tint }]}>{t.notFound.goHome}</Text>
         </Link>
       </View>
     </>
@@ -37,7 +38,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   linkText: {
-    fontSize: 14,
-    color: '#2e78b7',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

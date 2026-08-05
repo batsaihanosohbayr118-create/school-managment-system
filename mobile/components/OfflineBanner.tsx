@@ -7,13 +7,13 @@ import { useLanguage } from '@/lib/language-context';
 /** Shown above cached data when the last refresh failed because the device is offline. */
 export function OfflineBanner() {
   const { t } = useLanguage();
-  const mutedColor = useThemeColor({}, 'muted');
-  const borderColor = useThemeColor({}, 'border');
+  const warningColor = useThemeColor({}, 'warning');
+  const backgroundColor = useThemeColor({}, 'warningMuted');
 
   return (
-    <View style={[styles.banner, { borderColor }]}>
-      <SymbolView name="wifi.slash" size={14} tintColor={mutedColor} />
-      <Text style={[styles.text, { color: mutedColor }]}>{t.common.offlineShowingSavedData}</Text>
+    <View style={[styles.banner, { backgroundColor }]}>
+      <SymbolView name="wifi.slash" size={14} tintColor={warningColor} />
+      <Text style={[styles.text, { color: warningColor }]}>{t.common.offlineShowingSavedData}</Text>
     </View>
   );
 }
@@ -23,12 +23,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 8,
+    paddingVertical: 9,
     paddingHorizontal: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth
+    borderRadius: 10,
+    marginBottom: 12
   },
   text: {
     fontSize: 13,
-    fontWeight: '600'
+    fontWeight: '600',
+    flexShrink: 1
   }
 });

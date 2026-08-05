@@ -132,7 +132,12 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingVertical: 14,
     alignItems: 'center',
-    borderRadius: 10
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3
   },
   submitDisabled: {
     opacity: 0.5

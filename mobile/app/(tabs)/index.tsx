@@ -25,6 +25,7 @@ export default function HomeScreen() {
   const mutedColor = useThemeColor({}, 'muted');
   const dangerColor = useThemeColor({}, 'danger');
   const tint = useThemeColor({}, 'tint');
+  const tintMuted = useThemeColor({}, 'tintMuted');
 
   const timetable = useApiData('timetable', api.timetable);
   const grades = useApiData('grades', api.grades);
@@ -46,8 +47,6 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {session ? <Text style={styles.subtitle}>{session.name || session.email}</Text> : null}
-
       {(timetable.isOffline || grades.isOffline) ? <OfflineBanner /> : null}
 
       <SectionHeader icon="calendar" label={isTeacher ? t.common.todaysClasses : t.common.todaysSchedule} />
@@ -78,7 +77,7 @@ export default function HomeScreen() {
             {/* Link's web `asChild` forwards this style straight onto the underlying
                 <a> tag, bypassing react-native-web's array flattening — an array
                 (rather than one merged object) crashes react-dom's style setter. */}
-            <Pressable style={StyleSheet.flatten([styles.paymentsLink, { borderColor: tint }])}>
+            <Pressable style={StyleSheet.flatten([styles.paymentsLink, { backgroundColor: tintMuted }])}>
               {({ pressed }) => (
                 <View style={[styles.paymentsLinkInner, pressed && { opacity: 0.6 }]}>
                   <SymbolView name="creditcard" size={18} tintColor={tint} />
@@ -138,16 +137,13 @@ const styles = StyleSheet.create({
   content: {
     padding: 16
   },
-  subtitle: {
-    fontSize: 22,
-    fontWeight: '800'
-  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginTop: 26,
-    marginBottom: 8
+    marginBottom: 8,
+    backgroundColor: 'transparent'
   },
   sectionTitle: {
     fontSize: 13,
@@ -176,15 +172,15 @@ const styles = StyleSheet.create({
   },
   paymentsLink: {
     marginTop: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1.5
+    paddingVertical: 13,
+    borderRadius: 14
   },
   paymentsLinkInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8
+    gap: 8,
+    backgroundColor: 'transparent'
   },
   paymentsLinkText: {
     fontWeight: '700',

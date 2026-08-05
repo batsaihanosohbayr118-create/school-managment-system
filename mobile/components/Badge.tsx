@@ -35,11 +35,13 @@ export function statusTone(status: string): BadgeTone {
 
 const styles = StyleSheet.create({
   badge: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 999,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
     overflow: 'hidden'
   }
 });

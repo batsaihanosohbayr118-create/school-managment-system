@@ -21,6 +21,7 @@ export default function SettingsScreen() {
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
   const dangerColor = useThemeColor({}, 'danger');
+  const dangerStrongColor = useThemeColor({}, 'dangerStrong');
   const borderColor = useThemeColor({}, 'border');
   const cardColor = useThemeColor({}, 'card');
 
@@ -119,7 +120,7 @@ export default function SettingsScreen() {
         />
       </Card>
 
-      <Pressable style={[styles.signOut, { borderColor: dangerColor, backgroundColor: dangerColor }]} onPress={() => signOut()}>
+      <Pressable style={[styles.signOut, { borderColor: dangerStrongColor, backgroundColor: dangerStrongColor }]} onPress={() => signOut()}>
         <SymbolView name="rectangle.portrait.and.arrow.right" size={17} tintColor="#fff" />
         <Text style={[styles.signOutText, { color: '#fff' }]}>{t.common.logout}</Text>
       </Pressable>

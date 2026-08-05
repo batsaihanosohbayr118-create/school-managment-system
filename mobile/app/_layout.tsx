@@ -9,6 +9,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { LanguageProvider, useLanguage } from '@/lib/language-context';
 import { ThemeProvider as AppThemeProvider } from '@/lib/theme-context';
+import Colors from '@/constants/Colors';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -94,8 +95,25 @@ function RootLayoutNav() {
   // uses for the tab's own title.
   const homeLabel = language === 'mn' ? 'Нүүр' : 'Home';
 
+  // React Navigation's own screen canvas defaults to DefaultTheme/DarkTheme's
+  // background (#fff / #000), which does not match our own Colors.ts palette.
+  // Any Themed <View> left without an explicit override paints our custom
+  // background over that mismatched canvas — visible as a stray band. Aligning
+  // the two here fixes every such spot at once instead of patching each one.
+  const navigationTheme = {
+    ...(colorScheme === 'dark' ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(colorScheme === 'dark' ? DarkTheme : DefaultTheme).colors,
+      background: Colors[colorScheme].background,
+      card: Colors[colorScheme].card,
+      border: Colors[colorScheme].border,
+      text: Colors[colorScheme].text,
+      primary: Colors[colorScheme].tint
+    }
+  };
+
   return (
-    <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <NavigationThemeProvider value={navigationTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />

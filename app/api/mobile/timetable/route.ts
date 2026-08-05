@@ -1,11 +1,11 @@
 import type { TimetableResponse } from "@shared/api-types";
-import { createResource, listResource } from "@/lib/school-db";
+import { createResource, deleteResource, listResource } from "@/lib/school-db";
 import { toTimetableSlots } from "@/lib/mobile/projections";
 import { mobileRoute, preflight } from "@/lib/mobile/route-helpers";
 
 export const runtime = "nodejs";
 
-const METHODS = ["GET", "POST"];
+const METHODS = ["GET", "POST", "DELETE"];
 
 export const OPTIONS = preflight(METHODS);
 
@@ -42,5 +42,15 @@ export const POST = mobileRoute<TimetableResponse>(METHODS, async (context, requ
     context
   );
 
+  return { slots: toTimetableSlots(table) };
+});
+
+export const DELETE = mobileRoute<TimetableResponse>(METHODS, async (context, request) => {
+  const id = new URL(request.url).searchParams.get("id");
+  if (!id) throw new Error("id is required.");
+
+  // requireManageAccess inside deleteResource rejects any role outside
+  // {admin, teacher}; not repeated here.
+  const table = await deleteResource("timetable", id, context);
   return { slots: toTimetableSlots(table) };
 });

@@ -55,5 +55,11 @@ export const api = {
   postGrade: (body: { student: string; subject?: string; score: number | string; semester?: string }) =>
     request<GradesResponse>("/api/mobile/grades", { method: "POST", body: JSON.stringify(body) }),
   postTimetable: (body: { subject: string; teacher?: string; class?: string; day: string; time: string }) =>
-    request<TimetableResponse>("/api/mobile/timetable", { method: "POST", body: JSON.stringify(body) })
+    request<TimetableResponse>("/api/mobile/timetable", { method: "POST", body: JSON.stringify(body) }),
+  deleteAttendance: (id: string) =>
+    request<AttendanceResponse>(`/api/mobile/attendance?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
+  deleteGrade: (id: string) =>
+    request<GradesResponse>(`/api/mobile/grades?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
+  deleteTimetable: (id: string) =>
+    request<TimetableResponse>(`/api/mobile/timetable?id=${encodeURIComponent(id)}`, { method: "DELETE" })
 };
