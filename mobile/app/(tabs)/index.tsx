@@ -2,8 +2,7 @@ import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
-import { SymbolView } from 'expo-symbols';
-import type { SFSymbol } from 'sf-symbols-typescript';
+import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
 import { OfflineBanner } from '@/components/OfflineBanner';
@@ -49,7 +48,7 @@ export default function HomeScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {(timetable.isOffline || grades.isOffline) ? <OfflineBanner /> : null}
 
-      <SectionHeader icon="calendar" label={isTeacher ? t.common.todaysClasses : t.common.todaysSchedule} />
+      <SectionHeader icon="calendar-outline" label={isTeacher ? t.common.todaysClasses : t.common.todaysSchedule} />
       {timetable.loading ? (
         <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
       ) : timetable.error && !timetable.isOffline ? (
@@ -62,7 +61,7 @@ export default function HomeScreen() {
 
       {!isTeacher && (
         <>
-          <SectionHeader icon="chart.bar.fill" label={t.common.latestGrades} />
+          <SectionHeader icon="bar-chart-outline" label={t.common.latestGrades} />
           {grades.loading ? (
             <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
           ) : grades.error && !grades.isOffline ? (
@@ -80,7 +79,7 @@ export default function HomeScreen() {
             <Pressable style={StyleSheet.flatten([styles.paymentsLink, { backgroundColor: tintMuted }])}>
               {({ pressed }) => (
                 <View style={[styles.paymentsLinkInner, pressed && { opacity: 0.6 }]}>
-                  <SymbolView name="creditcard" size={18} tintColor={tint} />
+                  <Ionicons name="card-outline" size={18} color={tint} />
                   <Text style={[styles.paymentsLinkText, { color: tint }]}>{t.common.viewPayments}</Text>
                 </View>
               )}
@@ -92,11 +91,12 @@ export default function HomeScreen() {
   );
 }
 
-function SectionHeader({ icon, label }: { icon: SFSymbol; label: string }) {
+function SectionHeader({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
   const mutedColor = useThemeColor({}, 'muted');
+  const tint = useThemeColor({}, 'tint');
   return (
     <View style={styles.sectionHeader}>
-      <SymbolView name={icon} size={13} tintColor={mutedColor} />
+      <Ionicons name={icon} size={14} color={tint} />
       <Text style={[styles.sectionTitle, { color: mutedColor }]}>{label}</Text>
     </View>
   );

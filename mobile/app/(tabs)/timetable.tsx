@@ -1,10 +1,13 @@
 import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Alert, FlatList, Pressable, StyleSheet } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { Alert, FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
+import { EmptyState } from '@/components/EmptyState';
+import { LoadingState } from '@/components/LoadingState';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { SwipeableRow } from '@/components/SwipeableRow';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -16,9 +19,9 @@ import type { TimetableSlot } from '@shared/api-types';
 export default function TimetableScreen() {
   const { data, error, loading, refetch, isOffline } = useApiData('timetable', api.timetable);
   const { session } = useAuth();
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const dangerColor = useThemeColor({}, 'danger');
-  const mutedColor = useThemeColor({}, 'muted');
+  const tint = useThemeColor({}, 'tint');
   const isTeacher = session?.role === 'teacher';
 
   // Picks up a slot a teacher just added via /timetable-entry — that screen
@@ -30,34 +33,17 @@ export default function TimetableScreen() {
     }, [])
   );
 
-  function confirmDelete(slot: TimetableSlot) {
-    Alert.alert(
-      t.common.deleteRecord,
-      t.common.deleteWarning(`${slot.subject} · ${translateValue(slot.day, language)} ${slot.timeLabel}`),
-      [
-        { text: t.common.cancel, style: 'cancel' },
-        {
-          text: t.common.delete,
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.deleteTimetable(slot.id);
-              refetch();
-            } catch {
-              Alert.alert(t.common.deleteFailed);
-            }
-          }
-        }
-      ]
-    );
+  async function handleDelete(slot: TimetableSlot) {
+    try {
+      await api.deleteTimetable(slot.id);
+      refetch();
+    } catch {
+      Alert.alert(t.common.deleteFailed);
+    }
   }
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
-      </View>
-    );
+    return <LoadingState />;
   }
 
   if (error && !isOffline) {
@@ -74,37 +60,28 @@ export default function TimetableScreen() {
       contentContainerStyle={styles.content}
       data={data?.slots ?? []}
       keyExtractor={(slot) => slot.id}
-      onRefresh={refetch}
-      refreshing={loading}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
       ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
-      ListEmptyComponent={
-        <View style={styles.center}>
-          <Text style={{ color: mutedColor }}>{t.common.noTimetableSlotsYet}</Text>
-        </View>
-      }
-      renderItem={({ item }) => <SlotRow slot={item} onDelete={isTeacher ? () => confirmDelete(item) : undefined} />}
+      ListEmptyComponent={<EmptyState icon="calendar-outline" label={t.common.noTimetableSlotsYet} />}
+      renderItem={({ item }) => (
+        <SwipeableRow deleteLabel={t.common.delete} onDelete={isTeacher ? () => handleDelete(item) : undefined}>
+          <SlotRow slot={item} />
+        </SwipeableRow>
+      )}
     />
   );
 }
 
-function SlotRow({ slot, onDelete }: { slot: TimetableSlot; onDelete?: () => void }) {
+function SlotRow({ slot }: { slot: TimetableSlot }) {
   const { language } = useLanguage();
   const tint = useThemeColor({}, 'tint');
   const mutedColor = useThemeColor({}, 'muted');
-  const dangerColor = useThemeColor({}, 'danger');
 
   return (
     <Card style={styles.card}>
       <View style={styles.cardHeader}>
-        <View style={styles.cardHeaderLeft}>
-          <SymbolView name="calendar" size={18} tintColor={tint} />
-          <Text style={styles.subject}>{slot.subject}</Text>
-        </View>
-        {onDelete ? (
-          <Pressable onPress={onDelete} hitSlop={10} style={styles.deleteButton}>
-            <SymbolView name="trash" size={16} tintColor={dangerColor} />
-          </Pressable>
-        ) : null}
+        <Ionicons name="calendar" size={18} color={tint} />
+        <Text style={styles.subject}>{slot.subject}</Text>
       </View>
       <Text style={[styles.meta, { color: mutedColor }]}>
         {translateValue(slot.day, language)} · {slot.timeLabel}
@@ -130,23 +107,15 @@ const styles = StyleSheet.create({
     padding: 20
   },
   card: {
-    gap: 3
+    gap: 3,
+    marginBottom: 0
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 2,
     backgroundColor: 'transparent'
-  },
-  cardHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'transparent'
-  },
-  deleteButton: {
-    padding: 2
   },
   subject: {
     fontSize: 17,

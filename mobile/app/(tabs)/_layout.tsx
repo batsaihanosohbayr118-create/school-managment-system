@@ -1,7 +1,7 @@
-import { SymbolView } from 'expo-symbols';
+import { useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Link, Tabs } from 'expo-router';
-import { Pressable, View } from 'react-native';
-import type { SFSymbol } from 'sf-symbols-typescript';
+import { Animated, Pressable, View } from 'react-native';
 import type { MobileTab } from '@shared/roles';
 import { visibleTabsByRole } from '@shared/roles';
 import type { AppCopy, Language } from '@shared/i18n-tables';
@@ -17,12 +17,12 @@ import { useLanguage } from '@/lib/language-context';
  * icon. "home" maps to "index" — the tab group's default route — everything
  * else is named after the tab itself.
  */
-const tabMeta: Record<MobileTab, { routeName: string; icon: SFSymbol }> = {
-  home: { routeName: 'index', icon: 'house.fill' },
+const tabMeta: Record<MobileTab, { routeName: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  home: { routeName: 'index', icon: 'home' },
   timetable: { routeName: 'timetable', icon: 'calendar' },
-  grades: { routeName: 'grades', icon: 'chart.bar.fill' },
-  attendance: { routeName: 'attendance', icon: 'checkmark.circle.fill' },
-  announcements: { routeName: 'announcements', icon: 'megaphone.fill' }
+  grades: { routeName: 'grades', icon: 'bar-chart' },
+  attendance: { routeName: 'attendance', icon: 'checkmark-circle' },
+  announcements: { routeName: 'announcements', icon: 'megaphone' }
 };
 
 /**
@@ -52,6 +52,35 @@ const addEntryRouteByTab: Partial<Record<MobileTab, string>> = {
   timetable: '/timetable-entry'
 };
 
+/**
+ * The header "+" spins a half-turn as soon as the finger touches down —
+ * `onPressIn`, not `onPress`, because Link's `asChild` clones its own
+ * `onPress` (the navigation) onto this Pressable, and defining one here too
+ * would race it.
+ */
+function AddButton({ href, tintColor }: { href: string; tintColor: string }) {
+  const rotation = useRef(new Animated.Value(0)).current;
+
+  function spin() {
+    rotation.setValue(0);
+    Animated.timing(rotation, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+  }
+
+  const rotate = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+
+  return (
+    <Link href={href} asChild>
+      <Pressable style={{ marginRight: 15 }} onPressIn={spin}>
+        {({ pressed }) => (
+          <Animated.View style={{ transform: [{ rotate }], opacity: pressed ? 0.5 : 1 }}>
+            <Ionicons name="add" size={22} color={tintColor} />
+          </Animated.View>
+        )}
+      </Pressable>
+    </Link>
+  );
+}
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { session } = useAuth();
@@ -69,7 +98,7 @@ export default function TabLayout() {
     <Link href="/settings" asChild>
       <Pressable style={{ marginRight: 15 }}>
         {({ pressed }) => (
-          <SymbolView name="gearshape" size={22} tintColor={Colors[colorScheme].text} style={{ opacity: pressed ? 0.5 : 1 }} />
+          <Ionicons name="settings-outline" size={22} color={Colors[colorScheme].text} style={{ opacity: pressed ? 0.5 : 1 }} />
         )}
       </Pressable>
     </Link>
@@ -100,23 +129,23 @@ export default function TabLayout() {
             name={meta.routeName}
             options={{
               title: tabTitle(tab, t, language),
-              tabBarIcon: ({ color }) => <SymbolView name={meta.icon} tintColor={color} size={26} />,
+              tabBarIcon: ({ color, focused }) => (
+                <View
+                  style={{
+                    width: 40,
+                    height: 28,
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: focused ? Colors[colorScheme].tintMuted : 'transparent'
+                  }}
+                >
+                  <Ionicons name={meta.icon} color={color} size={24} />
+                </View>
+              ),
               headerRight: () => (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {addRoute ? (
-                    <Link href={addRoute} asChild>
-                      <Pressable style={{ marginRight: 15 }}>
-                        {({ pressed }) => (
-                          <SymbolView
-                            name="plus"
-                            size={22}
-                            tintColor={Colors[colorScheme].text}
-                            style={{ opacity: pressed ? 0.5 : 1 }}
-                          />
-                        )}
-                      </Pressable>
-                    </Link>
-                  ) : null}
+                  {addRoute ? <AddButton href={addRoute} tintColor={Colors[colorScheme].text} /> : null}
                   {settingsButton}
                 </View>
               )

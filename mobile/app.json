@@ -8,16 +8,21 @@
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "mn.app.novamind"
     },
     "android": {
+      "package": "mn.app.novamind",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -42,10 +47,24 @@
         {
           "photosPermission": "Зургийн санд хандаж профайлын зургаа сонгоно."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#2563eb"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": false
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a5258f88-974c-4acf-8ae3-e1869f6af911"
+      }
+    },
+    "owner": "osgoo"
   }
 }

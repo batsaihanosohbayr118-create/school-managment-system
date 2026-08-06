@@ -98,6 +98,8 @@ async function initialize() {
   // Role-specific links, added after the table shipped.
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS subject TEXT NOT NULL DEFAULT '';`);
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS student_email TEXT NOT NULL DEFAULT '';`);
+  // The mobile app's Expo push token — one per account, last-registered device wins.
+  await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS push_token TEXT NOT NULL DEFAULT '';`);
 
   // Case-insensitive uniqueness: nobody should be able to register "Admin@x"
   // alongside an existing "admin@x".
@@ -363,4 +365,46 @@ export async function countAdmins(excludeId?: string): Promise<number> {
     [excludeId ?? null]
   );
   return Number(rows[0]?.count ?? 0);
+}
+
+/** Called on mobile sign-in / app launch to (re)register the device's Expo push token. */
+export async function setPushToken(email: string, token: string): Promise<void> {
+  await ensureReady();
+  await getPool().query(`UPDATE app_users SET push_token = $1 WHERE LOWER(email) = LOWER($2);`, [
+    token,
+    email.trim()
+  ]);
+}
+
+/**
+ * Push tokens for a set of emails, skipping accounts with none registered
+ * (never opened the mobile app, or denied notification permission).
+ */
+export async function pushTokensForEmails(emails: string[]): Promise<string[]> {
+  await ensureReady();
+  const normalized = emails.map((email) => email.trim()).filter(Boolean);
+  if (normalized.length === 0) return [];
+
+  const { rows } = await getPool().query<{ push_token: string }>(
+    `SELECT push_token FROM app_users WHERE LOWER(email) = ANY($1::text[]) AND push_token <> '';`,
+    [normalized.map((email) => email.toLowerCase())]
+  );
+  return rows.map((row) => row.push_token);
+}
+
+/** Push tokens for every account with a given role, e.g. every parent, for a broadcast. */
+export async function pushTokensForRole(role: Role): Promise<string[]> {
+  await ensureReady();
+  const { rows } = await getPool().query<{ push_token: string }>(
+    `SELECT push_token FROM app_users WHERE role = $1 AND push_token <> '';`,
+    [role]
+  );
+  return rows.map((row) => row.push_token);
+}
+
+/** Push tokens for every account with a registered device, for an "All" broadcast. */
+export async function allPushTokens(): Promise<string[]> {
+  await ensureReady();
+  const { rows } = await getPool().query<{ push_token: string }>(`SELECT push_token FROM app_users WHERE push_token <> '';`);
+  return rows.map((row) => row.push_token);
 }

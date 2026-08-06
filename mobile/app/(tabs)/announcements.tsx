@@ -1,7 +1,10 @@
-import { FlatList, StyleSheet } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
+import { Badge } from '@/components/Badge';
 import { Card } from '@/components/Card';
+import { EmptyState } from '@/components/EmptyState';
+import { LoadingState } from '@/components/LoadingState';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
@@ -13,14 +16,10 @@ export default function AnnouncementsScreen() {
   const { data, error, loading, refetch, isOffline } = useApiData('announcements', api.announcements);
   const { t } = useLanguage();
   const dangerColor = useThemeColor({}, 'danger');
-  const mutedColor = useThemeColor({}, 'muted');
+  const tint = useThemeColor({}, 'tint');
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
-      </View>
-    );
+    return <LoadingState />;
   }
 
   if (error && !isOffline) {
@@ -37,14 +36,9 @@ export default function AnnouncementsScreen() {
       contentContainerStyle={styles.content}
       data={data?.announcements ?? []}
       keyExtractor={(entry) => entry.id}
-      onRefresh={refetch}
-      refreshing={loading}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
       ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
-      ListEmptyComponent={
-        <View style={styles.center}>
-          <Text style={{ color: mutedColor }}>{t.common.noAnnouncementsYet}</Text>
-        </View>
-      }
+      ListEmptyComponent={<EmptyState icon="megaphone-outline" label={t.common.noAnnouncementsYet} />}
       renderItem={({ item }) => <AnnouncementRow entry={item} />}
     />
   );
@@ -52,18 +46,22 @@ export default function AnnouncementsScreen() {
 
 function AnnouncementRow({ entry }: { entry: AnnouncementEntry }) {
   const tint = useThemeColor({}, 'tint');
+  const tintMuted = useThemeColor({}, 'tintMuted');
   const mutedColor = useThemeColor({}, 'muted');
 
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <SymbolView name="megaphone.fill" size={16} tintColor={tint} />
+        <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
+          <Ionicons name="megaphone" size={15} color={tint} />
+        </View>
         <Text style={styles.title}>{entry.title}</Text>
       </View>
       <Text style={styles.body}>{entry.content}</Text>
-      <Text style={[styles.meta, { color: mutedColor }]}>
-        {entry.audience} · {entry.date}
-      </Text>
+      <View style={styles.footer}>
+        <Badge label={entry.audience} tone="neutral" />
+        <Text style={[styles.date, { color: mutedColor }]}>{entry.date}</Text>
+      </View>
     </Card>
   );
 }
@@ -82,24 +80,39 @@ const styles = StyleSheet.create({
     padding: 20
   },
   card: {
-    gap: 4
+    gap: 8
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     backgroundColor: 'transparent'
+  },
+  iconBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   title: {
     fontSize: 17,
-    fontWeight: '700'
+    fontWeight: '700',
+    flex: 1
   },
   body: {
     fontSize: 15,
     lineHeight: 20
   },
-  meta: {
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+    backgroundColor: 'transparent'
+  },
+  date: {
     fontSize: 13,
-    marginTop: 4
+    fontWeight: '600'
   }
 });

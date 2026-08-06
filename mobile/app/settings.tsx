@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Switch } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { languages } from '@shared/i18n-tables';
 
@@ -20,6 +20,7 @@ export default function SettingsScreen() {
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
+  const tintMuted = useThemeColor({}, 'tintMuted');
   const dangerColor = useThemeColor({}, 'danger');
   const dangerStrongColor = useThemeColor({}, 'dangerStrong');
   const borderColor = useThemeColor({}, 'border');
@@ -79,7 +80,7 @@ export default function SettingsScreen() {
               {uploadingAvatar ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <SymbolView name="pencil" size={11} tintColor="#fff" />
+                <Ionicons name="pencil" size={11} color="#fff" />
               )}
             </View>
           </Pressable>
@@ -92,36 +93,43 @@ export default function SettingsScreen() {
 
       {avatarError ? <Text style={[styles.avatarError, { color: dangerColor }]}>{avatarError}</Text> : null}
 
-      <Text style={[styles.sectionTitle, { color: mutedColor }]}>{t.common.appearance}</Text>
-      <Card style={[styles.toggleRow, { borderColor, backgroundColor: cardColor }]}>
-        <View style={styles.toggleLabel}>
-          <SymbolView name={isDark ? 'moon.fill' : 'sun.max.fill'} size={17} tintColor={mutedColor} />
-          <Text style={styles.toggleText}>{isDark ? 'Dark' : 'Light'}</Text>
+      <Text style={[styles.sectionTitle, { color: mutedColor }]}>{t.common.general}</Text>
+      <Card style={styles.groupCard}>
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleLabel}>
+            <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
+              <Ionicons name={isDark ? 'moon' : 'sunny'} size={15} color={tint} />
+            </View>
+            <Text style={styles.toggleText}>{t.common.appearance}</Text>
+          </View>
+          <Switch
+            value={isDark}
+            onValueChange={(value) => setPreference(value ? 'dark' : 'light')}
+            trackColor={{ false: borderColor, true: tint }}
+            thumbColor="#fff"
+          />
         </View>
-        <Switch
-          value={isDark}
-          onValueChange={(value) => setPreference(value ? 'dark' : 'light')}
-          trackColor={{ false: borderColor, true: tint }}
-          thumbColor="#fff"
-        />
-      </Card>
 
-      <Text style={[styles.sectionTitle, { color: mutedColor }]}>{t.common.language}</Text>
-      <Card style={[styles.toggleRow, { borderColor, backgroundColor: cardColor }]}>
-        <View style={styles.toggleLabel}>
-          <SymbolView name="globe" size={17} tintColor={mutedColor} />
-          <Text style={styles.toggleText}>{isSecondLanguage ? secondLanguage.name : firstLanguage.name}</Text>
+        <View style={[styles.divider, { backgroundColor: borderColor }]} />
+
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleLabel}>
+            <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
+              <Ionicons name="globe-outline" size={15} color={tint} />
+            </View>
+            <Text style={styles.toggleText}>{isSecondLanguage ? secondLanguage.name : firstLanguage.name}</Text>
+          </View>
+          <Switch
+            value={isSecondLanguage}
+            onValueChange={(value) => setLanguage(value ? secondLanguage.id : firstLanguage.id)}
+            trackColor={{ false: borderColor, true: tint }}
+            thumbColor="#fff"
+          />
         </View>
-        <Switch
-          value={isSecondLanguage}
-          onValueChange={(value) => setLanguage(value ? secondLanguage.id : firstLanguage.id)}
-          trackColor={{ false: borderColor, true: tint }}
-          thumbColor="#fff"
-        />
       </Card>
 
       <Pressable style={[styles.signOut, { borderColor: dangerStrongColor, backgroundColor: dangerStrongColor }]} onPress={() => signOut()}>
-        <SymbolView name="rectangle.portrait.and.arrow.right" size={17} tintColor="#fff" />
+        <Ionicons name="log-out-outline" size={17} color="#fff" />
         <Text style={[styles.signOutText, { color: '#fff' }]}>{t.common.logout}</Text>
       </Pressable>
 
@@ -197,20 +205,32 @@ const styles = StyleSheet.create({
     marginTop: 22,
     marginBottom: 8
   },
+  groupCard: {
+    paddingVertical: 4,
+    paddingHorizontal: 14
+  },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 12,
-    paddingHorizontal: 14
+    paddingVertical: 11,
+    backgroundColor: 'transparent'
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth
   },
   toggleLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     backgroundColor: 'transparent'
+  },
+  iconBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   toggleText: {
     fontSize: 15,

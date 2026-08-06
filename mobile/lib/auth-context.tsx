@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { authService } from "./auth";
+import { registerPushToken } from "./notifications";
 import { resolveActiveSession, type ActiveSession } from "./session";
 
 type AuthState = {
@@ -30,6 +31,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
     };
   }, []);
+
+  // Covers both a fresh sign-in and relaunching the app while already
+  // signed in — either way, a signed-in session should have a current
+  // push token on file.
+  useEffect(() => {
+    if (session) void registerPushToken();
+  }, [session]);
 
   async function signIn(identifier: string, password: string) {
     const { error } = await authService.signIn(identifier, password);

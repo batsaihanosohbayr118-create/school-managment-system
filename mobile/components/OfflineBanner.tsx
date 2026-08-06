@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { Ionicons } from '@expo/vector-icons';
 
 import { Text, View, useThemeColor } from './Themed';
 import { useLanguage } from '@/lib/language-context';
@@ -12,7 +12,7 @@ export function OfflineBanner() {
 
   return (
     <View style={[styles.banner, { backgroundColor }]}>
-      <SymbolView name="wifi.slash" size={14} tintColor={warningColor} />
+      <Ionicons name="cloud-offline-outline" size={14} color={warningColor} />
       <Text style={[styles.text, { color: warningColor }]}>{t.common.offlineShowingSavedData}</Text>
     </View>
   );

@@ -8,7 +8,7 @@ import {
   StyleSheet,
   TextInput
 } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
 import { Text, View, useThemeColor } from '@/components/Themed';
@@ -55,6 +55,8 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.container}>
+        <View style={styles.topSpacer} />
+
         <View style={styles.header}>
           <Image
             source={require('@/assets/images/logo.png')}
@@ -67,7 +69,7 @@ export default function LoginScreen() {
 
         <Card style={[styles.formCard, { borderColor, backgroundColor: cardColor }]}>
           <View style={styles.field}>
-            <SymbolView name="envelope.fill" size={17} tintColor={placeholderColor} />
+            <Ionicons name="mail" size={17} color={placeholderColor} />
             <TextInput
               style={[styles.input, { color: textColor }]}
               placeholder="Email"
@@ -84,7 +86,7 @@ export default function LoginScreen() {
           <View style={[styles.divider, { backgroundColor: borderColor }]} />
 
           <View style={styles.field}>
-            <SymbolView name="lock.fill" size={17} tintColor={placeholderColor} />
+            <Ionicons name="lock-closed" size={17} color={placeholderColor} />
             <TextInput
               style={[styles.input, { color: textColor }]}
               placeholder="Password"
@@ -99,18 +101,14 @@ export default function LoginScreen() {
               hitSlop={8}
               style={styles.eyeButton}
             >
-              <SymbolView
-                name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
-                size={17}
-                tintColor={placeholderColor}
-              />
+              <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={17} color={placeholderColor} />
             </Pressable>
           </View>
         </Card>
 
         {error ? (
           <View style={[styles.errorBanner, { backgroundColor: dangerMuted }]}>
-            <SymbolView name="exclamationmark.triangle.fill" size={15} tintColor={dangerColor} />
+            <Ionicons name="warning" size={15} color={dangerColor} />
             <Text style={[styles.errorText, { color: dangerColor }]}>{error}</Text>
           </View>
         ) : null}
@@ -130,10 +128,12 @@ export default function LoginScreen() {
           ) : (
             <>
               <Text style={styles.buttonText}>Log in</Text>
-              <SymbolView name="arrow.right" size={16} tintColor="#fff" />
+              <Ionicons name="arrow-forward" size={16} color="#fff" />
             </>
           )}
         </Pressable>
+
+        <View style={styles.bottomSpacer} />
       </View>
     </KeyboardAvoidingView>
   );
@@ -145,20 +145,26 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    justifyContent: 'center',
     padding: 24
+  },
+  topSpacer: {
+    flex: 1
+  },
+  bottomSpacer: {
+    flex: 1
   },
   header: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 20,
     backgroundColor: 'transparent'
   },
   crest: {
-    width: 140,
-    height: 140
+    width: 132,
+    height: 132,
+    marginBottom: 4
   },
   title: {
-    fontSize: 26,
+    fontSize: 27,
     fontWeight: '800',
     textAlign: 'center',
     letterSpacing: 0.2
@@ -169,7 +175,7 @@ const styles = StyleSheet.create({
     marginTop: 6
   },
   formCard: {
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 16,
     paddingVertical: 2

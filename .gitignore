@@ -20,3 +20,5 @@ data/*.db-*
 
 .vercel
 .env*
+.expo/
+.vscode/

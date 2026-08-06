@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 
 import { Text, View, useThemeColor } from '@/components/Themed';
@@ -18,7 +18,7 @@ export default function AdminWebOnlyScreen() {
 
   return (
     <View style={styles.container}>
-      <SymbolView name="desktopcomputer" size={40} tintColor={tint} />
+      <Ionicons name="desktop-outline" size={40} color={tint} />
       <Text style={styles.title}>{t.adminWebOnly.title}</Text>
       <Text style={[styles.body, { color: mutedColor }]}>{t.adminWebOnly.body}</Text>
 

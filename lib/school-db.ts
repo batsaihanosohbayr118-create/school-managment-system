@@ -5,7 +5,8 @@ import path from "node:path";
 
 import type { NavModule, Role } from "@/lib/types";
 import { defaultStudentSubjects, defaultStudentSubjectsValue, subjectCatalog } from "@/lib/subjects";
-import { AccountConflictError, createAccount, setAccountPassword } from "@/lib/auth-db";
+import { AccountConflictError, allPushTokens, createAccount, pushTokensForRole, setAccountPassword } from "@/lib/auth-db";
+import { sendPushNotifications } from "@/lib/mobile/push";
 import type { SchoolSession } from "./school-session";
 
 export type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
@@ -1056,6 +1057,33 @@ async function applyLogin(
   }
 }
 
+/**
+ * Push notification for a newly-created announcement. "Audience" is free
+ * text on the admin form (no fixed dropdown), so this matches loosely on the
+ * role name and falls back to everyone — an unrecognized audience should
+ * still reach people, not silently notify nobody.
+ *
+ * Deliberately not awaited by the caller: a failed or slow push send must
+ * never delay or fail the announcement save that triggered it.
+ */
+async function notifyAnnouncement(audience: string, title: string) {
+  const normalized = audience.trim().toLowerCase();
+
+  const tokens = await (normalized.includes("teacher")
+    ? pushTokensForRole("teacher")
+    : normalized.includes("student")
+      ? pushTokensForRole("student")
+      : normalized.includes("parent")
+        ? pushTokensForRole("parent")
+        : allPushTokens());
+
+  await sendPushNotifications(tokens, {
+    title: "Шинэ зарлал",
+    body: title,
+    data: { type: "announcement" }
+  });
+}
+
 export async function createResource(resource: SchoolResource, values: Record<string, string>, context?: SchoolRequestContext) {
   // Deliberately outside the try block below: that block's catch treats every
   // failure as "Postgres is unreachable, fall back to the local store" and
@@ -1220,6 +1248,10 @@ export async function createResource(resource: SchoolResource, values: Record<st
           [id, values.Question, values.Category || "General", values.Note ?? "", values.Date || new Date().toISOString().slice(0, 10)]
         );
         break;
+    }
+
+    if (resource === "announcements") {
+      void notifyAnnouncement(values.Audience || "All", values.Title);
     }
 
     return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "neon" }, mode: "summary" });

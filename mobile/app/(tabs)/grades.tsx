@@ -1,10 +1,12 @@
 import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Alert, FlatList, Pressable, StyleSheet } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { Alert, FlatList, RefreshControl, StyleSheet } from 'react-native';
 
 import { Card } from '@/components/Card';
+import { EmptyState } from '@/components/EmptyState';
+import { LoadingState } from '@/components/LoadingState';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { SwipeableRow } from '@/components/SwipeableRow';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -17,7 +19,7 @@ export default function GradesScreen() {
   const { session } = useAuth();
   const { t } = useLanguage();
   const dangerColor = useThemeColor({}, 'danger');
-  const mutedColor = useThemeColor({}, 'muted');
+  const tint = useThemeColor({}, 'tint');
   const isTeacher = session?.role === 'teacher';
 
   // Picks up a row a teacher just added via /grade-entry — that screen
@@ -29,30 +31,17 @@ export default function GradesScreen() {
     }, [])
   );
 
-  function confirmDelete(grade: GradeEntry) {
-    Alert.alert(t.common.deleteRecord, t.common.deleteWarning(`${grade.student} · ${grade.subject}`), [
-      { text: t.common.cancel, style: 'cancel' },
-      {
-        text: t.common.delete,
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.deleteGrade(grade.id);
-            refetch();
-          } catch {
-            Alert.alert(t.common.deleteFailed);
-          }
-        }
-      }
-    ]);
+  async function handleDelete(grade: GradeEntry) {
+    try {
+      await api.deleteGrade(grade.id);
+      refetch();
+    } catch {
+      Alert.alert(t.common.deleteFailed);
+    }
   }
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
-      </View>
-    );
+    return <LoadingState />;
   }
 
   if (error && !isOffline) {
@@ -69,20 +58,19 @@ export default function GradesScreen() {
       contentContainerStyle={styles.content}
       data={data?.grades ?? []}
       keyExtractor={(grade) => grade.id}
-      onRefresh={refetch}
-      refreshing={loading}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
       ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
-      ListEmptyComponent={
-        <View style={styles.center}>
-          <Text style={{ color: mutedColor }}>{t.common.noGradesYet}</Text>
-        </View>
-      }
-      renderItem={({ item }) => <GradeRow grade={item} onDelete={isTeacher ? () => confirmDelete(item) : undefined} />}
+      ListEmptyComponent={<EmptyState icon="bar-chart-outline" label={t.common.noGradesYet} />}
+      renderItem={({ item }) => (
+        <SwipeableRow deleteLabel={t.common.delete} onDelete={isTeacher ? () => handleDelete(item) : undefined}>
+          <GradeRow grade={item} />
+        </SwipeableRow>
+      )}
     />
   );
 }
 
-function GradeRow({ grade, onDelete }: { grade: GradeEntry; onDelete?: () => void }) {
+function GradeRow({ grade }: { grade: GradeEntry }) {
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
   const successColor = useThemeColor({}, 'success');
@@ -94,14 +82,7 @@ function GradeRow({ grade, onDelete }: { grade: GradeEntry; onDelete?: () => voi
     <Card style={styles.card}>
       <View style={styles.rowHeader}>
         <Text style={styles.subject}>{grade.subject}</Text>
-        <View style={styles.rowActions}>
-          <Text style={[styles.score, { color: scoreColor ?? tint }]}>{grade.scoreLabel}</Text>
-          {onDelete ? (
-            <Pressable onPress={onDelete} hitSlop={10} style={styles.deleteButton}>
-              <SymbolView name="trash" size={16} tintColor={dangerColor} />
-            </Pressable>
-          ) : null}
-        </View>
+        <Text style={[styles.score, { color: scoreColor ?? tint }]}>{grade.scoreLabel}</Text>
       </View>
       <Text style={[styles.meta, { color: mutedColor }]}>
         {grade.student} · {grade.semester}
@@ -135,22 +116,14 @@ const styles = StyleSheet.create({
     padding: 20
   },
   card: {
-    gap: 3
+    gap: 3,
+    marginBottom: 0
   },
   rowHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: 'transparent'
-  },
-  rowActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'transparent'
-  },
-  deleteButton: {
-    padding: 2
   },
   subject: {
     fontSize: 17,

@@ -1,7 +1,10 @@
-import { FlatList, StyleSheet } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { Badge, statusTone } from '@/components/Badge';
 import { Card } from '@/components/Card';
+import { EmptyState } from '@/components/EmptyState';
+import { LoadingState } from '@/components/LoadingState';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
@@ -14,14 +17,10 @@ export default function PaymentsScreen() {
   const { data, error, loading, refetch, isOffline } = useApiData('payments', api.payments);
   const { t } = useLanguage();
   const dangerColor = useThemeColor({}, 'danger');
-  const mutedColor = useThemeColor({}, 'muted');
+  const tint = useThemeColor({}, 'tint');
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
-      </View>
-    );
+    return <LoadingState />;
   }
 
   if (error && !isOffline) {
@@ -38,14 +37,9 @@ export default function PaymentsScreen() {
       contentContainerStyle={styles.content}
       data={data?.payments ?? []}
       keyExtractor={(payment) => payment.id}
-      onRefresh={refetch}
-      refreshing={loading}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
       ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
-      ListEmptyComponent={
-        <View style={styles.center}>
-          <Text style={{ color: mutedColor }}>{t.common.noPaymentsYet}</Text>
-        </View>
-      }
+      ListEmptyComponent={<EmptyState icon="card-outline" label={t.common.noPaymentsYet} />}
       renderItem={({ item }) => <PaymentRow payment={item} />}
     />
   );
@@ -54,11 +48,18 @@ export default function PaymentsScreen() {
 function PaymentRow({ payment }: { payment: PaymentEntry }) {
   const { language, t } = useLanguage();
   const mutedColor = useThemeColor({}, 'muted');
+  const tint = useThemeColor({}, 'tint');
+  const tintMuted = useThemeColor({}, 'tintMuted');
 
   return (
     <Card style={styles.card}>
       <View style={styles.rowHeader}>
-        <Text style={styles.amount}>{payment.amountLabel}</Text>
+        <View style={styles.amountRow}>
+          <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
+            <Ionicons name="card" size={15} color={tint} />
+          </View>
+          <Text style={styles.amount}>{payment.amountLabel}</Text>
+        </View>
         <Badge label={translateValue(payment.status, language)} tone={statusTone(payment.status)} />
       </View>
       <Text style={[styles.meta, { color: mutedColor }]}>
@@ -82,13 +83,26 @@ const styles = StyleSheet.create({
     padding: 20
   },
   card: {
-    gap: 3
+    gap: 6
   },
   rowHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: 'transparent'
+  },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'transparent'
+  },
+  iconBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   amount: {
     fontSize: 20,
