@@ -98,8 +98,19 @@ async function initialize() {
   // Role-specific links, added after the table shipped.
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS subject TEXT NOT NULL DEFAULT '';`);
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS student_email TEXT NOT NULL DEFAULT '';`);
-  // The mobile app's Expo push token — one per account, last-registered device wins.
-  await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS push_token TEXT NOT NULL DEFAULT '';`);
+
+  // One row per device: an account signed in on a phone and a tablet gets
+  // notified on both. Keyed by the token itself (not email) so re-registering
+  // the same device is an upsert, and a different account signing in on a
+  // shared device reassigns that device's token instead of duplicating it.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS push_tokens (
+      token TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS push_tokens_email_idx ON push_tokens (LOWER(email));`);
 
   // Case-insensitive uniqueness: nobody should be able to register "Admin@x"
   // alongside an existing "admin@x".
@@ -370,41 +381,43 @@ export async function countAdmins(excludeId?: string): Promise<number> {
 /** Called on mobile sign-in / app launch to (re)register the device's Expo push token. */
 export async function setPushToken(email: string, token: string): Promise<void> {
   await ensureReady();
-  await getPool().query(`UPDATE app_users SET push_token = $1 WHERE LOWER(email) = LOWER($2);`, [
-    token,
-    email.trim()
-  ]);
+  await getPool().query(
+    `INSERT INTO push_tokens (token, email) VALUES ($1, $2)
+     ON CONFLICT (token) DO UPDATE SET email = EXCLUDED.email, created_at = NOW();`,
+    [token, email.trim()]
+  );
 }
 
 /**
  * Push tokens for a set of emails, skipping accounts with none registered
- * (never opened the mobile app, or denied notification permission).
+ * (never opened the mobile app, or denied notification permission). An
+ * account with several signed-in devices contributes one token each.
  */
 export async function pushTokensForEmails(emails: string[]): Promise<string[]> {
   await ensureReady();
   const normalized = emails.map((email) => email.trim()).filter(Boolean);
   if (normalized.length === 0) return [];
 
-  const { rows } = await getPool().query<{ push_token: string }>(
-    `SELECT push_token FROM app_users WHERE LOWER(email) = ANY($1::text[]) AND push_token <> '';`,
+  const { rows } = await getPool().query<{ token: string }>(
+    `SELECT token FROM push_tokens WHERE LOWER(email) = ANY($1::text[]);`,
     [normalized.map((email) => email.toLowerCase())]
   );
-  return rows.map((row) => row.push_token);
+  return rows.map((row) => row.token);
 }
 
 /** Push tokens for every account with a given role, e.g. every parent, for a broadcast. */
 export async function pushTokensForRole(role: Role): Promise<string[]> {
   await ensureReady();
-  const { rows } = await getPool().query<{ push_token: string }>(
-    `SELECT push_token FROM app_users WHERE role = $1 AND push_token <> '';`,
+  const { rows } = await getPool().query<{ token: string }>(
+    `SELECT pt.token FROM push_tokens pt JOIN app_users u ON LOWER(u.email) = LOWER(pt.email) WHERE u.role = $1;`,
     [role]
   );
-  return rows.map((row) => row.push_token);
+  return rows.map((row) => row.token);
 }
 
-/** Push tokens for every account with a registered device, for an "All" broadcast. */
+/** Push tokens for every registered device, for an "All" broadcast. */
 export async function allPushTokens(): Promise<string[]> {
   await ensureReady();
-  const { rows } = await getPool().query<{ push_token: string }>(`SELECT push_token FROM app_users WHERE push_token <> '';`);
-  return rows.map((row) => row.push_token);
+  const { rows } = await getPool().query<{ token: string }>(`SELECT token FROM push_tokens;`);
+  return rows.map((row) => row.token);
 }

@@ -1063,8 +1063,12 @@ async function applyLogin(
  * role name and falls back to everyone — an unrecognized audience should
  * still reach people, not silently notify nobody.
  *
- * Deliberately not awaited by the caller: a failed or slow push send must
- * never delay or fail the announcement save that triggered it.
+ * The caller awaits this despite it being "fire and forget" in spirit: on
+ * Vercel, a serverless function's execution is frozen as soon as its
+ * response is sent, so an un-awaited async call here would race the
+ * response and routinely get cut off before the push actually went out.
+ * Errors are swallowed at the call site instead — a failed or slow push
+ * must never fail the announcement save that triggered it.
  */
 async function notifyAnnouncement(audience: string, title: string) {
   const normalized = audience.trim().toLowerCase();
@@ -1251,7 +1255,11 @@ export async function createResource(resource: SchoolResource, values: Record<st
     }
 
     if (resource === "announcements") {
-      void notifyAnnouncement(values.Audience || "All", values.Title);
+      try {
+        await notifyAnnouncement(values.Audience || "All", values.Title);
+      } catch (error) {
+        console.warn("Failed to send announcement push notifications.", error);
+      }
     }
 
     return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "neon" }, mode: "summary" });
