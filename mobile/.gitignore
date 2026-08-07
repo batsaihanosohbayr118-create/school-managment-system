@@ -33,6 +33,11 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Firebase Admin SDK service account key — used once to upload push
+# credentials to EAS, never committed. google-services.json (the Android
+# client config) is fine to commit; its values aren't secret.
+firebase-service-account.json
+
 # typescript
 *.tsbuildinfo
 

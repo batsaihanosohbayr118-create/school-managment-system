@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "38427294698",
+    "project_id": "nova-mind-academy",
+    "storage_bucket": "nova-mind-academy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:38427294698:android:b88cff69ed978ade169093",
+        "android_client_info": {
+          "package_name": "mn.app.novamind"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-GgEWfDC6BZjcYMZ5zMS9zYJsU1q-GNQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

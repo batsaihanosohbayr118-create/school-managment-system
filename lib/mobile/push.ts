@@ -31,7 +31,7 @@ export async function sendPushNotifications(tokens: string[], message: PushMessa
 
   for (const batch of chunk(uniqueTokens, BATCH_SIZE)) {
     try {
-      await fetch(EXPO_PUSH_URL, {
+      const response = await fetch(EXPO_PUSH_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(
@@ -43,6 +43,16 @@ export async function sendPushNotifications(tokens: string[], message: PushMessa
           }))
         )
       });
+
+      // Expo's API returns 200 even when an individual token failed — the
+      // per-token result (e.g. DeviceNotRegistered, a missing FCM/APNs
+      // credential) is only visible in the response body's ticket list.
+      const body = (await response.json().catch(() => null)) as { data?: unknown; errors?: unknown } | null;
+      const tickets = Array.isArray(body?.data) ? body.data : [];
+      const errorTickets = tickets.filter((ticket: { status?: string }) => ticket?.status === "error");
+      if (!response.ok || errorTickets.length > 0 || body?.errors) {
+        console.warn("Push notification batch had errors.", JSON.stringify({ status: response.status, body }));
+      }
     } catch (error) {
       console.warn("Push notification batch failed to send.", error);
     }
