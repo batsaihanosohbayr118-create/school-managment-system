@@ -1056,7 +1056,8 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const modalAction = modalMode === "edit" ? copy.common.saveChanges : createCopy.action;
   const unreadNotifications = activityNotifications.filter((item) => !item.read).length;
   const canManageAttendance = role === "admin" || role === "teacher";
-  const canManageActiveModule = activeModule === "attendance" ? canManageAttendance : role === "admin";
+  const canManageActiveModule =
+    activeModule === "attendance" || activeModule === "announcements" ? canManageAttendance : role === "admin";
 
   async function logout() {
     authService.signOut();
@@ -1589,7 +1590,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               <TimetableModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
             {activeModule === "announcements" ? (
-              <AnnouncementsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+              <AnnouncementsModule apiData={resourceData} canManage={canManageAttendance} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
             ) : null}
             {activeModule === "wellbeing" ? (
               <WellbeingModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />

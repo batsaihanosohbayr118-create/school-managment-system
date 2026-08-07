@@ -1,4 +1,4 @@
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { Alert, FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Badge } from '@/components/Badge';
@@ -6,17 +6,30 @@ import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { SwipeableRow } from '@/components/SwipeableRow';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { useApiData } from '@/lib/use-api';
 import type { AnnouncementEntry } from '@shared/api-types';
 
 export default function AnnouncementsScreen() {
   const { data, error, loading, refetch, isOffline } = useApiData('announcements', api.announcements);
+  const { session } = useAuth();
   const { t } = useLanguage();
   const dangerColor = useThemeColor({}, 'danger');
   const tint = useThemeColor({}, 'tint');
+  const canManage = session?.role === 'admin' || session?.role === 'teacher';
+
+  async function handleDelete(entry: AnnouncementEntry) {
+    try {
+      await api.deleteAnnouncement(entry.id);
+      refetch();
+    } catch {
+      Alert.alert(t.common.deleteFailed);
+    }
+  }
 
   if (loading) {
     return <LoadingState />;
@@ -39,7 +52,11 @@ export default function AnnouncementsScreen() {
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
       ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
       ListEmptyComponent={<EmptyState icon="megaphone-outline" label={t.common.noAnnouncementsYet} />}
-      renderItem={({ item }) => <AnnouncementRow entry={item} />}
+      renderItem={({ item }) => (
+        <SwipeableRow deleteLabel={t.common.delete} onDelete={canManage ? () => handleDelete(item) : undefined}>
+          <AnnouncementRow entry={item} />
+        </SwipeableRow>
+      )}
     />
   );
 }
@@ -80,7 +97,8 @@ const styles = StyleSheet.create({
     padding: 20
   },
   card: {
-    gap: 8
+    gap: 8,
+    marginBottom: 0
   },
   header: {
     flexDirection: 'row',

@@ -62,6 +62,8 @@ export const api = {
     request<GradesResponse>(`/api/mobile/grades?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
   deleteTimetable: (id: string) =>
     request<TimetableResponse>(`/api/mobile/timetable?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
+  deleteAnnouncement: (id: string) =>
+    request<AnnouncementsResponse>(`/api/mobile/announcements?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
   registerPushToken: (token: string) =>
     request<{ ok: true }>("/api/mobile/push-token", { method: "POST", body: JSON.stringify({ token }) })
 };

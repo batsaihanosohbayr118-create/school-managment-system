@@ -853,7 +853,6 @@ function manageRolesFor(resource: SchoolResource) {
     case "parents":
     case "subjects":
     case "payments":
-    case "announcements":
     case "wellbeing":
       return new Set<Role>(["admin"]);
     case "attendance":
@@ -861,6 +860,7 @@ function manageRolesFor(resource: SchoolResource) {
     case "assignments":
     case "materials":
     case "timetable":
+    case "announcements":
       return new Set<Role>(["admin", "teacher"]);
     default:
       return new Set<Role>(["admin"]);
