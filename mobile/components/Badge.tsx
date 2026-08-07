@@ -2,13 +2,16 @@ import { StyleSheet } from 'react-native';
 
 import { Text, useThemeColor } from './Themed';
 
-export type BadgeTone = 'success' | 'danger' | 'warning' | 'neutral';
+export type BadgeTone = 'success' | 'danger' | 'warning' | 'neutral' | 'tint' | 'purple' | 'pink';
 
 const toneColorKeys = {
   success: { text: 'success', bg: 'successMuted' },
   danger: { text: 'danger', bg: 'dangerMuted' },
   warning: { text: 'warning', bg: 'warningMuted' },
-  neutral: { text: 'muted', bg: 'border' }
+  neutral: { text: 'muted', bg: 'border' },
+  tint: { text: 'tint', bg: 'tintMuted' },
+  purple: { text: 'purple', bg: 'purpleMuted' },
+  pink: { text: 'pink', bg: 'pinkMuted' }
 } as const;
 
 /** A small colored status pill — Present/Absent/Late, Paid/Unpaid, etc. */
@@ -31,6 +34,20 @@ export function statusTone(status: string): BadgeTone {
   if (NEGATIVE.has(normalized)) return 'danger';
   if (CAUTION.has(normalized)) return 'warning';
   return 'neutral';
+}
+
+/**
+ * Maps an announcement's free-text Audience field to a tone. The admin form
+ * has no fixed dropdown for it, so this matches loosely by keyword — same
+ * approach as the server's push-notification targeting — across both the
+ * English and Mongolian labels the app actually produces.
+ */
+export function audienceTone(audience: string): BadgeTone {
+  const normalized = audience.trim().toLowerCase();
+  if (normalized.includes('teacher') || normalized.includes('багш')) return 'tint';
+  if (normalized.includes('student') || normalized.includes('сурагч')) return 'purple';
+  if (normalized.includes('parent') || normalized.includes('эцэг') || normalized.includes('эх')) return 'pink';
+  return 'success';
 }
 
 const styles = StyleSheet.create({

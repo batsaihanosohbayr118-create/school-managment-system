@@ -1,7 +1,7 @@
 import { Alert, FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Badge } from '@/components/Badge';
+import { audienceTone, Badge } from '@/components/Badge';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
@@ -76,7 +76,7 @@ function AnnouncementRow({ entry }: { entry: AnnouncementEntry }) {
       </View>
       <Text style={styles.body}>{entry.content}</Text>
       <View style={styles.footer}>
-        <Badge label={entry.audience} tone="neutral" />
+        <Badge label={entry.audience} tone={audienceTone(entry.audience)} />
         <Text style={[styles.date, { color: mutedColor }]}>{entry.date}</Text>
       </View>
     </Card>

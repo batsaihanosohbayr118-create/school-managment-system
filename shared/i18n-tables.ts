@@ -690,9 +690,9 @@ export const translations = {
       save: "Хадгалах",
       dateFormatHint: "(YYYY-MM-DD)",
       saveFailed: "Хадгалж чадсангүй. Дахин оролдоно уу.",
-      dayPlaceholder: "Жишээ нь: Даваа",
-      timePlaceholder: "Жишээ нь: 09:00-09:45",
-      classPlaceholder: "Жишээ нь: 8A анги",
+      dayPlaceholder: "Даваа",
+      timePlaceholder: "09:00-09:45",
+      classPlaceholder: "8A анги",
       photoPermissionDenied: "Профайлын зураг солихын тулд зургийн санд хандах зөвшөөрөл шаардлагатай.",
       avatarUpdateFailed: "Зураг шинэчилж чадсангүй. Дахин оролдоно уу.",
       invalidCredentials: "Имэйл эсвэл нууц үг буруу байна."

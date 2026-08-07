@@ -814,6 +814,25 @@ async function filterResourceTable(
     };
   }
 
+  if (resource === "announcements") {
+    if (role === "admin") return table;
+
+    const audienceIndex = table.columns.findIndex((column) => column.toLowerCase() === "audience");
+    if (audienceIndex < 0) return table;
+
+    const ids: string[] = [];
+    const rows: string[][] = [];
+    table.rows.forEach((row, rowIndex) => {
+      const targetRole = audienceRole(row[audienceIndex] ?? "");
+      if (targetRole === null || targetRole === role) {
+        rows.push(row);
+        ids.push(table.ids[rowIndex] ?? "");
+      }
+    });
+
+    return { ...table, ids, rows };
+  }
+
   return table;
 }
 
@@ -1070,16 +1089,25 @@ async function applyLogin(
  * Errors are swallowed at the call site instead — a failed or slow push
  * must never fail the announcement save that triggered it.
  */
-async function notifyAnnouncement(audience: string, title: string) {
+/**
+ * Loosely matches an announcement's free-text Audience field to a role —
+ * matches both the English and Mongolian labels the create form actually
+ * produces. Returns null for "All" or anything unrecognized, meaning
+ * everyone: both the push fan-out and the list-visibility filter below
+ * treat null the same way, so a typo'd or unusual audience value fails open
+ * to "everyone can see/hear this" rather than silently going nowhere.
+ */
+function audienceRole(audience: string): Role | null {
   const normalized = audience.trim().toLowerCase();
+  if (normalized.includes("teacher") || normalized.includes("багш")) return "teacher";
+  if (normalized.includes("student") || normalized.includes("сурагч")) return "student";
+  if (normalized.includes("parent") || normalized.includes("эцэг") || normalized.includes("эх")) return "parent";
+  return null;
+}
 
-  const tokens = await (normalized.includes("teacher")
-    ? pushTokensForRole("teacher")
-    : normalized.includes("student")
-      ? pushTokensForRole("student")
-      : normalized.includes("parent")
-        ? pushTokensForRole("parent")
-        : allPushTokens());
+async function notifyAnnouncement(audience: string, title: string) {
+  const role = audienceRole(audience);
+  const tokens = await (role ? pushTokensForRole(role) : allPushTokens());
 
   await sendPushNotifications(tokens, {
     title: "Шинэ зарлал",
