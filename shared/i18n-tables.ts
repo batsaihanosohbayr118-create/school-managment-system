@@ -338,7 +338,12 @@ export const translations = {
       todaysSchedule: "Today's schedule",
       latestGrades: "Latest grades",
       noGradesYet: "No grades yet.",
-      viewPayments: "View payments"
+      viewPayments: "View payments",
+      goodMorning: "Good morning",
+      goodAfternoon: "Good afternoon",
+      goodEvening: "Good evening",
+      classesToday: "Classes today",
+      newAnnouncements: "New announcements"
     },
     columns: {
       Amount: "Amount",
@@ -634,7 +639,12 @@ export const translations = {
       todaysSchedule: "Өнөөдрийн хуваарь",
       latestGrades: "Сүүлийн дүнгүүд",
       noGradesYet: "Одоогоор дүн алга байна.",
-      viewPayments: "Төлбөр харах"
+      viewPayments: "Төлбөр харах",
+      goodMorning: "Өглөөний мэнд",
+      goodAfternoon: "Өдрийн мэнд",
+      goodEvening: "Оройн мэнд",
+      classesToday: "Өнөөдрийн хичээл",
+      newAnnouncements: "Шинэ зарлал"
     },
     columns: {
       Amount: "Дүн",

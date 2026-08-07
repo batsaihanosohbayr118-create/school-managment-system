@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Link } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
@@ -25,14 +25,18 @@ export default function HomeScreen() {
   const dangerColor = useThemeColor({}, 'danger');
   const tint = useThemeColor({}, 'tint');
   const tintMuted = useThemeColor({}, 'tintMuted');
+  const purple = useThemeColor({}, 'purple');
+  const purpleMuted = useThemeColor({}, 'purpleMuted');
 
   const timetable = useApiData('timetable', api.timetable);
   const grades = useApiData('grades', api.grades);
+  const announcements = useApiData('announcements', api.announcements);
 
   useFocusEffect(
     useCallback(() => {
       timetable.refetch();
       grades.refetch();
+      announcements.refetch();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
@@ -44,9 +48,48 @@ export default function HomeScreen() {
   // The server already returns newest-first (created_at desc); take the top 3.
   const latestGrades = (grades.data?.grades ?? []).slice(0, 3);
 
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const newAnnouncementsCount = (announcements.data?.announcements ?? []).filter((entry) => {
+    const posted = new Date(entry.date);
+    return !Number.isNaN(posted.getTime()) && posted >= weekAgo;
+  }).length;
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? t.common.goodMorning : hour < 18 ? t.common.goodAfternoon : t.common.goodEvening;
+  const name = session?.name || session?.email || '';
+  const initial = name.trim().charAt(0).toUpperCase() || '?';
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {(timetable.isOffline || grades.isOffline) ? <OfflineBanner /> : null}
+
+      <View style={styles.greetingRow}>
+        {session?.avatarUrl ? (
+          <Image source={{ uri: session.avatarUrl }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: tint }]}>
+            <Text style={styles.avatarText}>{initial}</Text>
+          </View>
+        )}
+        <View style={styles.greetingText}>
+          <Text style={[styles.greetingLabel, { color: mutedColor }]}>{greeting}</Text>
+          <Text style={styles.greetingName}>{name}</Text>
+        </View>
+      </View>
+
+      <View style={styles.statRow}>
+        <View style={[styles.statTile, { backgroundColor: tintMuted }]}>
+          <Ionicons name="calendar" size={18} color={tint} />
+          <Text style={[styles.statValue, { color: tint }]}>{todaysSlots.length}</Text>
+          <Text style={[styles.statLabel, { color: mutedColor }]}>{t.common.classesToday}</Text>
+        </View>
+        <View style={[styles.statTile, { backgroundColor: purpleMuted }]}>
+          <Ionicons name="megaphone" size={18} color={purple} />
+          <Text style={[styles.statValue, { color: purple }]}>{newAnnouncementsCount}</Text>
+          <Text style={[styles.statLabel, { color: mutedColor }]}>{t.common.newAnnouncements}</Text>
+        </View>
+      </View>
 
       <SectionHeader icon="calendar-outline" label={isTeacher ? t.common.todaysClasses : t.common.todaysSchedule} />
       {timetable.loading ? (
@@ -136,6 +179,55 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16
+  },
+  greetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'transparent'
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  avatarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700'
+  },
+  greetingText: {
+    backgroundColor: 'transparent'
+  },
+  greetingLabel: {
+    fontSize: 13,
+    fontWeight: '600'
+  },
+  greetingName: {
+    fontSize: 21,
+    fontWeight: '800'
+  },
+  statRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+    backgroundColor: 'transparent'
+  },
+  statTile: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 14,
+    gap: 4
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '800'
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '600'
   },
   sectionHeader: {
     flexDirection: 'row',
