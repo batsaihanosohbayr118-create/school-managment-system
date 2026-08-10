@@ -7,14 +7,21 @@ import { NextResponse } from "next/server";
  *
  * No wildcard: these endpoints accept bearer tokens. A native release build
  * sends no Origin header at all, in which case CORS does not apply and the
- * request proceeds normally — the entries below exist for the Expo dev client
- * and web callers.
+ * request proceeds normally — the entries below exist for the Expo dev client,
+ * Expo Go, and web callers.
  */
 const staticOrigins = [
   "http://localhost:8081",  // Expo dev server
   "http://localhost:19006", // Expo web
   "http://localhost:3000"   // local Next dev
 ];
+
+// Metro/Expo dev servers are reached over LAN by IP (e.g. http://192.168.1.23:8081)
+// whenever the client is a physical device rather than a simulator on the same
+// machine — most notably Expo Go, whose JS runtime enforces CORS unlike a real
+// native build. The static localhost entries above never match that case, so
+// every request (including GET) got silently dropped at the preflight step.
+const devLanOriginPattern = /^http:\/\/(\d{1,3}\.){3}\d{1,3}:(8081|19006)$/;
 
 function allowedOrigins(): Set<string> {
   const extra = (process.env.MOBILE_ALLOWED_ORIGINS ?? "")
@@ -26,7 +33,8 @@ function allowedOrigins(): Set<string> {
 }
 
 export function isAllowedOrigin(origin: string | null): boolean {
-  return origin !== null && allowedOrigins().has(origin);
+  if (origin === null) return false;
+  return allowedOrigins().has(origin) || devLanOriginPattern.test(origin);
 }
 
 export function corsHeaders(origin: string | null, methods: string[]): Record<string, string> {

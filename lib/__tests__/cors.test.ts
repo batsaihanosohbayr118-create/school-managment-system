@@ -13,6 +13,19 @@ describe("isAllowedOrigin", () => {
   it("rejects a null origin", () => {
     expect(isAllowedOrigin(null)).toBe(false);
   });
+
+  it("allows a LAN Metro/Expo-web origin (a physical device reaching the dev server by IP)", () => {
+    expect(isAllowedOrigin("http://192.168.10.197:8081")).toBe(true);
+    expect(isAllowedOrigin("http://10.0.0.5:19006")).toBe(true);
+  });
+
+  it("rejects a LAN IP on a port that isn't Metro/Expo-web", () => {
+    expect(isAllowedOrigin("http://192.168.10.197:3000")).toBe(false);
+  });
+
+  it("rejects a non-IP host even on a dev port", () => {
+    expect(isAllowedOrigin("http://evil.example:8081")).toBe(false);
+  });
 });
 
 describe("corsHeaders", () => {
