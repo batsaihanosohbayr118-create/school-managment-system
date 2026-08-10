@@ -61,5 +61,13 @@ export function withCors<T extends NextResponse>(response: T, request: Request, 
   for (const [key, value] of Object.entries(corsHeaders(request.headers.get("origin"), methods))) {
     response.headers.set(key, value);
   }
+
+  // Every mobile response carries per-user data behind a bearer token.
+  // Next's default "public, max-age=0, must-revalidate" is still cacheable —
+  // a client (or intermediate cache) that skips revalidation under flaky
+  // connectivity can replay a stale response, including a stale error, well
+  // after the condition that caused it is gone.
+  response.headers.set("Cache-Control", "no-store");
+
   return response;
 }
