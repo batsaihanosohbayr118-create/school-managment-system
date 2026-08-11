@@ -34,6 +34,19 @@ export async function PATCH(request: Request) {
     return withCors(NextResponse.json({ message: "Invalid request body." }, { status: 400 }), request, METHODS);
   }
 
+  // The avatar rides along as a bearer token claim on every subsequent
+  // request (see issueToken's cap in lib/auth-token.ts) — an uncompressed
+  // photo blows past the edge's header size limit and turns every request
+  // into an unparseable 494. Reject it here so the failure is immediate and
+  // explained, instead of silently dropped from the token on next login.
+  if (typeof body.avatarUrl === "string" && body.avatarUrl.length > 6000) {
+    return withCors(
+      NextResponse.json({ message: "Photo is too large. Please choose a smaller image." }, { status: 413 }),
+      request,
+      METHODS
+    );
+  }
+
   try {
     // Changing a password requires proving the current one, so a stolen token
     // alone cannot lock the real owner out.
