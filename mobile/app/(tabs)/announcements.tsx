@@ -4,8 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { audienceTone, Badge } from '@/components/Badge';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
-import { LoadingState } from '@/components/LoadingState';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { SkeletonList } from '@/components/Skeleton';
 import { SwipeableRow } from '@/components/SwipeableRow';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
@@ -32,7 +32,7 @@ export default function AnnouncementsScreen() {
   }
 
   if (loading) {
-    return <LoadingState />;
+    return <SkeletonList variant="announcement" count={4} />;
   }
 
   if (error && !isOffline) {

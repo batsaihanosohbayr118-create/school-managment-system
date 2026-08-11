@@ -4,8 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Badge, statusTone } from '@/components/Badge';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
-import { LoadingState } from '@/components/LoadingState';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { SkeletonList } from '@/components/Skeleton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { useLanguage } from '@/lib/language-context';
@@ -20,7 +20,7 @@ export default function PaymentsScreen() {
   const tint = useThemeColor({}, 'tint');
 
   if (loading) {
-    return <LoadingState />;
+    return <SkeletonList />;
   }
 
   if (error && !isOffline) {

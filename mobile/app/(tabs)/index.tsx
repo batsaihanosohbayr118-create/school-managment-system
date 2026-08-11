@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { SkeletonHome } from '@/components/Skeleton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
@@ -59,6 +60,14 @@ export default function HomeScreen() {
   const greeting = hour < 12 ? t.common.goodMorning : hour < 18 ? t.common.goodAfternoon : t.common.goodEvening;
   const name = session?.name || session?.email || '';
   const initial = name.trim().charAt(0).toUpperCase() || '?';
+
+  if (timetable.loading || grades.loading) {
+    return (
+      <ScrollView style={styles.container}>
+        <SkeletonHome />
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
