@@ -16,7 +16,7 @@
       }
     },
     "android": {
-      "package": "mn.app.novamind",
+      "package": "mn.aethertech.novamind",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

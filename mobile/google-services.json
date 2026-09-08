@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:38427294698:android:7f76276f4d6cc9cf169093",
+        "android_client_info": {
+          "package_name": "mn.aethertech.novamind"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-GgEWfDC6BZjcYMZ5zMS9zYJsU1q-GNQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:38427294698:android:b88cff69ed978ade169093",
         "android_client_info": {
           "package_name": "mn.app.novamind"
