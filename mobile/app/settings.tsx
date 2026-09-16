@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { languages } from '@shared/i18n-tables';
 
 import { Card } from '@/components/Card';
@@ -46,19 +47,26 @@ export default function SettingsScreen() {
       mediaTypes: 'images',
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.5,
-      base64: true
+      quality: 0.8
     });
-    if (result.canceled || !result.assets[0]?.base64) return;
+    const asset = result.canceled ? null : result.assets[0];
+    if (!asset?.uri) return;
 
     setUploadingAvatar(true);
-    // Stored as a data URI directly in the account's avatar_url column
-    // (via PATCH /api/auth/profile) — same approach the web app's profile
-    // editor uses, no separate storage bucket involved.
-    const dataUri = `data:image/jpeg;base64,${result.assets[0].base64}`;
-    const { error } = await updateAvatar(dataUri);
-    setUploadingAvatar(false);
-    if (error) setAvatarError(t.mobileForms.avatarUpdateFailed);
+    try {
+      const compactImage = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 48, height: 48 } }],
+        { compress: 0.15, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      const dataUri = compactImage.base64 ? `data:image/jpeg;base64,${compactImage.base64}` : '';
+      const { error } = dataUri ? await updateAvatar(dataUri) : { error: 'image-processing-failed' };
+      if (error) setAvatarError(t.mobileForms.avatarUpdateFailed);
+    } catch {
+      setAvatarError(t.mobileForms.avatarUpdateFailed);
+    } finally {
+      setUploadingAvatar(false);
+    }
   }
 
   return (

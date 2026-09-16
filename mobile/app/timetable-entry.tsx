@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput
+} from 'react-native';
 
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
@@ -48,62 +56,74 @@ export default function TimetableEntryScreen() {
   const inputStyle = [styles.input, { color: textColor, backgroundColor: inputBg, borderColor }];
 
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ title: t.create.timetable.title }} />
-      <Text style={styles.title}>{t.create.timetable.title}</Text>
+    <KeyboardAvoidingView
+      style={styles.keyboardContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+      >
+        <Stack.Screen options={{ title: t.create.timetable.title }} />
+        <Text style={styles.title}>{t.create.timetable.title}</Text>
 
-      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Subject}</Text>
-      <TextInput style={inputStyle} placeholderTextColor={placeholderColor} value={subject} onChangeText={setSubject} editable={!submitting} autoFocus />
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Subject}</Text>
+        <TextInput style={inputStyle} placeholderTextColor={placeholderColor} value={subject} onChangeText={setSubject} editable={!submitting} autoFocus />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Day}</Text>
-      <TextInput
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Day}</Text>
+        <TextInput
         style={inputStyle}
         placeholder={t.mobileForms.dayPlaceholder}
         placeholderTextColor={placeholderColor}
         value={day}
         onChangeText={setDay}
         editable={!submitting}
-      />
+        />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Time}</Text>
-      <TextInput
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Time}</Text>
+        <TextInput
         style={inputStyle}
         placeholder={t.mobileForms.timePlaceholder}
         placeholderTextColor={placeholderColor}
         value={time}
         onChangeText={setTime}
         editable={!submitting}
-      />
+        />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Class}</Text>
-      <TextInput
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Class}</Text>
+        <TextInput
         style={inputStyle}
         placeholder={t.mobileForms.classPlaceholder}
         placeholderTextColor={placeholderColor}
         value={className}
         onChangeText={setClassName}
         editable={!submitting}
-      />
+        />
 
-      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Teacher}</Text>
-      <TextInput style={inputStyle} placeholderTextColor={placeholderColor} value={teacher} onChangeText={setTeacher} editable={!submitting} />
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Teacher}</Text>
+        <TextInput style={inputStyle} placeholderTextColor={placeholderColor} value={teacher} onChangeText={setTeacher} editable={!submitting} />
 
-      {error ? <Text style={[styles.error, { color: dangerColor }]}>{error}</Text> : null}
+        {error ? <Text style={[styles.error, { color: dangerColor }]}>{error}</Text> : null}
 
-      <Pressable
-        style={[styles.submit, { backgroundColor: tint }, (submitting || !subject || !day || !time) && styles.submitDisabled]}
-        onPress={handleSubmit}
-        disabled={submitting || !subject || !day || !time}
-      >
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{t.mobileForms.save}</Text>}
-      </Pressable>
-    </View>
+        <Pressable
+          style={[styles.submit, { backgroundColor: tint }, (submitting || !subject || !day || !time) && styles.submitDisabled]}
+          onPress={handleSubmit}
+          disabled={submitting || !subject || !day || !time}
+        >
+          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{t.mobileForms.save}</Text>}
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardContainer: {
+    flex: 1
+  },
   container: {
-    flex: 1,
     padding: 20,
     gap: 6
   },

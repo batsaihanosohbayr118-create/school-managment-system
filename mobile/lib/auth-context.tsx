@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { AppState } from "react-native";
 import { authService } from "./auth";
 import { registerPushToken } from "./notifications";
 import { resolveActiveSession, type ActiveSession } from "./session";
@@ -25,10 +26,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       setSession(initial);
       setLoading(false);
+      if (initial) {
+        void authService.refreshProfile().then(() => {
+          if (mounted) void resolveActiveSession().then(setSession);
+        });
+      }
+    });
+
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active" && mounted) {
+        void authService.refreshProfile().then(({ error }) => {
+          if (!error && mounted) void resolveActiveSession().then(setSession);
+        });
+      }
     });
 
     return () => {
       mounted = false;
+      subscription.remove();
     };
   }, []);
 

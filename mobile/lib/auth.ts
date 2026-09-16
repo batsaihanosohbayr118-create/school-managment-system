@@ -168,6 +168,26 @@ export const authService = {
     await clearToken();
   },
 
+  async refreshProfile(): Promise<{ error: string | null }> {
+    const token = await getToken();
+    if (!token) return { error: "not-signed-in" };
+
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/api/auth/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch {
+      return { error: "No connection." };
+    }
+
+    if (!response.ok) return { error: await readMessage(response) };
+
+    const { token: nextToken } = (await response.json()) as { token: string };
+    await setToken(nextToken);
+    return { error: null };
+  },
+
   async updateProfile({ avatarUrl }: { avatarUrl: string }): Promise<{ error: string | null }> {
     const token = await getToken();
     if (!token) return { error: "not-signed-in" };
