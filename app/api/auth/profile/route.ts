@@ -5,7 +5,7 @@ import { preflight, withCors } from "@/lib/cors";
 
 export const runtime = "nodejs";
 
-const METHODS = ["PATCH"];
+const METHODS = ["GET", "PATCH"];
 
 export const OPTIONS = preflight(METHODS);
 
@@ -13,6 +13,37 @@ function callerFrom(request: Request) {
   const header = request.headers.get("authorization") ?? "";
   if (!header.toLowerCase().startsWith("bearer ")) return null;
   return verifyToken(header.slice(7).trim());
+}
+
+/** Refreshes the signed-in user's profile data after an admin edit. */
+export async function GET(request: Request) {
+  const caller = callerFrom(request);
+  if (!caller) {
+    return withCors(NextResponse.json({ message: "Not signed in." }, { status: 401 }), request, METHODS);
+  }
+
+  try {
+    const account = await findAccountById(caller.sub);
+    if (!account) {
+      return withCors(NextResponse.json({ message: "Account not found." }, { status: 404 }), request, METHODS);
+    }
+
+    const token = issueToken({
+      sub: account.id,
+      email: account.email,
+      name: account.name,
+      role: account.role,
+      avatarUrl: account.avatarUrl
+    });
+
+    return withCors(NextResponse.json({ token, user: account }), request, METHODS);
+  } catch (error) {
+    return withCors(
+      NextResponse.json({ message: error instanceof Error ? error.message : "Profile refresh failed." }, { status: 500 }),
+      request,
+      METHODS
+    );
+  }
 }
 
 /** Updates the signed-in user's own profile, or their password. */
