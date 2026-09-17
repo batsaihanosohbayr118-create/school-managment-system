@@ -20,6 +20,7 @@ import { useLanguage } from '@/lib/language-context';
 const tabMeta: Record<MobileTab, { routeName: string; icon: keyof typeof Ionicons.glyphMap }> = {
   home: { routeName: 'index', icon: 'home' },
   timetable: { routeName: 'timetable', icon: 'calendar' },
+  subjects: { routeName: 'subjects', icon: 'book' },
   grades: { routeName: 'grades', icon: 'bar-chart' },
   attendance: { routeName: 'attendance', icon: 'checkmark-circle' },
   announcements: { routeName: 'announcements', icon: 'megaphone' }
@@ -36,6 +37,8 @@ function tabTitle(tab: MobileTab, t: AppCopy, language: Language): string {
       return language === 'mn' ? 'Нүүр' : 'Home';
     case 'timetable':
       return t.nav.timetable.label;
+    case 'subjects':
+      return t.nav.subjects.label;
     case 'grades':
       return t.nav.grades.label;
     case 'attendance':

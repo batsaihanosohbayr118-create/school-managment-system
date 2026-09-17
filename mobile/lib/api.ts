@@ -6,6 +6,7 @@ import type {
   MobileErrorBody,
   MobileProfile,
   PaymentsResponse,
+  SubjectsResponse,
   TimetableResponse
 } from "@shared/api-types";
 import { getToken } from "./auth";
@@ -50,6 +51,7 @@ export const api = {
   attendance: () => request<AttendanceResponse>("/api/mobile/attendance"),
   announcements: () => request<AnnouncementsResponse>("/api/mobile/announcements"),
   payments: () => request<PaymentsResponse>("/api/mobile/payments"),
+  subjects: () => request<SubjectsResponse>("/api/mobile/subjects"),
   postAttendance: (body: { student: string; subject?: string; date?: string; status: string }) =>
     request<AttendanceResponse>("/api/mobile/attendance", { method: "POST", body: JSON.stringify(body) }),
   postGrade: (body: { student: string; subject?: string; score: number | string; semester?: string }) =>
