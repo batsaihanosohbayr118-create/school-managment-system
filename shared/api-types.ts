@@ -77,6 +77,49 @@ export type SubjectEntry = {
   gradeLevels: string;
 };
 
+/**
+ * Structural duplicates of SubjectTopic/SubjectLesson/SubjectAssignment/
+ * SubjectContent in lib/types.ts — that file pulls in lucide-react, a
+ * web-only dependency shared/ must not carry (same reason Role/NavModule are
+ * duplicated in i18n-tables.ts). Keep in sync by hand.
+ */
+export type SubjectTopic = {
+  id: string;
+  title: string;
+  description?: string;
+};
+
+export type SubjectLesson = {
+  id: string;
+  title: string;
+  topicId: string;
+  duration?: string;
+  objectives?: string[];
+  videoUrl?: string;
+  fileName?: string;
+  fileUrl?: string;
+  fileType?: string;
+  fileSize?: number;
+  uploadedAt?: string;
+};
+
+export type SubjectAssignment = {
+  id: string;
+  title: string;
+  lessonId?: string;
+  dueDate?: string;
+  maxScore?: number;
+  type?: string;
+  description?: string;
+};
+
+export type SubjectContent = {
+  subjectId: string;
+  topics: SubjectTopic[];
+  lessons: SubjectLesson[];
+  assignments: SubjectAssignment[];
+};
+
 export type MobileErrorBody = { message: string };
 
 export type TimetableResponse = { slots: TimetableSlot[] };

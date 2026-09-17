@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { Link } from 'expo-router';
+import { FlatList, Pressable, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Badge } from '@/components/Badge';
@@ -95,33 +96,41 @@ function SubjectRow({ subject, index }: { subject: SubjectEntry; index: number }
   const borderColor = useThemeColor({}, 'border');
 
   return (
-    <Card style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={[styles.icon, { backgroundColor: accentMuted }]}>
-          <Ionicons name={iconForSubject(subject)} size={18} color={accentColor} />
-        </View>
-        <View style={styles.titleGroup}>
-          <Text style={styles.name} numberOfLines={1}>
-            {translateValue(subject.name, language)}
-          </Text>
-          {subject.teacher ? (
-            <Text style={[styles.teacher, { color: mutedColor }]} numberOfLines={1}>
-              {subject.teacher}
-            </Text>
-          ) : null}
-        </View>
-        {subject.code ? (
-          <Text style={[styles.code, { color: accentColor, backgroundColor: accentMuted }]}>{subject.code}</Text>
-        ) : null}
-      </View>
+    <Link
+      href={{ pathname: '/subject-content', params: { id: subject.id, name: translateValue(subject.name, language) } }}
+      asChild
+    >
+      <Pressable style={({ pressed }) => pressed && styles.pressed}>
+        <Card style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.icon, { backgroundColor: accentMuted }]}>
+              <Ionicons name={iconForSubject(subject)} size={18} color={accentColor} />
+            </View>
+            <View style={styles.titleGroup}>
+              <Text style={styles.name} numberOfLines={1}>
+                {translateValue(subject.name, language)}
+              </Text>
+              {subject.teacher ? (
+                <Text style={[styles.teacher, { color: mutedColor }]} numberOfLines={1}>
+                  {subject.teacher}
+                </Text>
+              ) : null}
+            </View>
+            {subject.code ? (
+              <Text style={[styles.code, { color: accentColor, backgroundColor: accentMuted }]}>{subject.code}</Text>
+            ) : null}
+            <Ionicons name="chevron-forward" size={16} color={mutedColor} />
+          </View>
 
-      {subject.category || subject.gradeLevels ? (
-        <View style={[styles.tagRow, { borderTopColor: borderColor }]}>
-          {subject.category ? <Badge label={translateValue(subject.category, language)} tone={accent} /> : null}
-          {subject.gradeLevels ? <Badge label={translateValue(subject.gradeLevels, language)} tone="neutral" /> : null}
-        </View>
-      ) : null}
-    </Card>
+          {subject.category || subject.gradeLevels ? (
+            <View style={[styles.tagRow, { borderTopColor: borderColor }]}>
+              {subject.category ? <Badge label={translateValue(subject.category, language)} tone={accent} /> : null}
+              {subject.gradeLevels ? <Badge label={translateValue(subject.gradeLevels, language)} tone="neutral" /> : null}
+            </View>
+          ) : null}
+        </Card>
+      </Pressable>
+    </Link>
   );
 }
 
@@ -141,6 +150,9 @@ const styles = StyleSheet.create({
   card: {
     gap: 0,
     marginBottom: 10
+  },
+  pressed: {
+    opacity: 0.7
   },
   cardHeader: {
     flexDirection: 'row',

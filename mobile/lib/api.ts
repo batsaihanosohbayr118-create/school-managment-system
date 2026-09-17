@@ -6,6 +6,7 @@ import type {
   MobileErrorBody,
   MobileProfile,
   PaymentsResponse,
+  SubjectContent,
   SubjectsResponse,
   TimetableResponse
 } from "@shared/api-types";
@@ -15,6 +16,11 @@ const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 if (!baseUrl) {
   throw new Error("EXPO_PUBLIC_API_BASE_URL must be set (mobile/.env.local).");
+}
+
+/** A lesson's fileUrl/videoUrl from the server is server-relative (e.g. "/api/subjects/files/F-1") — resolve it to open outside `request`. */
+export function resolveApiUrl(path: string): string {
+  return /^https?:\/\//.test(path) ? path : `${baseUrl}${path}`;
 }
 
 async function authHeader(): Promise<HeadersInit> {
@@ -44,6 +50,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/**
+ * A file upload needs its body to stay a raw FormData — setting a
+ * "Content-Type: application/json" header the way `request` does would
+ * override the multipart boundary the runtime generates for it.
+ */
+async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, { method: "POST", headers: await authHeader(), body: formData });
+  } catch {
+    throw new ApiError("offline", "No connection.");
+  }
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as MobileErrorBody | null;
+    throw new ApiError(classifyStatus(response.status), body?.message ?? "Request failed.");
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export const api = {
   me: () => request<MobileProfile>("/api/mobile/me"),
   timetable: () => request<TimetableResponse>("/api/mobile/timetable"),
@@ -52,6 +79,15 @@ export const api = {
   announcements: () => request<AnnouncementsResponse>("/api/mobile/announcements"),
   payments: () => request<PaymentsResponse>("/api/mobile/payments"),
   subjects: () => request<SubjectsResponse>("/api/mobile/subjects"),
+  subjectContent: (subjectId: string) =>
+    request<SubjectContent | null>(`/api/subjects/${encodeURIComponent(subjectId)}/content`),
+  saveSubjectContent: (subjectId: string, content: SubjectContent) =>
+    request<{ success: true }>(`/api/subjects/${encodeURIComponent(subjectId)}/content`, {
+      method: "POST",
+      body: JSON.stringify(content)
+    }),
+  uploadSubjectFile: (subjectId: string, formData: FormData) =>
+    uploadRequest<SubjectContent>(`/api/subjects/${encodeURIComponent(subjectId)}/content`, formData),
   postAttendance: (body: { student: string; subject?: string; date?: string; status: string }) =>
     request<AttendanceResponse>("/api/mobile/attendance", { method: "POST", body: JSON.stringify(body) }),
   postGrade: (body: { student: string; subject?: string; score: number | string; semester?: string }) =>
