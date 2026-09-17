@@ -5,7 +5,7 @@ import path from "node:path";
 
 import type { NavModule, Role } from "@/lib/types";
 import { defaultStudentSubjects, defaultStudentSubjectsValue, subjectCatalog } from "@/lib/subjects";
-import { AccountConflictError, allPushTokens, createAccount, pushTokensForRole, setAccountPassword } from "@/lib/auth-db";
+import { AccountConflictError, allPushTokens, createAccount, pushTokensForRole, setAccountPassword, syncAccountName } from "@/lib/auth-db";
 import { sendPushNotifications } from "@/lib/mobile/push";
 import type { SchoolSession } from "./school-session";
 
@@ -1043,7 +1043,11 @@ async function ensureTeacherSubject(pool: Pool, context: SchoolRequestContext | 
  *
  * `create` refuses an email that is already taken; `set` also accepts an
  * existing account and just changes its password, which is how someone added
- * before this field existed finally gets a login.
+ * before this field existed finally gets a login. `set` additionally keeps
+ * the login's display name following the record's Name field even when no
+ * password is being changed — otherwise editing a typo'd name here leaves
+ * every already-signed-in session (the greeting on mobile, `me.name` on web)
+ * showing the old one until the account is edited separately in Admin → Users.
  */
 async function applyLogin(
   mode: "create" | "set",
@@ -1052,15 +1056,21 @@ async function applyLogin(
   /** What the account is tied to: a parent's child, or a teacher's subject. */
   link?: { studentEmail?: string; subject?: string }
 ) {
+  const email = values.Email?.trim();
+  const name = values.Name?.trim();
+
+  if (mode === "set" && email && name) {
+    await syncAccountName(email, role, name);
+  }
+
   const password = values.Password?.trim();
   if (!password) return;
 
-  const email = values.Email?.trim();
   if (!email) {
     throw new ValidationError("Email is required when you set a password.");
   }
 
-  const account = { email, password, name: values.Name?.trim() || email, role, ...link };
+  const account = { email, password, name: name || email, role, ...link };
 
   try {
     if (mode === "create") {

@@ -340,6 +340,21 @@ export async function updateAccount(id: string, input: UpdateAccountInput): Prom
  * password by reusing their email. In that case no row matches, and
  * createAccount raises the email conflict instead.
  */
+/**
+ * Keeps a login's display name following the school record it was created
+ * from. `app_users` and `students`/`teachers`/`parents` are separate tables
+ * (see applyLogin in lib/school-db.ts) — editing a record's Name there only
+ * reaches this table if this is called too. A no-op when no account with
+ * that email/role exists, since not every school record has a login.
+ */
+export async function syncAccountName(email: string, role: Role, name: string): Promise<void> {
+  await ensureReady();
+  await getPool().query(
+    `UPDATE app_users SET name = $1 WHERE LOWER(email) = LOWER($2) AND role = $3;`,
+    [name.trim(), email.trim(), role]
+  );
+}
+
 export async function setAccountPassword(input: {
   email: string;
   name: string;

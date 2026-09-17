@@ -175,7 +175,7 @@ export default function HomeScreen() {
           >
             <Ionicons name="sunny-outline" size={25} color={tint} />
           </Animated.View>
-          <Text style={[styles.emptyScheduleTitle, { color: tint }]}>Today is a quiet day</Text>
+          <Text style={[styles.emptyScheduleTitle, { color: tint }]}>{t.common.todayIsAQuietDay}</Text>
           <Text style={[styles.emptyScheduleText, { color: mutedColor }]}>
             {t.common.nothingScheduledFor(translateValue(today, language))}
           </Text>
