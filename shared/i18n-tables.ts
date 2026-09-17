@@ -449,7 +449,26 @@ export const translations = {
       assignmentAdded: "Assignment added",
       topics: "Topics",
       assignments: "Assignments",
+      categoryLabels: { topic: "Topic", lesson: "Lesson", video: "Video lesson", assignment: "Assignment" },
+      categorySubtitles: {
+        topic: "Browse subject topics",
+        lesson: "Videos and lesson notes",
+        video: "Watch and rewatch recordings",
+        assignment: "Practice work and grading"
+      },
+      fieldLabels: {
+        name: "Name",
+        duration: "Duration",
+        objectives: "Objectives",
+        description: "Description",
+        videoUrl: "Link",
+        dueDate: "Due date",
+        maxScore: "Max score",
+        type: "Type"
+      },
       noTopicsYet: "No topics yet.",
+      noLessonsYet: "No lessons yet.",
+      noVideosYet: "No video lessons yet.",
       noAssignmentsYet: "No assignments yet.",
       loadFailed: "Could not load this subject's content."
     },
@@ -794,7 +813,26 @@ export const translations = {
       assignmentAdded: "Даалгавар нэмэгдлээ",
       topics: "Сэдвүүд",
       assignments: "Даалгаврууд",
+      categoryLabels: { topic: "Сэдэв", lesson: "Хичээл", video: "Видео хичээл", assignment: "Даалгавар" },
+      categorySubtitles: {
+        topic: "Хичээлийн сэдвүүдийг ерөнхийлөн үзэх",
+        lesson: "Видео хичээл, тайлбар үзэх",
+        video: "Бичлэг хичээлийг үзэх, давтах",
+        assignment: "Дасгал ажил хийх, үнэлгээ авах"
+      },
+      fieldLabels: {
+        name: "Нэр",
+        duration: "Үргэлжлэх хугацаа",
+        objectives: "Зорилго",
+        description: "Тайлбар",
+        videoUrl: "Холбоос",
+        dueDate: "Дуусах хугацаа",
+        maxScore: "Дээд оноо",
+        type: "Төрөл"
+      },
       noTopicsYet: "Одоогоор сэдэв алга байна.",
+      noLessonsYet: "Одоогоор хичээл алга байна.",
+      noVideosYet: "Одоогоор видео хичээл алга байна.",
       noAssignmentsYet: "Одоогоор даалгавар алга байна.",
       loadFailed: "Ачааллаж чадсангүй."
     },

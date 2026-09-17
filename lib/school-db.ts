@@ -724,7 +724,26 @@ async function filterResourceTable(
 
   if (resource === "subjects") {
     if (role === "admin") return table;
-    return filterByColumnValues(table, "Name", accessibleSubjects);
+    const filtered = filterByColumnValues(table, "Name", accessibleSubjects);
+
+    // filterByColumnValues keeps the subjects table's own row order, which
+    // has no relation to this student's (or the parent's child's) subjects.
+    // accessibleSubjects is a Set built from that student's own CSV field in
+    // enrollment order, so re-sort the filtered rows to match it — the
+    // subject a student is actually enrolled in first surfaces first,
+    // instead of whatever order the subjects table happens to store rows in.
+    const nameIndex = filtered.columns.findIndex((column) => column.toLowerCase() === "name");
+    if (nameIndex < 0) return filtered;
+
+    const order = Array.from(accessibleSubjects);
+    const positions = filtered.rows.map((row) => order.indexOf(normalizedToken(row[nameIndex])));
+    const sortedIndices = filtered.rows.map((_, i) => i).sort((a, b) => positions[a] - positions[b]);
+
+    return {
+      ...filtered,
+      ids: sortedIndices.map((i) => filtered.ids[i]),
+      rows: sortedIndices.map((i) => filtered.rows[i])
+    };
   }
 
   if (resource === "assignments" || resource === "materials" || resource === "attendance" || resource === "grades" || resource === "timetable") {

@@ -151,6 +151,7 @@ export default function HomeScreen() {
         tint={success}
         mutedColor={mutedColor}
         language={language}
+        isParent={session?.role === 'parent'}
       />
 
       <SectionHeader icon="calendar-outline" label={isTeacher ? t.common.todaysClasses : t.common.todaysSchedule} />
@@ -231,7 +232,8 @@ function AttendanceSummary({
   percentage,
   tint,
   mutedColor,
-  language
+  language,
+  isParent
 }: {
   attendedCount: number;
   totalCount: number;
@@ -239,6 +241,7 @@ function AttendanceSummary({
   tint: string;
   mutedColor: string;
   language: 'en' | 'mn';
+  isParent: boolean;
 }) {
   const cardColor = useThemeColor({}, 'card');
   const borderColor = useThemeColor({}, 'border');
@@ -260,7 +263,11 @@ function AttendanceSummary({
                 <View style={[styles.attendanceIcon, { backgroundColor: `${tint}22` }]}>
                   <Ionicons name="stats-chart" size={18} color={tint} />
                 </View>
-                <Text style={styles.attendanceTitle}>{language === 'mn' ? 'Миний ирц' : 'My attendance'}</Text>
+                <Text style={styles.attendanceTitle}>
+                  {isParent
+                    ? language === 'mn' ? 'Хүүхдийн ирц' : "Child's attendance"
+                    : language === 'mn' ? 'Миний ирц' : 'My attendance'}
+                </Text>
               </View>
               <View style={styles.attendanceDetails}>
                 <Text style={[styles.attendanceDetailsText, { color: tint }]}>
@@ -383,9 +390,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#ffffff'
+    justifyContent: 'center'
   },
   avatarText: {
     color: '#fff',
