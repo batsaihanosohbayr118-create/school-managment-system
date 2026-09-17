@@ -1,5 +1,5 @@
 import type { ResourceTable } from "@/lib/school-db";
-import type { AnnouncementEntry, AttendanceEntry, GradeEntry, PaymentEntry, TimetableSlot } from "@shared/api-types";
+import type { AnnouncementEntry, AttendanceEntry, GradeEntry, PaymentEntry, SubjectEntry, TimetableSlot } from "@shared/api-types";
 import { columnIndex, parseMoney, parseScore, parseTimeRange } from "./table";
 
 export function toTimetableSlots(table: ResourceTable): TimetableSlot[] {
@@ -79,6 +79,25 @@ export function toPaymentEntries(table: ResourceTable): PaymentEntry[] {
       dueDate: row[dueDate] ?? ""
     };
   });
+}
+
+export function toSubjectEntries(table: ResourceTable): SubjectEntry[] {
+  const name = columnIndex(table.columns, "Name");
+  const code = columnIndex(table.columns, "Code");
+  const description = columnIndex(table.columns, "Description");
+  const teacher = columnIndex(table.columns, "Teacher");
+  const category = columnIndex(table.columns, "Category");
+  const gradeLevels = columnIndex(table.columns, "Grade Levels");
+
+  return table.rows.map((row, index) => ({
+    id: table.ids[index] ?? "",
+    name: row[name] ?? "",
+    code: row[code] ?? "",
+    description: row[description] ?? "",
+    teacher: row[teacher] ?? "",
+    category: row[category] ?? "",
+    gradeLevels: row[gradeLevels] ?? ""
+  }));
 }
 
 export function toAnnouncementEntries(table: ResourceTable): AnnouncementEntry[] {

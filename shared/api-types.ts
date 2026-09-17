@@ -67,6 +67,16 @@ export type AnnouncementEntry = {
   date: string;
 };
 
+export type SubjectEntry = {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  teacher: string;
+  category: string;
+  gradeLevels: string;
+};
+
 export type MobileErrorBody = { message: string };
 
 export type TimetableResponse = { slots: TimetableSlot[] };
@@ -74,3 +84,4 @@ export type GradesResponse = { grades: GradeEntry[] };
 export type AttendanceResponse = { entries: AttendanceEntry[] };
 export type PaymentsResponse = { payments: PaymentEntry[] };
 export type AnnouncementsResponse = { announcements: AnnouncementEntry[] };
+export type SubjectsResponse = { subjects: SubjectEntry[] };

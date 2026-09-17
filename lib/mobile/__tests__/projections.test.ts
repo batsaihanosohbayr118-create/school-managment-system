@@ -5,6 +5,7 @@ import {
   toAttendanceEntries,
   toGradeEntries,
   toPaymentEntries,
+  toSubjectEntries,
   toTimetableSlots
 } from "@/lib/mobile/projections";
 
@@ -149,5 +150,35 @@ describe("toAnnouncementEntries", () => {
       audience: "All",
       date: "2026-05-18"
     });
+  });
+});
+
+const subjects: ResourceTable = {
+  columns: ["Name", "Code", "Description", "Teacher", "Category", "Grade Levels"],
+  ids: ["SU-1"],
+  rows: [["Математик", "MATH101", "Algebra and geometry", "Б.Дорж", "Science", "9-11"]]
+};
+
+describe("toSubjectEntries", () => {
+  it("maps the row", () => {
+    expect(toSubjectEntries(subjects)[0]).toEqual({
+      id: "SU-1",
+      name: "Математик",
+      code: "MATH101",
+      description: "Algebra and geometry",
+      teacher: "Б.Дорж",
+      category: "Science",
+      gradeLevels: "9-11"
+    });
+  });
+
+  it("returns an empty array for no rows", () => {
+    expect(toSubjectEntries({ ...subjects, ids: [], rows: [] })).toEqual([]);
+  });
+
+  it("throws when the Grade Levels column is renamed", () => {
+    expect(() =>
+      toSubjectEntries({ ...subjects, columns: ["Name", "Code", "Description", "Teacher", "Category", "Grades"] })
+    ).toThrow(/Grade Levels/);
   });
 });

@@ -11,13 +11,13 @@ export type { Role };
  * tabs at all — signing in as admin on mobile shows a single screen
  * directing them to the web, not a tab layout.
  */
-export type MobileTab = "home" | "timetable" | "grades" | "attendance" | "announcements";
+export type MobileTab = "home" | "timetable" | "subjects" | "grades" | "attendance" | "announcements";
 
 export const visibleTabsByRole: Record<Role, MobileTab[]> = {
   admin: [],
-  teacher: ["home", "attendance", "grades", "timetable", "announcements"],
-  student: ["home", "timetable", "grades", "attendance", "announcements"],
-  parent: ["home", "timetable", "grades", "attendance", "announcements"]
+  teacher: ["home", "attendance", "grades", "timetable", "subjects", "announcements"],
+  student: ["home", "timetable", "subjects", "grades", "attendance", "announcements"],
+  parent: ["home", "timetable", "subjects", "grades", "attendance", "announcements"]
 };
 
 /**
