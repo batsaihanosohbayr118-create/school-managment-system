@@ -62,9 +62,18 @@ function PaymentRow({ payment }: { payment: PaymentEntry }) {
         </View>
         <Badge label={translateValue(payment.status, language)} tone={statusTone(payment.status)} />
       </View>
-      <Text style={[styles.meta, { color: mutedColor }]}>
-        {payment.student} · {t.columns['Due date']} {payment.dueDate}
-      </Text>
+      <View style={styles.metaRow}>
+        <View style={styles.metaGroup}>
+          <Ionicons name="person-outline" size={13} color={mutedColor} />
+          <Text style={styles.student} numberOfLines={1}>{payment.student}</Text>
+        </View>
+        <View style={styles.metaGroup}>
+          <Ionicons name="calendar-outline" size={12} color={mutedColor} />
+          <Text style={[styles.date, { color: mutedColor }]}>
+            {t.columns['Due date']} {payment.dueDate}
+          </Text>
+        </View>
+      </View>
     </Card>
   );
 }
@@ -108,7 +117,26 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800'
   },
-  meta: {
-    fontSize: 14
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'transparent'
+  },
+  metaGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+    backgroundColor: 'transparent'
+  },
+  student: {
+    fontSize: 14,
+    fontWeight: '600',
+    flexShrink: 1
+  },
+  date: {
+    fontSize: 12,
+    fontWeight: '500'
   }
 });

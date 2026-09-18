@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ActivityIndicator,
@@ -480,6 +479,38 @@ function TopicPicker({ topics, value, onChange }: { topics: SubjectTopic[]; valu
   );
 }
 
+function AssignmentTypePicker({ value, onChange }: { value: string; onChange: (type: string) => void }) {
+  const { t } = useLanguage();
+  const accentColor = useThemeColor({}, 'warning');
+  const mutedColor = useThemeColor({}, 'muted');
+  const options = Object.values(t.subjectContent.assignmentTypeOptions);
+
+  return (
+    <View style={styles.fieldGroup}>
+      <Text style={[styles.fieldLabel, { color: mutedColor }]}>{t.subjectContent.fieldLabels.type}</Text>
+      <View style={styles.topicPicker}>
+        {options.map((option) => {
+          const selected = value === option;
+          return (
+            <Pressable
+              key={option}
+              onPress={() => onChange(option)}
+              style={[
+                styles.assignmentTypeOption,
+                { borderColor: selected ? accentColor : mutedColor },
+                selected && { backgroundColor: `${accentColor}1f` }
+              ]}
+            >
+              <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={17} color={selected ? accentColor : mutedColor} />
+              <Text style={{ color: selected ? accentColor : mutedColor, fontWeight: selected ? '700' : '500' }}>{option}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 /** A label above a plain bordered input — matches the entry-form look used by attendance-entry.tsx/grade-entry.tsx/timetable-entry.tsx (label, then box), not an icon-in-box style. */
 function FormField({
   label,
@@ -597,11 +628,25 @@ export function FilePanel({ subjectId, content, onChange }: PanelProps) {
 
   return (
     <View style={styles.panel}>
-      <Pressable style={[styles.filePicker, { borderColor: placeholderColor }]} onPress={pickFiles}>
-        <Ionicons name="images-outline" size={22} color={placeholderColor} />
-        <Text style={{ color: placeholderColor, fontWeight: '600' }}>
-          {assets.length > 0 ? t.subjectContent.filesSelected(assets.length) : t.subjectContent.chooseFile}
-        </Text>
+      <Pressable
+        style={({ pressed }) => [
+          styles.filePicker,
+          { borderColor: assets.length > 0 ? accentColor : placeholderColor },
+          assets.length > 0 && styles.filePickerSelected,
+          pressed && styles.filePickerPressed
+        ]}
+        onPress={pickFiles}
+      >
+        <View style={[styles.filePickerIcon, { backgroundColor: assets.length > 0 ? `${accentColor}24` : `${placeholderColor}18` }]}>
+          <Ionicons name={assets.length > 0 ? 'checkmark-circle' : 'cloud-upload-outline'} size={28} color={assets.length > 0 ? accentColor : placeholderColor} />
+        </View>
+        <View style={styles.filePickerCopy}>
+          <Text style={[styles.filePickerTitle, { color: assets.length > 0 ? accentColor : placeholderColor }]}>
+            {assets.length > 0 ? t.subjectContent.filesSelected(assets.length) : t.subjectContent.chooseFile}
+          </Text>
+          <Text style={[styles.filePickerHint, { color: placeholderColor }]}>{t.subjectContent.filePickerHint}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={placeholderColor} />
       </Pressable>
 
       {content.topics.length > 0 ? <TopicPicker topics={content.topics} value={topicId} onChange={setTopicId} /> : null}
@@ -840,7 +885,7 @@ export function AssignmentPanel({ subjectId, content, onChange }: PanelProps) {
       />
       <FormField label={t.subjectContent.fieldLabels.dueDate} placeholder={t.subjectContent.dueDatePlaceholder} value={dueDate} onChangeText={setDueDate} />
       <FormField label={t.subjectContent.fieldLabels.maxScore} placeholder={t.subjectContent.maxScorePlaceholder} value={maxScore} onChangeText={setMaxScore} keyboardType="numeric" />
-      <FormField label={t.subjectContent.fieldLabels.type} placeholder={t.subjectContent.assignmentTypePlaceholder} value={type} onChangeText={setType} />
+      <AssignmentTypePicker value={type} onChange={setType} />
       <SubmitButton onPress={handleSubmit} loading={loading} label={t.subjectContent.addAssignmentAction} color={accentColor} />
       <StatusLine status={status} />
     </View>
@@ -1126,6 +1171,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7
   },
+  assignmentTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9
+  },
   fieldGroup: {
     marginBottom: 14
   },
@@ -1152,12 +1206,37 @@ const styles = StyleSheet.create({
   filePicker: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    gap: 12,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderRadius: 12,
-    paddingVertical: 18
+    borderRadius: 18,
+    padding: 14
+  },
+  filePickerSelected: {
+    borderStyle: 'solid'
+  },
+  filePickerPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.985 }]
+  },
+  filePickerIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  filePickerCopy: {
+    flex: 1,
+    gap: 3,
+    backgroundColor: 'transparent'
+  },
+  filePickerTitle: {
+    fontSize: 15,
+    fontWeight: '700'
+  },
+  filePickerHint: {
+    fontSize: 12
   },
   submit: {
     flexDirection: 'row',

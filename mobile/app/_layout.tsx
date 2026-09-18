@@ -1,4 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import { Baloo2_800ExtraBold } from '@expo-google-fonts/baloo-2';
+import { Caveat_700Bold } from '@expo-google-fonts/caveat';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -28,6 +30,8 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    Baloo2_800ExtraBold,
+    Caveat_700Bold,
   });
 
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
@@ -91,12 +95,8 @@ function useAuthGate() {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   useAuthGate();
-
-  // No web equivalent to borrow for "Home" — same fallback (tabs)/_layout.tsx
-  // uses for the tab's own title.
-  const homeLabel = language === 'mn' ? 'Нүүр' : 'Home';
 
   // React Navigation's own screen canvas defaults to DefaultTheme/DarkTheme's
   // background (#fff / #000), which does not match our own Colors.ts palette.
@@ -117,7 +117,22 @@ function RootLayoutNav() {
 
   return (
     <NavigationThemeProvider value={navigationTheme}>
-      <Stack>
+      <Stack
+        screenOptions={{
+          // On iOS, native-stack renders the header as a native UINavigationBar
+          // and the screen content in its own native container — neither
+          // picks up NavigationThemeProvider's colors on its own, so both
+          // stay the native light chrome/background regardless of the app's
+          // own dark-mode override unless set explicitly here.
+          headerStyle: { backgroundColor: Colors[colorScheme].card },
+          headerTintColor: Colors[colorScheme].text,
+          contentStyle: { backgroundColor: Colors[colorScheme].background },
+          // The previous screen's title as back-button text crowds a long
+          // current title (e.g. "Хичээлүүд" next to "Математик") — just the
+          // chevron reads cleaner and is the more common iOS pattern anyway.
+          headerBackButtonDisplayMode: 'minimal'
+        }}
+      >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="admin-web-only" options={{ headerShown: false }} />
@@ -125,9 +140,9 @@ function RootLayoutNav() {
         <Stack.Screen name="attendance-entry" options={{ presentation: 'modal' }} />
         <Stack.Screen name="grade-entry" options={{ presentation: 'modal' }} />
         <Stack.Screen name="timetable-entry" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="payments" options={{ title: t.nav.payments.label, headerBackTitle: homeLabel }} />
-        <Stack.Screen name="subject-content" options={{ headerBackTitle: t.nav.subjects.label }} />
-        <Stack.Screen name="subject-add" options={{ presentation: 'modal', headerBackTitle: t.nav.subjects.label }} />
+        <Stack.Screen name="payments" options={{ title: t.nav.payments.label }} />
+        <Stack.Screen name="subject-content" />
+        <Stack.Screen name="subject-add" options={{ presentation: 'modal' }} />
       </Stack>
     </NavigationThemeProvider>
   );

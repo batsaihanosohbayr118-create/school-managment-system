@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { Link } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 import { Animated, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
@@ -31,7 +31,6 @@ export default function HomeScreen() {
   const tint = useThemeColor({}, 'tint');
   const tintMuted = useThemeColor({}, 'tintMuted');
   const purple = useThemeColor({}, 'purple');
-  const purpleMuted = useThemeColor({}, 'purpleMuted');
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -99,46 +98,79 @@ export default function HomeScreen() {
       {(timetable.isOffline || grades.isOffline) ? <OfflineBanner /> : null}
 
       <View style={[styles.greetingPanel, { backgroundColor: tintMuted, borderColor: `${tint}30` }]}>
-        {session?.avatarUrl && !avatarLoadFailed ? (
-          <Image
-            source={{ uri: session.avatarUrl }}
-            style={styles.avatar}
-            onError={() => setAvatarLoadFailed(true)}
-          />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: tint }]}>
-            <Text style={styles.avatarText}>{initial}</Text>
-          </View>
-        )}
+        <View style={[styles.avatarRing, { borderColor: tint }]}> 
+          {session?.avatarUrl && !avatarLoadFailed ? (
+            <Image
+              source={{ uri: session.avatarUrl }}
+              style={styles.avatar}
+              onError={() => setAvatarLoadFailed(true)}
+            />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: tint }]}> 
+              <Text style={styles.avatarText}>{initial}</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.greetingText}>
           <Text style={[styles.greetingLabel, { color: mutedColor }]}>
             {greetingEmoji} {greeting}
           </Text>
           <Text style={styles.greetingName}>{name}</Text>
+          <View style={[styles.roleBadge, { backgroundColor: `${tint}20` }]}> 
+            <Ionicons name="shield-checkmark-outline" size={12} color={tint} />
+            <Text style={[styles.roleBadgeText, { color: tint }]}>{translateValue(session?.role ?? '', language)}</Text>
+          </View>
         </View>
+        <Ionicons name="person-circle-outline" size={25} color={tint} style={styles.profileIcon} />
         <View style={[styles.greetingAccent, { backgroundColor: tint }]} />
       </View>
 
       <View style={styles.statRow}>
-        <View style={[styles.statLink, { backgroundColor: tintMuted }]}>
+        {/* The flex-sizing wrapper stays a plain View, not part of the
+            <Link asChild> chain — a function-valued `style` on the Link's
+            direct child confuses expo-router's Slot cloning (same class of
+            bug as passing it an array), so the Pressable it clones onto
+            keeps a plain style and the "pressed" look only affects the
+            LinearGradient inside, via the render-prop children. */}
+        <View style={styles.statLinkWrap}>
           <Link href="/timetable" asChild>
-            <Pressable style={({ pressed }) => [styles.statTile, pressed && styles.pressedTile]}>
-              <View style={[styles.statIcon, { backgroundColor: `${tint}18` }]}> 
-                <Ionicons name="calendar" size={17} color={tint} />
-              </View>
-              <Text style={[styles.statValue, { color: tint }]}>{todaysSlots.length}</Text>
-              <Text style={[styles.statLabel, { color: mutedColor }]}>{t.common.classesToday}</Text>
+            <Pressable style={styles.statLinkPress}>
+              {({ pressed }) => (
+                <LinearGradient
+                  colors={[tint, `${tint}cc`]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.statLink, pressed && styles.pressedTile]}
+                >
+                  <View style={styles.statBlob} />
+                  <View style={styles.statIcon}>
+                    <Ionicons name="calendar" size={19} color={tint} />
+                  </View>
+                  <Text style={styles.statValue}>{todaysSlots.length}</Text>
+                  <Text style={styles.statLabel}>{t.common.classesToday}</Text>
+                </LinearGradient>
+              )}
             </Pressable>
           </Link>
         </View>
-        <View style={[styles.statLink, { backgroundColor: purpleMuted }]}>
+        <View style={styles.statLinkWrap}>
           <Link href="/announcements" asChild>
-            <Pressable style={({ pressed }) => [styles.statTile, pressed && styles.pressedTile]}>
-              <View style={[styles.statIcon, { backgroundColor: `${purple}18` }]}> 
-                <Ionicons name="megaphone" size={17} color={purple} />
-              </View>
-              <Text style={[styles.statValue, { color: purple }]}>{newAnnouncementsCount}</Text>
-              <Text style={[styles.statLabel, { color: mutedColor }]}>{t.common.newAnnouncements}</Text>
+            <Pressable style={styles.statLinkPress}>
+              {({ pressed }) => (
+                <LinearGradient
+                  colors={[purple, `${purple}cc`]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.statLink, pressed && styles.pressedTile]}
+                >
+                  <View style={styles.statBlob} />
+                  <View style={styles.statIcon}>
+                    <Ionicons name="megaphone" size={19} color={purple} />
+                  </View>
+                  <Text style={styles.statValue}>{newAnnouncementsCount}</Text>
+                  <Text style={styles.statLabel}>{t.common.newAnnouncements}</Text>
+                </LinearGradient>
+              )}
             </Pressable>
           </Link>
         </View>
@@ -206,11 +238,16 @@ export default function HomeScreen() {
             {/* Link's web `asChild` forwards this style straight onto the underlying
                 <a> tag, bypassing react-native-web's array flattening — an array
                 (rather than one merged object) crashes react-dom's style setter. */}
-            <Pressable style={StyleSheet.flatten([styles.paymentsLink, { backgroundColor: tintMuted }])}>
+            <Pressable style={StyleSheet.flatten([styles.paymentsLink, { backgroundColor: tint }])}>
               {({ pressed }) => (
-                <View style={[styles.paymentsLinkInner, pressed && { opacity: 0.6 }]}>
-                  <Ionicons name="card-outline" size={18} color={tint} />
-                  <Text style={[styles.paymentsLinkText, { color: tint }]}>{t.common.viewPayments}</Text>
+                <View style={[styles.paymentsLinkInner, pressed && styles.paymentsLinkPressed]}>
+                  <View style={styles.paymentsLinkCopy}>
+                    <View style={[styles.paymentsLinkIcon, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
+                      <Ionicons name="card-outline" size={17} color="#fff" />
+                    </View>
+                    <Text style={[styles.paymentsLinkText, { color: '#fff' }]}>{t.common.viewPayments}</Text>
+                  </View>
+                  <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
                 </View>
               )}
             </Pressable>
@@ -317,7 +354,7 @@ function TimetableRow({ slot, isLast }: { slot: TimetableSlot; isLast: boolean }
 
   return (
     <View style={[styles.scheduleRow, !isLast && { borderBottomColor: borderColor, borderBottomWidth: StyleSheet.hairlineWidth }]}>
-      <Text style={[styles.scheduleTime, { color: mutedColor }]}>{slot.timeLabel}</Text>
+      <Text style={[styles.scheduleTime, { color: mutedColor }]} numberOfLines={1} adjustsFontSizeToFit>{slot.timeLabel}</Text>
       <View style={[styles.scheduleDot, { backgroundColor: statusColor }]} />
       <View style={styles.scheduleInfo}>
         <Text style={styles.rowTitle} numberOfLines={1}>{translateValue(slot.subject, language)}</Text>
@@ -385,6 +422,15 @@ const styles = StyleSheet.create({
     top: -24,
     opacity: 0.12
   },
+  avatarRing: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 2,
+    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   avatar: {
     width: 48,
     height: 48,
@@ -398,6 +444,7 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   greetingText: {
+    flex: 1,
     backgroundColor: 'transparent'
   },
   greetingLabel: {
@@ -408,47 +455,81 @@ const styles = StyleSheet.create({
     fontSize: 21,
     fontWeight: '800'
   },
+  roleBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 4
+  },
+  roleBadgeText: {
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  profileIcon: {
+    zIndex: 1
+  },
   statRow: {
     flexDirection: 'row',
     gap: 10,
     marginTop: 18,
     backgroundColor: 'transparent'
   },
+  statLinkWrap: {
+    flex: 1,
+    borderRadius: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 4
+  },
+  statLinkPress: {
+    flex: 1
+  },
   statLink: {
     flex: 1,
-    borderRadius: 16,
+    width: '100%',
+    borderRadius: 18,
     overflow: 'hidden',
-    minHeight: 116,
+    minHeight: 96,
     padding: 15
   },
-  statTile: {
-    flex: 1,
-    borderRadius: 16,
-    padding: 0,
-    gap: 5,
-    minHeight: 86,
-    height: '100%',
-    width: '100%',
-    backgroundColor: 'transparent'
+  statBlob: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    right: -30,
+    top: -30,
+    backgroundColor: 'rgba(255,255,255,0.14)'
   },
   pressedTile: {
-    opacity: 0.72
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }]
   },
   statIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2
+    marginBottom: 8,
+    backgroundColor: '#fff'
   },
   statValue: {
-    fontSize: 22,
-    fontWeight: '800'
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#fff'
   },
   statLabel: {
+    marginTop: 2,
     fontSize: 12,
-    fontWeight: '600'
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)'
   },
   attendanceSummary: {
     marginTop: 12,
@@ -555,7 +636,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent'
   },
   scheduleTime: {
-    width: 68,
+    width: 84,
     fontSize: 12,
     fontWeight: '600'
   },
@@ -642,15 +723,37 @@ const styles = StyleSheet.create({
   },
   paymentsLink: {
     marginTop: 20,
-    paddingVertical: 13,
-    borderRadius: 14
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 17,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3
   },
   paymentsLinkInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
     backgroundColor: 'transparent'
+  },
+  paymentsLinkPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.985 }]
+  },
+  paymentsLinkCopy: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'transparent'
+  },
+  paymentsLinkIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   paymentsLinkText: {
     fontWeight: '700',

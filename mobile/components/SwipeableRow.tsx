@@ -4,7 +4,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import { Text, useThemeColor } from './Themed';
+import { useThemeColor } from './Themed';
 
 /**
  * Wraps a row in a left-swipe-to-reveal delete action, matching the
@@ -33,23 +33,26 @@ export function SwipeableRow({
   const swipeableRef = useRef<Swipeable>(null);
   const dangerStrong = useThemeColor({}, 'dangerStrong');
 
-  if (!onDelete) return <>{children}</>;
+  // No Swipeable in this branch, so there's no action-column height to match —
+  // the wrapper's margin is safe to keep here (it's zeroed on the Card itself
+  // only for the swipeable branch below).
+  if (!onDelete) return <View style={styles.wrapper}>{children}</View>;
 
   function renderRightActions(progress: Animated.AnimatedInterpolation<number>) {
     const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1], extrapolate: 'clamp' });
 
     return (
       <Pressable
+        accessibilityLabel={deleteLabel}
         onPress={() => {
           swipeableRef.current?.close();
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           onDelete?.();
         }}
-        style={[styles.action, { backgroundColor: dangerStrong }]}
+        style={styles.action}
       >
-        <Animated.View style={[styles.actionInner, { transform: [{ scale }] }]}>
+        <Animated.View style={[styles.actionInner, { backgroundColor: dangerStrong, transform: [{ scale }] }]}> 
           <Ionicons name="trash" size={19} color="#fff" />
-          <Text style={styles.label}>{deleteLabel}</Text>
         </Animated.View>
       </Pressable>
     );
@@ -76,21 +79,15 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
   action: {
-    flex: 1,
-    width: 76,
-    marginLeft: 8,
-    borderRadius: 16,
+    width: 64,
     alignItems: 'center',
     justifyContent: 'center'
   },
   actionInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 15,
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'transparent'
-  },
-  label: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700'
+    justifyContent: 'center'
   }
 });

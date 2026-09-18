@@ -245,7 +245,7 @@ export default function AddContentAccordion({ subjectId }: Props) {
         <input
           value={fileDuration}
           onChange={(e) => setFileDuration(e.target.value)}
-          placeholder="Duration (e.g. 45 min)"
+          placeholder="Duration"
           className={fieldClass}
         />
 
@@ -372,7 +372,7 @@ export default function AddContentAccordion({ subjectId }: Props) {
         <input
           value={lessonDuration}
           onChange={(e) => setLessonDuration(e.target.value)}
-          placeholder="Duration (e.g. 45 min)"
+          placeholder="Duration"
           className={fieldClass}
         />
         <textarea

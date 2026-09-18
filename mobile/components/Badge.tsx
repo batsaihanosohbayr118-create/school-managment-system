@@ -42,7 +42,7 @@ export function statusTone(status: string): BadgeTone {
  * approach as the server's push-notification targeting — across both the
  * English and Mongolian labels the app actually produces.
  */
-export function audienceTone(audience: string): BadgeTone {
+export function audienceTone(audience: string): Exclude<BadgeTone, 'neutral' | 'warning'> {
   const normalized = audience.trim().toLowerCase();
   if (normalized.includes('teacher') || normalized.includes('багш')) return 'tint';
   if (normalized.includes('student') || normalized.includes('сурагч')) return 'purple';

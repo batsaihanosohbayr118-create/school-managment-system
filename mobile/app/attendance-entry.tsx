@@ -8,7 +8,7 @@ import { useLanguage } from '@/lib/language-context';
 import { ApiError } from '@shared/api-error';
 import { translateValue } from '@shared/i18n-tables';
 
-const STATUSES = ['Present', 'Absent', 'Late'] as const;
+const STATUSES = ['Present', 'Absent', 'Late', 'Excused'] as const;
 
 export default function AttendanceEntryScreen() {
   const router = useRouter();
@@ -135,11 +135,13 @@ const styles = StyleSheet.create({
   },
   statusRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 6
   },
   statusOption: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '47%',
     paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1.5,

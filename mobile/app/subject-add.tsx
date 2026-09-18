@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 
 import {
@@ -74,37 +74,48 @@ export default function SubjectAddScreen() {
   const showMenu = mode === 'menu' || !selectedSection;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Stack.Screen options={{ title: selectedSection?.title ?? t.subjectContent.addContent, headerBackTitle: name || t.nav.subjects.label }} />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+      >
+        <Stack.Screen options={{ title: selectedSection?.title ?? t.subjectContent.addContent, headerBackTitle: name || t.nav.subjects.label }} />
 
-      {showMenu ? (
-        <>
-          <Text style={[styles.intro, { color: mutedColor }]}>{name || t.nav.subjects.label}</Text>
-          {sections.map((section) => (
-            <MenuRow
-              key={section.id}
-              section={section}
-              onPress={() => router.push({ pathname: '/subject-add', params: { id: subjectId, name: name || '', type: section.id } })}
-            />
-          ))}
-        </>
-      ) : loading ? (
-        <ActivityIndicator color={tint} style={styles.loading} />
-      ) : error ? (
-        <Text style={{ color: dangerColor }}>{error}</Text>
-      ) : (
-        <>
-          <Text style={styles.pageTitle}>{selectedSection.title}</Text>
-          <View style={styles.formCard}>
-            {type === 'file' && <FilePanel subjectId={subjectId} content={content} onChange={setContent} />}
-            {type === 'topic' && <TopicPanel subjectId={subjectId} content={content} onChange={setContent} />}
-            {type === 'lesson' && <LessonPanel subjectId={subjectId} content={content} onChange={setContent} />}
-            {type === 'video' && <VideoPanel subjectId={subjectId} content={content} onChange={setContent} />}
-            {type === 'assignment' && <AssignmentPanel subjectId={subjectId} content={content} onChange={setContent} />}
-          </View>
-        </>
-      )}
-    </ScrollView>
+        {showMenu ? (
+          <>
+            <Text style={[styles.intro, { color: mutedColor }]}>{name || t.nav.subjects.label}</Text>
+            {sections.map((section) => (
+              <MenuRow
+                key={section.id}
+                section={section}
+                onPress={() => router.push({ pathname: '/subject-add', params: { id: subjectId, name: name || '', type: section.id } })}
+              />
+            ))}
+          </>
+        ) : loading ? (
+          <ActivityIndicator color={tint} style={styles.loading} />
+        ) : error ? (
+          <Text style={{ color: dangerColor }}>{error}</Text>
+        ) : (
+          <>
+            <Text style={styles.pageTitle}>{selectedSection.title}</Text>
+            <View style={styles.formCard}>
+              {type === 'file' && <FilePanel subjectId={subjectId} content={content} onChange={setContent} />}
+              {type === 'topic' && <TopicPanel subjectId={subjectId} content={content} onChange={setContent} />}
+              {type === 'lesson' && <LessonPanel subjectId={subjectId} content={content} onChange={setContent} />}
+              {type === 'video' && <VideoPanel subjectId={subjectId} content={content} onChange={setContent} />}
+              {type === 'assignment' && <AssignmentPanel subjectId={subjectId} content={content} onChange={setContent} />}
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

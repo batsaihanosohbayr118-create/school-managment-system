@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, Tabs } from 'expo-router';
-import { Animated, Pressable, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, View } from 'react-native';
 import type { MobileTab } from '@shared/roles';
 import { visibleTabsByRole } from '@shared/roles';
 import type { AppCopy, Language } from '@shared/i18n-tables';
@@ -61,7 +61,7 @@ const addEntryRouteByTab: Partial<Record<MobileTab, string>> = {
  * `onPress` (the navigation) onto this Pressable, and defining one here too
  * would race it.
  */
-function AddButton({ href, tintColor }: { href: string; tintColor: string }) {
+function AddButton({ href, tintColor, badgeColor }: { href: string; tintColor: string; badgeColor: string }) {
   const rotation = useRef(new Animated.Value(0)).current;
 
   function spin() {
@@ -73,16 +73,29 @@ function AddButton({ href, tintColor }: { href: string; tintColor: string }) {
 
   return (
     <Link href={href} asChild>
-      <Pressable style={{ marginRight: 15 }} onPressIn={spin}>
+      <Pressable
+        style={StyleSheet.flatten([headerButtonStyles.badge, { backgroundColor: badgeColor, marginRight: 10 }])}
+        onPressIn={spin}
+      >
         {({ pressed }) => (
           <Animated.View style={{ transform: [{ rotate }], opacity: pressed ? 0.5 : 1 }}>
-            <Ionicons name="add" size={22} color={tintColor} />
+            <Ionicons name="add" size={20} color={tintColor} />
           </Animated.View>
         )}
       </Pressable>
     </Link>
   );
 }
+
+const headerButtonStyles = StyleSheet.create({
+  badge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center'
+  }
+});
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -99,9 +112,11 @@ export default function TabLayout() {
 
   const settingsButton = (
     <Link href="/settings" asChild>
-      <Pressable style={{ marginRight: 15 }}>
+      <Pressable
+        style={StyleSheet.flatten([headerButtonStyles.badge, { backgroundColor: Colors[colorScheme].tintMuted, marginRight: 16 }])}
+      >
         {({ pressed }) => (
-          <Ionicons name="settings-outline" size={22} color={Colors[colorScheme].text} style={{ opacity: pressed ? 0.5 : 1 }} />
+          <Ionicons name="settings-outline" size={19} color={Colors[colorScheme].tint} style={{ opacity: pressed ? 0.5 : 1 }} />
         )}
       </Pressable>
     </Link>
@@ -111,10 +126,65 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme].tint,
+        tabBarInactiveTintColor: Colors[colorScheme].tabIconDefault,
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),
-        headerShadowVisible: false
+        headerShadowVisible: false,
+        // None of these follow the ambient NavigationThemeProvider theme set
+        // in the root layout — bottom-tabs (unlike native-stack) doesn't
+        // apply it to its header, tab bar, or scene container, so all three
+        // default to a light background regardless of the app's own
+        // dark-mode override.
+        headerStyle: { backgroundColor: Colors[colorScheme].card },
+        headerTintColor: Colors[colorScheme].text,
+        // A floating capsule rather than a bar flush with the screen edge —
+        // absolute positioning takes it out of layout, which is why
+        // sceneStyle below carries extra bottom padding so scrollable
+        // content has room to clear it instead of hiding underneath.
+        tabBarStyle: {
+          position: 'absolute',
+          left: 16,
+          right: 16,
+          bottom: Platform.OS === 'ios' ? 28 : 18,
+          height: 64,
+          borderRadius: 28,
+          borderTopWidth: 0,
+          paddingHorizontal: 10,
+          backgroundColor: Colors[colorScheme].card,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.15,
+          shadowRadius: 16,
+          elevation: 8
+        },
+        tabBarItemStyle: { height: 64 },
+        tabBarShowLabel: false,
+        // The library's own vertical-tab button style hardcodes
+        // `justifyContent: 'flex-start'` (it's built for icon-above-label,
+        // top-aligned) — tabBarItemStyle can't reach that inner style, only
+        // the outer wrapper around it, so the icon sat near the top of the
+        // 64px bar with empty space below it. Re-rendering the button
+        // ourselves and appending a centering override after its own
+        // `style` array is the only way to win that merge. Plain Pressable,
+        // not @react-navigation/elements' PlatformPressable — since SDK 56
+        // expo-router's Metro plugin hard-blocks app code importing
+        // @react-navigation/* directly (own bundled fork now); it doesn't
+        // give ripple-on-Android/opacity-on-iOS, but is otherwise identical
+        // here since bottom-tabs already supplies its own press styling.
+        //
+        // `props` is typed `any`: bottom-tabs' BottomTabBarButtonProps
+        // resolves its View/ref/event types against the react-navigation
+        // packages' own react-native instance (hoisted to the workspace
+        // root), a different nominal source than mobile's own react-native
+        // that Pressable here resolves against — the same dual-package
+        // situation metro.config.js's singleton forcing already handles at
+        // the bundler level, just surfacing here as a tsc-only mismatch.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tabBarButton: (props: any) => (
+          <Pressable {...props} style={[props.style, { justifyContent: 'center', alignItems: 'center' }]} />
+        ),
+        sceneStyle: { backgroundColor: Colors[colorScheme].background, paddingBottom: 90 }
       }}
     >
       {tabs.map((tab) => {
@@ -132,23 +202,29 @@ export default function TabLayout() {
             name={meta.routeName}
             options={{
               title: tabTitle(tab, t, language),
+              // The active tab gets a small filled circle behind its icon;
+              // inactive tabs stay plain — six tabs share the floating bar,
+              // so an inline label (variable width per tab) squeezed or
+              // distorted the indicator instead of reading as a fixed pill.
               tabBarIcon: ({ color, focused }) => (
                 <View
                   style={{
                     width: 40,
-                    height: 28,
-                    borderRadius: 14,
+                    height: 40,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: focused ? Colors[colorScheme].tintMuted : 'transparent'
+                    borderRadius: 20,
+                    backgroundColor: focused ? Colors[colorScheme].tint : 'transparent'
                   }}
                 >
-                  <Ionicons name={meta.icon} color={color} size={24} />
+                  <Ionicons name={meta.icon} color={focused ? '#fff' : color} size={22} />
                 </View>
               ),
               headerRight: () => (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {addRoute ? <AddButton href={addRoute} tintColor={Colors[colorScheme].text} /> : null}
+                  {addRoute ? (
+                    <AddButton href={addRoute} tintColor={Colors[colorScheme].tint} badgeColor={Colors[colorScheme].tintMuted} />
+                  ) : null}
                   {settingsButton}
                 </View>
               )
