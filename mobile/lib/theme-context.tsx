@@ -32,9 +32,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, next);
   }
 
-  // system scheme can be null (unspecified); default to light, same as the
+  // system scheme can be null or 'unspecified'; default to light, same as the
   // template's original useColorScheme did.
-  const colorScheme: ColorScheme = preference === 'system' ? systemScheme ?? 'light' : preference;
+  const colorScheme: ColorScheme =
+    preference === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : preference;
 
   return <ThemeContext.Provider value={{ preference, colorScheme, setPreference }}>{children}</ThemeContext.Provider>;
 }

@@ -37,7 +37,17 @@ config.resolver.extraNodeModules = {
 // Force it: resolve react/react-dom as if the request always originated
 // from mobile/ itself, so hierarchical lookup finds mobile's copy first
 // regardless of which file actually did the requiring.
-const singletonPackages = ["react", "react-dom"];
+//
+// react-native needs the same treatment: @expo/cli bundles its own internal,
+// unrelated expo-router@6 (used for the CLI's own tooling) which pulls in an
+// older react-native as a real (non-peer) dependency. npm hoists that one to
+// the workspace root, so @react-navigation/native — whose own react-native
+// dependency is just a wildcard peer dep and which itself isn't nested under
+// mobile/node_modules — resolves react-native from root and gets that older
+// copy instead of the app's actual react-native, breaking navigation context
+// ("Couldn't find a navigation object") even though only one React instance
+// is involved.
+const singletonPackages = ["react", "react-dom", "react-native"];
 // Subpaths (react-dom/client, react/jsx-runtime, ...) are separate moduleName
 // strings, not "react"/"react-dom" — a plain Set.has() missed them, so
 // react-dom/client (used by the web entry point) still escaped to root's

@@ -1042,7 +1042,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   videoThumbImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 10,
     opacity: 0.92
   },
