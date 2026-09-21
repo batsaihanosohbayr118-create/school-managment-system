@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
@@ -42,65 +42,79 @@ export default function GradeEntryScreen() {
   const inputStyle = [styles.input, { color: textColor, backgroundColor: inputBg, borderColor }];
 
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ title: t.create.grades.title }} />
-      <Text style={styles.title}>{t.create.grades.title}</Text>
-
-      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Student}</Text>
-      <TextInput
-        style={inputStyle}
-        placeholderTextColor={placeholderColor}
-        value={student}
-        onChangeText={setStudent}
-        editable={!submitting}
-        autoFocus
-      />
-
-      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Subject}</Text>
-      <TextInput
-        style={inputStyle}
-        placeholderTextColor={placeholderColor}
-        value={subject}
-        onChangeText={setSubject}
-        editable={!submitting}
-      />
-
-      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Score}</Text>
-      <TextInput
-        style={inputStyle}
-        placeholderTextColor={placeholderColor}
-        value={score}
-        onChangeText={setScore}
-        editable={!submitting}
-        keyboardType="numeric"
-      />
-
-      <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Semester}</Text>
-      <TextInput
-        style={inputStyle}
-        placeholderTextColor={placeholderColor}
-        value={semester}
-        onChangeText={setSemester}
-        editable={!submitting}
-      />
-
-      {error ? <Text style={[styles.error, { color: dangerColor }]}>{error}</Text> : null}
-
-      <Pressable
-        style={[styles.submit, { backgroundColor: tint }, (submitting || !student || !score) && styles.submitDisabled]}
-        onPress={handleSubmit}
-        disabled={submitting || !student || !score}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       >
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{t.mobileForms.save}</Text>}
-      </Pressable>
-    </View>
+        <Stack.Screen options={{ title: t.create.grades.title }} />
+        <Text style={styles.title}>{t.create.grades.title}</Text>
+
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Student}</Text>
+        <TextInput
+          style={inputStyle}
+          placeholderTextColor={placeholderColor}
+          value={student}
+          onChangeText={setStudent}
+          editable={!submitting}
+          autoFocus
+        />
+
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Subject}</Text>
+        <TextInput
+          style={inputStyle}
+          placeholderTextColor={placeholderColor}
+          value={subject}
+          onChangeText={setSubject}
+          editable={!submitting}
+        />
+
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Score}</Text>
+        <TextInput
+          style={inputStyle}
+          placeholderTextColor={placeholderColor}
+          value={score}
+          onChangeText={setScore}
+          editable={!submitting}
+          keyboardType="numeric"
+        />
+
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Semester}</Text>
+        <TextInput
+          style={inputStyle}
+          placeholderTextColor={placeholderColor}
+          value={semester}
+          onChangeText={setSemester}
+          editable={!submitting}
+        />
+
+        {error ? <Text style={[styles.error, { color: dangerColor }]}>{error}</Text> : null}
+
+        <Pressable
+          style={[styles.submit, { backgroundColor: tint }, (submitting || !student || !score) && styles.submitDisabled]}
+          onPress={handleSubmit}
+          disabled={submitting || !student || !score}
+        >
+          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{t.mobileForms.save}</Text>}
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 1
+  },
+  content: {
     padding: 20,
+    paddingBottom: 48,
     gap: 6
   },
   title: {

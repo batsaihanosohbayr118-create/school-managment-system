@@ -11,6 +11,7 @@ type AuthState = {
   signIn: (identifier: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   updateAvatar: (avatarUrl: string) => Promise<{ error: string | null }>;
+  updatePhone: (phone: string) => Promise<{ error: string | null }>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -71,8 +72,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   }
 
+  async function updatePhone(phone: string) {
+    const { error } = await authService.updateProfile({ phone });
+    if (!error) setSession(await resolveActiveSession());
+    return { error };
+  }
+
   return (
-    <AuthContext.Provider value={{ session, loading, signIn, signOut, updateAvatar }}>
+    <AuthContext.Provider value={{ session, loading, signIn, signOut, updateAvatar, updatePhone }}>
       {children}
     </AuthContext.Provider>
   );

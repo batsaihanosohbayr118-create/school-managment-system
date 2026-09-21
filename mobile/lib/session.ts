@@ -6,6 +6,7 @@ export type ActiveSession = {
   email: string;
   name: string;
   avatarUrl: string;
+  phone: string;
 };
 
 /**
@@ -28,6 +29,7 @@ export async function resolveActiveSession(): Promise<ActiveSession | null> {
     role: user.role,
     email: user.email,
     name: user.name,
-    avatarUrl: user.avatarUrl
+    avatarUrl: user.avatarUrl,
+    phone: user.phone
   };
 }

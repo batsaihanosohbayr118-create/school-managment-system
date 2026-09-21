@@ -8,6 +8,7 @@ import { Card } from '@/components/Card';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { SkeletonHome } from '@/components/Skeleton';
 import { Text, View, useThemeColor } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { useLanguage } from '@/lib/language-context';
@@ -29,8 +30,20 @@ export default function HomeScreen() {
   const dangerColor = useThemeColor({}, 'danger');
   const success = useThemeColor({}, 'success');
   const tint = useThemeColor({}, 'tint');
-  const tintMuted = useThemeColor({}, 'tintMuted');
-  const purple = useThemeColor({}, 'purple');
+  const scheme = useColorScheme();
+  const isLight = scheme === 'light';
+  const panelGradientColors: [string, string] = isLight
+    ? ['#eef4ff', '#dbeafe']
+    : ['#1f2a5c', '#141936'];
+  const panelBorderColor = isLight ? 'rgba(37,99,235,0.10)' : 'rgba(255,255,255,0.07)';
+  const panelGlowRgb = isLight ? '37,99,235' : '150,175,255';
+  const panelShadowColor = isLight ? '#2563eb' : '#000';
+  const avatarRingBorderColor = isLight ? 'rgba(37,99,235,0.35)' : tint;
+  const roleBadgeBg = isLight ? 'rgba(37,99,235,0.08)' : `${tint}20`;
+  const roleBadgeBorder = isLight ? 'rgba(37,99,235,0.18)' : `${tint}30`;
+  const profileIconBg = isLight ? 'rgba(37,99,235,0.08)' : 'rgba(255,255,255,0.12)';
+  const greetingLabelColor = isLight ? '#64748b' : 'rgba(255,255,255,0.65)';
+  const greetingNameColor = isLight ? '#111827' : '#fff';
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -81,7 +94,7 @@ export default function HomeScreen() {
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? t.common.goodMorning : hour < 18 ? t.common.goodAfternoon : t.common.goodEvening;
-  const greetingEmoji = '👋';
+  const greetingEmoji = '👑';
   const name = session?.name || session?.email || '';
   const initial = name.trim().charAt(0).toUpperCase() || '?';
 
@@ -97,32 +110,57 @@ export default function HomeScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {(timetable.isOffline || grades.isOffline) ? <OfflineBanner /> : null}
 
-      <View style={[styles.greetingPanel, { backgroundColor: tintMuted, borderColor: `${tint}30` }]}>
-        <View style={[styles.avatarRing, { borderColor: tint }]}> 
-          {session?.avatarUrl && !avatarLoadFailed ? (
-            <Image
-              source={{ uri: session.avatarUrl }}
-              style={styles.avatar}
-              onError={() => setAvatarLoadFailed(true)}
-            />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: tint }]}> 
-              <Text style={styles.avatarText}>{initial}</Text>
+      <View style={[styles.greetingPanelWrap, { shadowColor: panelShadowColor }]}>
+        <View style={[styles.greetingPanel, { borderColor: panelBorderColor }]}>
+          <LinearGradient
+            colors={panelGradientColors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0.6 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={[`rgba(${panelGlowRgb},${isLight ? 0.14 : 0.2})`, `rgba(${panelGlowRgb},0)`]}
+            start={{ x: 0.3, y: 0.3 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.greetingGlow}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={[`rgba(${panelGlowRgb},${isLight ? 0.06 : 0.1})`, `rgba(${panelGlowRgb},0)`]}
+            start={{ x: 1, y: 1 }}
+            end={{ x: 0.2, y: 0.2 }}
+            style={styles.greetingGlowSoft}
+            pointerEvents="none"
+          />
+
+          <View style={[styles.avatarRing, { borderColor: avatarRingBorderColor }]}>
+            {session?.avatarUrl && !avatarLoadFailed ? (
+              <Image
+                source={{ uri: session.avatarUrl }}
+                style={styles.avatar}
+                onError={() => setAvatarLoadFailed(true)}
+              />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: tint }]}>
+                <Text style={styles.avatarText}>{initial}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.greetingText}>
+            <Text style={[styles.greetingLabel, { color: greetingLabelColor }]}>
+              {greetingEmoji} {greeting}
+            </Text>
+            <Text style={[styles.greetingName, { color: greetingNameColor }]}>{name}</Text>
+            <View style={[styles.roleBadge, { backgroundColor: roleBadgeBg, borderColor: roleBadgeBorder }]}>
+              <Ionicons name="shield-checkmark-outline" size={12} color={tint} />
+              <Text style={[styles.roleBadgeText, { color: tint }]}>{translateValue(session?.role ?? '', language)}</Text>
             </View>
-          )}
-        </View>
-        <View style={styles.greetingText}>
-          <Text style={[styles.greetingLabel, { color: mutedColor }]}>
-            {greetingEmoji} {greeting}
-          </Text>
-          <Text style={styles.greetingName}>{name}</Text>
-          <View style={[styles.roleBadge, { backgroundColor: `${tint}20` }]}> 
-            <Ionicons name="shield-checkmark-outline" size={12} color={tint} />
-            <Text style={[styles.roleBadgeText, { color: tint }]}>{translateValue(session?.role ?? '', language)}</Text>
+          </View>
+          <View style={[styles.profileIconWrap, { backgroundColor: profileIconBg }]}>
+            <Ionicons name="person-circle-outline" size={22} color={tint} />
           </View>
         </View>
-        <Ionicons name="person-circle-outline" size={25} color={tint} style={styles.profileIcon} />
-        <View style={[styles.greetingAccent, { backgroundColor: tint }]} />
       </View>
 
       <View style={styles.statRow}>
@@ -132,43 +170,51 @@ export default function HomeScreen() {
             bug as passing it an array), so the Pressable it clones onto
             keeps a plain style and the "pressed" look only affects the
             LinearGradient inside, via the render-prop children. */}
-        <View style={styles.statLinkWrap}>
+        <View style={[styles.statLinkWrap, { shadowColor: '#2563eb' }]}>
           <Link href="/timetable" asChild>
             <Pressable style={styles.statLinkPress}>
               {({ pressed }) => (
                 <LinearGradient
-                  colors={[tint, `${tint}cc`]}
+                  colors={['#3b82f6', '#1d4ed8']}
                   start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
+                  end={{ x: 1, y: 0.7 }}
                   style={[styles.statLink, pressed && styles.pressedTile]}
                 >
-                  <View style={styles.statBlob} />
+                  <View style={styles.statGlowOuter} pointerEvents="none" />
+                  <Ionicons name="calendar" size={44} color="rgba(255,255,255,0.14)" style={styles.statBgIcon} />
                   <View style={styles.statIcon}>
-                    <Ionicons name="calendar" size={19} color={tint} />
+                    <Ionicons name="calendar-outline" size={18} color="#fff" />
                   </View>
                   <Text style={styles.statValue}>{todaysSlots.length}</Text>
-                  <Text style={styles.statLabel}>{t.common.classesToday}</Text>
+                  <View style={styles.statFooterRow}>
+                    <Text style={styles.statLabel}>{t.common.classesToday}</Text>
+                    <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.75)" />
+                  </View>
                 </LinearGradient>
               )}
             </Pressable>
           </Link>
         </View>
-        <View style={styles.statLinkWrap}>
+        <View style={[styles.statLinkWrap, { shadowColor: '#7c3aed' }]}>
           <Link href="/announcements" asChild>
             <Pressable style={styles.statLinkPress}>
               {({ pressed }) => (
                 <LinearGradient
-                  colors={[purple, `${purple}cc`]}
+                  colors={['#a78bfa', '#7c3aed']}
                   start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
+                  end={{ x: 1, y: 0.7 }}
                   style={[styles.statLink, pressed && styles.pressedTile]}
                 >
-                  <View style={styles.statBlob} />
+                  <View style={styles.statGlowOuter} pointerEvents="none" />
+                  <Ionicons name="megaphone" size={44} color="rgba(255,255,255,0.14)" style={styles.statBgIcon} />
                   <View style={styles.statIcon}>
-                    <Ionicons name="megaphone" size={19} color={purple} />
+                    <Ionicons name="megaphone-outline" size={18} color="#fff" />
                   </View>
                   <Text style={styles.statValue}>{newAnnouncementsCount}</Text>
-                  <Text style={styles.statLabel}>{t.common.newAnnouncements}</Text>
+                  <View style={styles.statFooterRow}>
+                    <Text style={styles.statLabel}>{t.common.newAnnouncements}</Text>
+                    <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.75)" />
+                  </View>
                 </LinearGradient>
               )}
             </Pressable>
@@ -404,37 +450,58 @@ const styles = StyleSheet.create({
   content: {
     padding: 16
   },
+  greetingPanelWrap: {
+    borderRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    elevation: 4
+  },
   greetingPanel: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    borderWidth: 0,
-    borderRadius: 22,
-    padding: 14,
+    gap: 14,
+    borderWidth: 1,
+    borderRadius: 24,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
     overflow: 'hidden'
   },
-  greetingAccent: {
+  greetingGlow: {
     position: 'absolute',
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    right: -24,
-    top: -24,
-    opacity: 0.12
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    right: -50,
+    top: -60
+  },
+  greetingGlowSoft: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    left: -40,
+    bottom: -50
   },
   avatarRing: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    borderWidth: 2,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 1.5,
     padding: 3,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 3
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -449,11 +516,17 @@ const styles = StyleSheet.create({
   },
   greetingLabel: {
     fontSize: 13,
-    fontWeight: '600'
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    color: 'rgba(255,255,255,0.65)'
   },
   greetingName: {
-    fontSize: 21,
-    fontWeight: '800'
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+    lineHeight: 27,
+    marginTop: 2,
+    color: '#fff'
   },
   roleBadge: {
     alignSelf: 'flex-start',
@@ -461,16 +534,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginTop: 4
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    marginTop: 8
   },
   roleBadgeText: {
     fontSize: 11,
     fontWeight: '700'
   },
-  profileIcon: {
-    zIndex: 1
+  profileIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   statRow: {
     flexDirection: 'row',
@@ -480,11 +558,10 @@ const styles = StyleSheet.create({
   },
   statLinkWrap: {
     flex: 1,
-    borderRadius: 18,
-    shadowColor: '#000',
+    borderRadius: 24,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.18,
-    shadowRadius: 10,
+    shadowRadius: 12,
     elevation: 4
   },
   statLinkPress: {
@@ -493,19 +570,25 @@ const styles = StyleSheet.create({
   statLink: {
     flex: 1,
     width: '100%',
-    borderRadius: 18,
+    borderRadius: 24,
     overflow: 'hidden',
-    minHeight: 96,
-    padding: 15
+    minHeight: 100,
+    padding: 16
   },
-  statBlob: {
+  statGlowOuter: {
     position: 'absolute',
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    right: -30,
-    top: -30,
-    backgroundColor: 'rgba(255,255,255,0.14)'
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    top: -45,
+    right: -35,
+    backgroundColor: 'rgba(255,255,255,0.08)'
+  },
+  statBgIcon: {
+    position: 'absolute',
+    right: 2,
+    bottom: 6,
+    transform: [{ rotate: '6deg' }]
   },
   pressedTile: {
     opacity: 0.85,
@@ -514,19 +597,25 @@ const styles = StyleSheet.create({
   statIcon: {
     width: 34,
     height: 34,
-    borderRadius: 11,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
-    backgroundColor: '#fff'
+    marginBottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)'
   },
   statValue: {
     fontSize: 26,
     fontWeight: '800',
     color: '#fff'
   },
+  statFooterRow: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent'
+  },
   statLabel: {
-    marginTop: 2,
     fontSize: 12,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.9)'

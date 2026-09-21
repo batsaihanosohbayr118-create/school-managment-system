@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Switch } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Switch, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { languages } from '@shared/i18n-tables';
+import { languages, translateValue } from '@shared/i18n-tables';
 
 import { Card } from '@/components/Card';
 import { Text, View, useThemeColor } from '@/components/Themed';
@@ -14,11 +14,17 @@ import { useLanguage } from '@/lib/language-context';
 import { useTheme } from '@/lib/theme-context';
 
 export default function SettingsScreen() {
-  const { session, signOut, updateAvatar } = useAuth();
+  const router = useRouter();
+  const { session, signOut, updateAvatar, updatePhone } = useAuth();
   const { preference, setPreference } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [personalInfoOpen, setPersonalInfoOpen] = useState(false);
+  const [phoneEditing, setPhoneEditing] = useState(false);
+  const [phoneDraft, setPhoneDraft] = useState('');
+  const [phoneSaving, setPhoneSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
   const tintMuted = useThemeColor({}, 'tintMuted');
@@ -26,6 +32,8 @@ export default function SettingsScreen() {
   const dangerStrongColor = useThemeColor({}, 'dangerStrong');
   const borderColor = useThemeColor({}, 'border');
   const cardColor = useThemeColor({}, 'card');
+  const textColor = useThemeColor({}, 'text');
+  const inputBg = useThemeColor({}, 'card');
 
   const name = session?.name || session?.email || '';
   const initial = name.trim().charAt(0).toUpperCase() || '?';
@@ -69,6 +77,27 @@ export default function SettingsScreen() {
     }
   }
 
+  function openPhoneEditor() {
+    setPhoneError(null);
+    setPhoneDraft(session?.phone ?? '');
+    setPhoneEditing(true);
+  }
+
+  async function handleSavePhone() {
+    setPhoneError(null);
+    setPhoneSaving(true);
+    try {
+      const { error } = await updatePhone(phoneDraft.trim());
+      if (error) {
+        setPhoneError(t.mobileForms.phoneUpdateFailed);
+      } else {
+        setPhoneEditing(false);
+      }
+    } finally {
+      setPhoneSaving(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: t.nav.settings.label }} />
@@ -94,12 +123,139 @@ export default function SettingsScreen() {
           </Pressable>
           <View style={styles.accountInfo}>
             <Text style={styles.value}>{name}</Text>
-            <Text style={[styles.role, { color: tint }]}>{session.role}</Text>
+            <Text style={[styles.role, { color: tint }]}>{translateValue(session.role, language)}</Text>
           </View>
         </Card>
       ) : null}
 
       {avatarError ? <Text style={[styles.avatarError, { color: dangerColor }]}>{avatarError}</Text> : null}
+
+      {session ? (
+        <>
+          <Text style={[styles.sectionTitle, { color: mutedColor }]}>
+            {language === 'mn' ? 'Хувийн мэдээлэл' : 'Personal information'}
+          </Text>
+          <Card style={styles.groupCard}>
+            <Pressable
+              style={styles.toggleRow}
+              onPress={() => setPersonalInfoOpen((open) => !open)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: personalInfoOpen }}
+            >
+              <View style={styles.toggleLabel}>
+                <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
+                  <Ionicons name="person-outline" size={15} color={tint} />
+                </View>
+                <Text style={styles.toggleText}>{language === 'mn' ? 'Хувийн мэдээлэл' : 'Personal information'}</Text>
+              </View>
+              <Ionicons name={personalInfoOpen ? 'chevron-up' : 'chevron-down'} size={18} color={mutedColor} />
+            </Pressable>
+
+            {personalInfoOpen ? (
+              <>
+                <View style={[styles.divider, { backgroundColor: borderColor }]} />
+
+                <View style={styles.toggleRow}>
+                  <View style={styles.toggleLabel}>
+                    <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
+                      <Ionicons name="person-circle-outline" size={15} color={tint} />
+                    </View>
+                    <Text style={styles.toggleText}>{t.columns.Name}</Text>
+                  </View>
+                  <Text style={[styles.infoValue, { color: mutedColor }]} numberOfLines={1}>{name}</Text>
+                </View>
+
+                <View style={[styles.divider, { backgroundColor: borderColor }]} />
+
+                <View style={styles.toggleRow}>
+                  <View style={styles.toggleLabel}>
+                    <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
+                      <Ionicons name="mail-outline" size={15} color={tint} />
+                    </View>
+                    <Text style={styles.toggleText}>{t.columns.Email}</Text>
+                  </View>
+                  <Text style={[styles.infoValue, { color: mutedColor }]} numberOfLines={1}>{session.email || '—'}</Text>
+                </View>
+
+                <View style={[styles.divider, { backgroundColor: borderColor }]} />
+
+                {phoneEditing ? (
+                  <View style={styles.phoneEditRow}>
+                    <View style={[styles.toggleLabel, { flex: 1 }]}>
+                      <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
+                        <Ionicons name="call-outline" size={15} color={tint} />
+                      </View>
+                      <TextInput
+                        style={[styles.phoneInput, { color: textColor, backgroundColor: inputBg, borderColor }]}
+                        placeholder={t.mobileForms.phonePlaceholder}
+                        placeholderTextColor={mutedColor}
+                        value={phoneDraft}
+                        onChangeText={setPhoneDraft}
+                        editable={!phoneSaving}
+                        keyboardType="phone-pad"
+                        autoFocus
+                      />
+                    </View>
+                    <View style={styles.phoneEditActions}>
+                      <Pressable onPress={() => setPhoneEditing(false)} disabled={phoneSaving} hitSlop={8}>
+                        <Ionicons name="close" size={20} color={mutedColor} />
+                      </Pressable>
+                      <Pressable onPress={handleSavePhone} disabled={phoneSaving} hitSlop={8}>
+                        {phoneSaving ? (
+                          <ActivityIndicator color={tint} size="small" />
+                        ) : (
+                          <Ionicons name="checkmark" size={20} color={tint} />
+                        )}
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <Pressable style={styles.toggleRow} onPress={openPhoneEditor}>
+                    <View style={styles.toggleLabel}>
+                      <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
+                        <Ionicons name="call-outline" size={15} color={tint} />
+                      </View>
+                      <Text style={styles.toggleText}>{t.columns.Phone}</Text>
+                    </View>
+                    <View style={styles.phoneValueRow}>
+                      <Text style={[styles.infoValue, { color: mutedColor }]} numberOfLines={1}>
+                        {session.phone || '—'}
+                      </Text>
+                      <Ionicons name="pencil" size={13} color={mutedColor} />
+                    </View>
+                  </Pressable>
+                )}
+
+                {phoneError ? <Text style={[styles.avatarError, { color: dangerColor }]}>{phoneError}</Text> : null}
+
+                <View style={[styles.divider, { backgroundColor: borderColor }]} />
+
+                <View style={styles.toggleRow}>
+                  <View style={styles.toggleLabel}>
+                    <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
+                      <Ionicons name="shield-checkmark-outline" size={15} color={tint} />
+                    </View>
+                    <Text style={styles.toggleText}>{language === 'mn' ? 'Эрх' : 'Role'}</Text>
+                  </View>
+                  <Text style={[styles.infoValue, { color: mutedColor }]} numberOfLines={1}>{translateValue(session.role, language)}</Text>
+                </View>
+
+                <View style={[styles.divider, { backgroundColor: borderColor }]} />
+
+                <Pressable style={styles.toggleRow} onPress={() => router.push('/change-password')}>
+                  <View style={styles.toggleLabel}>
+                    <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
+                      <Ionicons name="key-outline" size={15} color={tint} />
+                    </View>
+                    <Text style={styles.toggleText}>{t.mobileForms.changePassword}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={17} color={mutedColor} />
+                </Pressable>
+              </>
+            ) : null}
+          </Card>
+        </>
+      ) : null}
 
       <Text style={[styles.sectionTitle, { color: mutedColor }]}>{t.common.general}</Text>
       <Card style={styles.groupCard}>
@@ -205,6 +361,43 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'capitalize'
   },
+  infoValue: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'right',
+    marginLeft: 12
+  },
+  phoneValueRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    backgroundColor: 'transparent'
+  },
+  phoneEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 8,
+    backgroundColor: 'transparent'
+  },
+  phoneInput: {
+    flex: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 14
+  },
+  phoneEditActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: 'transparent'
+  },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
@@ -231,6 +424,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flexShrink: 0,
     backgroundColor: 'transparent'
   },
   iconBadge: {

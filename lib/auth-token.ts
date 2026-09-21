@@ -17,6 +17,7 @@ export type TokenPayload = {
   name: string;
   role: Role;
   avatarUrl: string;
+  phone: string;
   exp: number;
 };
 

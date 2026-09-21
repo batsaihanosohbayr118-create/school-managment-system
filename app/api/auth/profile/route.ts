@@ -33,7 +33,8 @@ export async function GET(request: Request) {
       email: account.email,
       name: account.name,
       role: account.role,
-      avatarUrl: account.avatarUrl
+      avatarUrl: account.avatarUrl,
+      phone: account.phone
     });
 
     return withCors(NextResponse.json({ token, user: account }), request, METHODS);
@@ -57,6 +58,7 @@ export async function PATCH(request: Request) {
     name?: string;
     email?: string;
     avatarUrl?: string;
+    phone?: string;
     currentPassword?: string;
     newPassword?: string;
   } | null;
@@ -101,6 +103,7 @@ export async function PATCH(request: Request) {
       name: body.name,
       email: body.email,
       avatarUrl: body.avatarUrl,
+      phone: body.phone,
       password: body.newPassword
     });
 
@@ -114,7 +117,8 @@ export async function PATCH(request: Request) {
       email: account.email,
       name: account.name,
       role: account.role,
-      avatarUrl: account.avatarUrl
+      avatarUrl: account.avatarUrl,
+      phone: account.phone
     });
 
     return withCors(NextResponse.json({ token, user: account }), request, METHODS);

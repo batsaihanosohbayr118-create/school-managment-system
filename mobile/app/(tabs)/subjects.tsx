@@ -24,11 +24,12 @@ export default function SubjectsScreen() {
   const [query, setQuery] = useState('');
   const dangerColor = useThemeColor({}, 'danger');
   const tint = useThemeColor({}, 'tint');
-  // Students browse read-only, so subjects page sideways instead of stacking;
-  // teachers/parents keep the stacked list (teachers also need the full-width
-  // "Add content" row at the bottom of each card). Cards stay full width —
-  // one subject per page — rather than shrinking to fit several on screen.
-  const isStudent = session?.role === 'student';
+  // Students and parents browse read-only, so subjects page sideways instead
+  // of stacking; teachers keep the stacked list, since they also need the
+  // full-width "Add content" row at the bottom of each card. Cards stay full
+  // width — one subject per page — rather than shrinking to fit several on
+  // screen.
+  const isReadOnlyViewer = session?.role === 'student' || session?.role === 'parent';
   const { width: windowWidth } = useWindowDimensions();
   const horizontalCardWidth = windowWidth - styles.container.paddingHorizontal * 2;
 
@@ -80,15 +81,15 @@ export default function SubjectsScreen() {
 
       <FlatList
         style={styles.flex}
-        contentContainerStyle={isStudent ? styles.contentHorizontal : styles.content}
+        contentContainerStyle={isReadOnlyViewer ? styles.contentHorizontal : styles.content}
         data={filteredSubjects}
         keyExtractor={(subject) => subject.id}
-        horizontal={isStudent}
+        horizontal={isReadOnlyViewer}
         showsHorizontalScrollIndicator={false}
-        pagingEnabled={isStudent}
-        snapToInterval={isStudent ? horizontalCardWidth + 16 : undefined}
-        decelerationRate={isStudent ? 'fast' : undefined}
-        refreshControl={isStudent ? undefined : <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
+        pagingEnabled={isReadOnlyViewer}
+        snapToInterval={isReadOnlyViewer ? horizontalCardWidth + 16 : undefined}
+        decelerationRate={isReadOnlyViewer ? 'fast' : undefined}
+        refreshControl={isReadOnlyViewer ? undefined : <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           <EmptyState
@@ -97,7 +98,7 @@ export default function SubjectsScreen() {
           />
         }
         renderItem={({ item }) =>
-          isStudent ? (
+          isReadOnlyViewer ? (
             <View style={[styles.horizontalCard, { width: horizontalCardWidth }]}>
               <SubjectRow subject={item} />
             </View>

@@ -63,6 +63,7 @@ export type SessionUser = {
   name: string;
   role: Role;
   avatarUrl: string;
+  phone: string;
 };
 
 /**
@@ -122,6 +123,7 @@ export function readToken(token: string): SessionUser | null {
       name?: unknown;
       role?: unknown;
       avatarUrl?: unknown;
+      phone?: unknown;
       exp?: unknown;
     };
 
@@ -132,7 +134,8 @@ export function readToken(token: string): SessionUser | null {
       email: typeof payload.email === "string" ? payload.email : "",
       name: typeof payload.name === "string" ? payload.name : "",
       role: isRole(payload.role) ? payload.role : "student",
-      avatarUrl: typeof payload.avatarUrl === "string" ? payload.avatarUrl : ""
+      avatarUrl: typeof payload.avatarUrl === "string" ? payload.avatarUrl : "",
+      phone: typeof payload.phone === "string" ? payload.phone : ""
     };
   } catch {
     return null;
@@ -188,7 +191,7 @@ export const authService = {
     return { error: null };
   },
 
-  async updateProfile({ avatarUrl }: { avatarUrl: string }): Promise<{ error: string | null }> {
+  async updateProfile({ avatarUrl, phone }: { avatarUrl?: string; phone?: string }): Promise<{ error: string | null }> {
     const token = await getToken();
     if (!token) return { error: "not-signed-in" };
 
@@ -197,7 +200,35 @@ export const authService = {
       response = await fetch(`${baseUrl}/api/auth/profile`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ avatarUrl })
+        body: JSON.stringify({ avatarUrl, phone })
+      });
+    } catch {
+      return { error: "No connection." };
+    }
+
+    if (!response.ok) return { error: await readMessage(response) };
+
+    const { token: nextToken } = (await response.json()) as { token: string };
+    await setToken(nextToken);
+    return { error: null };
+  },
+
+  async changePassword({
+    currentPassword,
+    newPassword
+  }: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<{ error: string | null }> {
+    const token = await getToken();
+    if (!token) return { error: "not-signed-in" };
+
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/api/auth/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword, newPassword })
       });
     } catch {
       return { error: "No connection." };

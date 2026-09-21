@@ -45,7 +45,8 @@ export async function POST(request: Request) {
       email: account.email,
       name: account.name,
       role: account.role,
-      avatarUrl: account.avatarUrl
+      avatarUrl: account.avatarUrl,
+      phone: account.phone
     });
 
     return withCors(NextResponse.json({ token, user: account }), request, METHODS);

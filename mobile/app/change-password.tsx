@@ -3,16 +3,12 @@ import { Stack, useRouter } from 'expo-router';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 import { Text, View, useThemeColor } from '@/components/Themed';
-import { api } from '@/lib/api';
+import { authService } from '@/lib/auth';
 import { useLanguage } from '@/lib/language-context';
-import { ApiError } from '@shared/api-error';
-import { translateValue } from '@shared/i18n-tables';
 
-const STATUSES = ['Present', 'Absent', 'Late', 'Excused'] as const;
-
-export default function AttendanceEntryScreen() {
+export default function ChangePasswordScreen() {
   const router = useRouter();
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   // TextInput isn't a Themed component, so it doesn't pick up dark mode's
   // colors on its own — typed text was invisible (black on black) before.
   const textColor = useThemeColor({}, 'text');
@@ -21,28 +17,48 @@ export default function AttendanceEntryScreen() {
   const borderColor = useThemeColor({}, 'border');
   const tint = useThemeColor({}, 'tint');
   const dangerColor = useThemeColor({}, 'danger');
+  const successColor = useThemeColor({}, 'success');
 
-  const [student, setStudent] = useState('');
-  const [subject, setSubject] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [status, setStatus] = useState<(typeof STATUSES)[number]>('Present');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
     setError(null);
+    setSuccess(false);
+
+    if (newPassword.length < 6) {
+      setError(t.mobileForms.passwordTooShort);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError(t.mobileForms.passwordMismatch);
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await api.postAttendance({ student: student.trim(), subject: subject.trim(), date, status });
-      router.back();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.mobileForms.saveFailed);
+      const { error: apiError } = await authService.changePassword({ currentPassword, newPassword });
+      if (apiError === 'current-password-invalid') {
+        setError(t.mobileForms.currentPasswordInvalid);
+      } else if (apiError) {
+        setError(t.mobileForms.saveFailed);
+      } else {
+        setSuccess(true);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      }
     } finally {
       setSubmitting(false);
     }
   }
 
   const inputStyle = [styles.input, { color: textColor, backgroundColor: inputBg, borderColor }];
+  const canSubmit = !submitting && currentPassword && newPassword && confirmPassword;
 
   return (
     <KeyboardAvoidingView
@@ -56,64 +72,53 @@ export default function AttendanceEntryScreen() {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        <Stack.Screen options={{ title: t.create.attendance.title }} />
-        <Text style={styles.title}>{t.create.attendance.title}</Text>
+        <Stack.Screen options={{ title: t.mobileForms.changePassword }} />
+        <Text style={styles.title}>{t.mobileForms.changePassword}</Text>
 
-        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Student}</Text>
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.mobileForms.currentPassword}</Text>
         <TextInput
           style={inputStyle}
           placeholderTextColor={placeholderColor}
-          value={student}
-          onChangeText={setStudent}
+          value={currentPassword}
+          onChangeText={setCurrentPassword}
           editable={!submitting}
+          secureTextEntry
           autoFocus
         />
 
-        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Subject}</Text>
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.mobileForms.newPassword}</Text>
         <TextInput
           style={inputStyle}
           placeholderTextColor={placeholderColor}
-          value={subject}
-          onChangeText={setSubject}
+          value={newPassword}
+          onChangeText={setNewPassword}
           editable={!submitting}
+          secureTextEntry
         />
 
-        <Text style={[styles.label, { color: placeholderColor }]}>
-          {t.columns.Date} {t.mobileForms.dateFormatHint}
-        </Text>
+        <Text style={[styles.label, { color: placeholderColor }]}>{t.mobileForms.confirmPassword}</Text>
         <TextInput
           style={inputStyle}
           placeholderTextColor={placeholderColor}
-          value={date}
-          onChangeText={setDate}
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
           editable={!submitting}
+          secureTextEntry
         />
-
-        <Text style={[styles.label, { color: placeholderColor }]}>{t.columns.Status}</Text>
-        <View style={styles.statusRow}>
-          {STATUSES.map((option) => {
-            const active = status === option;
-            return (
-              <Pressable
-                key={option}
-                style={[styles.statusOption, { borderColor: active ? tint : borderColor, backgroundColor: active ? tint : 'transparent' }]}
-                onPress={() => setStatus(option)}
-                disabled={submitting}
-              >
-                <Text style={[styles.statusText, active && styles.statusTextActive]}>{translateValue(option, language)}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
 
         {error ? <Text style={[styles.error, { color: dangerColor }]}>{error}</Text> : null}
+        {success ? <Text style={[styles.success, { color: successColor }]}>{t.mobileForms.passwordUpdated}</Text> : null}
 
         <Pressable
-          style={[styles.submit, { backgroundColor: tint }, (submitting || !student || !status) && styles.submitDisabled]}
+          style={[styles.submit, { backgroundColor: tint }, !canSubmit && styles.submitDisabled]}
           onPress={handleSubmit}
-          disabled={submitting || !student || !status}
+          disabled={!canSubmit}
         >
           {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{t.mobileForms.save}</Text>}
+        </Pressable>
+
+        <Pressable style={styles.cancel} onPress={() => router.back()} disabled={submitting}>
+          <Text style={[styles.cancelText, { color: placeholderColor }]}>{t.common.cancel}</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -147,29 +152,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 4
   },
-  statusRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 6
-  },
-  statusOption: {
-    flexGrow: 1,
-    flexBasis: '47%',
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    alignItems: 'center'
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '700'
-  },
-  statusTextActive: {
-    color: '#fff'
-  },
   error: {
-    marginTop: 16
+    marginTop: 16,
+    fontSize: 13,
+    fontWeight: '600'
+  },
+  success: {
+    marginTop: 16,
+    fontSize: 13,
+    fontWeight: '600'
   },
   submit: {
     marginTop: 24,
@@ -189,5 +180,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 16
+  },
+  cancel: {
+    marginTop: 14,
+    paddingVertical: 10,
+    alignItems: 'center'
+  },
+  cancelText: {
+    fontSize: 14,
+    fontWeight: '600'
   }
 });

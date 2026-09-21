@@ -420,7 +420,17 @@ export const translations = {
       classPlaceholder: "e.g. Grade 8A",
       photoPermissionDenied: "Photo library access is required to change your photo.",
       avatarUpdateFailed: "Could not update photo. Please try again.",
-      invalidCredentials: "Incorrect email or password."
+      phoneUpdateFailed: "Could not update phone number. Please try again.",
+      phonePlaceholder: "e.g. 99112233",
+      invalidCredentials: "Incorrect email or password.",
+      changePassword: "Change password",
+      currentPassword: "Current password",
+      newPassword: "New password",
+      confirmPassword: "Confirm new password",
+      passwordMismatch: "New passwords do not match.",
+      passwordTooShort: "New password must be at least 6 characters.",
+      currentPasswordInvalid: "Current password is incorrect.",
+      passwordUpdated: "Password updated."
     },
     subjectContent: {
       addContent: "Add content",
@@ -796,7 +806,17 @@ export const translations = {
       classPlaceholder: "8A анги",
       photoPermissionDenied: "Профайлын зураг солихын тулд зургийн санд хандах зөвшөөрөл шаардлагатай.",
       avatarUpdateFailed: "Зураг шинэчилж чадсангүй. Дахин оролдоно уу.",
-      invalidCredentials: "Имэйл эсвэл нууц үг буруу байна."
+      phoneUpdateFailed: "Утасны дугаар шинэчилж чадсангүй. Дахин оролдоно уу.",
+      phonePlaceholder: "жишээ нь 99112233",
+      invalidCredentials: "Имэйл эсвэл нууц үг буруу байна.",
+      changePassword: "Нууц үг солих",
+      currentPassword: "Одоогийн нууц үг",
+      newPassword: "Шинэ нууц үг",
+      confirmPassword: "Шинэ нууц үг (давтах)",
+      passwordMismatch: "Шинэ нууц үг таарахгүй байна.",
+      passwordTooShort: "Шинэ нууц үг хамгийн багадаа 6 тэмдэгт байх ёстой.",
+      currentPasswordInvalid: "Одоогийн нууц үг буруу байна.",
+      passwordUpdated: "Нууц үг шинэчлэгдлээ."
     },
     subjectContent: {
       addContent: "Контент нэмэх",

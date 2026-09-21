@@ -19,6 +19,7 @@ export type SessionUser = {
   name: string;
   role: Role;
   avatarUrl: string;
+  phone: string;
 };
 
 export function getToken(): string | null {
@@ -50,6 +51,7 @@ export function readToken(token: string): SessionUser | null {
       name?: unknown;
       role?: unknown;
       avatarUrl?: unknown;
+      phone?: unknown;
       exp?: unknown;
     };
 
@@ -60,7 +62,8 @@ export function readToken(token: string): SessionUser | null {
       email: typeof payload.email === "string" ? payload.email : "",
       name: typeof payload.name === "string" ? payload.name : "",
       role: isRole(payload.role) ? payload.role : "student",
-      avatarUrl: typeof payload.avatarUrl === "string" ? payload.avatarUrl : ""
+      avatarUrl: typeof payload.avatarUrl === "string" ? payload.avatarUrl : "",
+      phone: typeof payload.phone === "string" ? payload.phone : ""
     };
   } catch {
     return null;
@@ -104,7 +107,7 @@ export const authService = {
     clearToken();
   },
 
-  async updateProfile(values: { name?: string; email?: string; avatarUrl?: string }) {
+  async updateProfile(values: { name?: string; email?: string; avatarUrl?: string; phone?: string }) {
     return patchProfile(values);
   },
 

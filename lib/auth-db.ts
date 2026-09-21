@@ -30,6 +30,7 @@ export type AccountRecord = {
   name: string;
   role: Role;
   avatarUrl: string;
+  phone: string;
   /** Teachers only — the subject they teach. Free text; not tied to a table. */
   subject: string;
   /** Parents only — the email of the student they are guardian for. */
@@ -98,6 +99,7 @@ async function initialize() {
   // Role-specific links, added after the table shipped.
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS subject TEXT NOT NULL DEFAULT '';`);
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS student_email TEXT NOT NULL DEFAULT '';`);
+  await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';`);
 
   // One row per device: an account signed in on a phone and a tablet gets
   // notified on both. Keyed by the token itself (not email) so re-registering
@@ -148,6 +150,7 @@ type Row = {
   name: string;
   role: string;
   avatar_url: string;
+  phone: string;
   subject: string;
   student_email: string;
   created_at: Date | string;
@@ -161,13 +164,14 @@ function mapRow(row: Row): AccountRecord {
     name: row.name,
     role: isRole(row.role) ? row.role : "student",
     avatarUrl: row.avatar_url,
+    phone: row.phone ?? "",
     subject: row.subject ?? "",
     studentEmail: row.student_email ?? "",
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at)
   };
 }
 
-const SELECT = `id, email, username, name, role, avatar_url, subject, student_email, created_at`;
+const SELECT = `id, email, username, name, role, avatar_url, phone, subject, student_email, created_at`;
 
 /**
  * A parent account may only be linked to a student that actually exists, so
@@ -226,6 +230,7 @@ export type CreateAccountInput = {
   name?: string;
   username?: string;
   role: Role;
+  phone?: string;
   subject?: string;
   studentEmail?: string;
 };
@@ -257,8 +262,8 @@ export async function createAccount(input: CreateAccountInput): Promise<AccountR
 
   try {
     const { rows } = await getPool().query<Row>(
-      `INSERT INTO app_users (id, email, username, name, role, password_hash, subject, student_email)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO app_users (id, email, username, name, role, password_hash, phone, subject, student_email)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING ${SELECT};`,
       [
         makeId(),
@@ -267,6 +272,7 @@ export async function createAccount(input: CreateAccountInput): Promise<AccountR
         input.name?.trim() ?? "",
         input.role,
         passwordHash,
+        input.phone?.trim() ?? "",
         input.role === "teacher" ? (input.subject?.trim() ?? "") : "",
         input.role === "parent" ? (input.studentEmail?.trim() ?? "") : ""
       ]
@@ -284,6 +290,7 @@ export type UpdateAccountInput = {
   username?: string;
   role?: Role;
   avatarUrl?: string;
+  phone?: string;
   subject?: string;
   studentEmail?: string;
 };
@@ -300,6 +307,7 @@ export async function updateAccount(id: string, input: UpdateAccountInput): Prom
   if (typeof input.username === "string") set("username", input.username.trim());
   if (typeof input.name === "string") set("name", input.name.trim());
   if (typeof input.avatarUrl === "string") set("avatar_url", input.avatarUrl);
+  if (typeof input.phone === "string") set("phone", input.phone.trim());
   if (typeof input.subject === "string") set("subject", input.subject.trim());
   if (typeof input.studentEmail === "string") set("student_email", input.studentEmail.trim());
 
