@@ -7,6 +7,9 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
+    "locales": {
+      "mn": "./locales/mn.json"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "mn.app.novamind",
@@ -24,10 +27,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "bundler": "metro",
@@ -44,13 +44,20 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-font",
       "expo-web-browser",
       [
         "expo-image-picker",
         {
-          "photosPermission": "Зургийн санд хандаж профайлын зургаа сонгоно."
+          "photosPermission": "Nova Mind Academy accesses your photos so you can choose a profile picture and attach images to lessons.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       [

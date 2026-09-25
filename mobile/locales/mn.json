@@ -1,0 +1,5 @@
+{
+  "CFBundleDisplayName": "Nova Mind Academy",
+  "NSPhotoLibraryUsageDescription": "Nova Mind Academy нь профайл зураг сонгох болон хичээлд зураг хавсаргахын тулд таны зургийн санд хандана.",
+  "NSLocalNetworkUsageDescription": "Хөгжүүлэлтийн горимд компьютер дээрх хөгжүүлэлтийн сервертэй холбогдохын тулд локал сүлжээг ашиглана."
+}
