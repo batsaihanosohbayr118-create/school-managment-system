@@ -40,10 +40,10 @@ export function LoginView() {
         />
       ))}
 
-      {/* Split container */}
-      <div className="relative z-10 grid w-full max-w-[1400px] overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.02] shadow-[0_40px_120px_rgba(2,6,23,0.7)] backdrop-blur-sm lg:min-h-[82vh] lg:grid-cols-2">
+      {/* Split container — framed only on lg, where the brand panel sits beside the form */}
+      <div className="relative z-10 grid w-full max-w-[1400px] lg:min-h-[82vh] lg:grid-cols-2 lg:overflow-hidden lg:rounded-[2rem] lg:border lg:border-white/10 lg:bg-white/[0.02] lg:shadow-[0_40px_120px_rgba(2,6,23,0.7)] lg:backdrop-blur-sm">
         <BrandPanel />
-        <div className="flex items-center justify-center bg-[#0b1020]/40 p-6 backdrop-blur-xl sm:p-10 lg:p-12">
+        <div className="flex items-center justify-center lg:bg-[#0b1020]/40 lg:p-12 lg:backdrop-blur-xl">
           <LoginCard />
         </div>
       </div>

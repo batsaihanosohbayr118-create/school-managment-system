@@ -41,11 +41,11 @@ export function Hero({ dict }: HeroProps) {
   return (
     <section
       id="home"
-      className="relative flex min-h-screen items-center overflow-hidden bg-[linear-gradient(120deg,#fdf6ec_0%,#fdf5ea_38%,#f3f2ff_66%,#eaf1ff_100%)] pt-17 lg:sticky lg:top-0 lg:z-0 lg:h-screen lg:min-h-0"
+      className="relative flex min-h-screen items-center overflow-hidden bg-[linear-gradient(120deg,#fdf6ec_0%,#fdf5ea_38%,#f3f2ff_66%,#eaf1ff_100%)] pt-17 sm:min-h-[560px] lg:sticky lg:top-0 lg:z-0 lg:h-screen"
     >
-      {/* Full-bleed background photo (desktop / laptop) — students on the right */}
+      {/* Full-bleed background photo (tablet and up; mobile shows no photo) — students on the right */}
       {imageOk ? (
-        <div className="absolute inset-x-0 bottom-0 top-17 hidden lg:block">
+        <div className="absolute inset-x-0 bottom-0 top-17 hidden sm:block">
           <Image
             src={BRAND.heroImage}
             alt="Nova Mind Academy students"
@@ -63,9 +63,9 @@ export function Hero({ dict }: HeroProps) {
       <div className="pointer-events-none absolute -left-24 top-24 h-80 w-80 rounded-full bg-[#fde68a]/25 blur-[120px]" />
       <div className="pointer-events-none absolute right-10 top-10 h-72 w-72 rounded-full bg-[#c4b5fd]/25 blur-[130px]" />
 
-      <div className="relative z-10 mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-12 px-5 py-16 sm:px-8 lg:grid-cols-2 lg:gap-6 lg:py-20">
+      <div className="relative z-10 mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-12 px-5 py-16 sm:grid-cols-2 sm:gap-6 sm:px-8 sm:pb-20 sm:pt-12 md:gap-8 lg:gap-6 lg:py-20">
         {/* Left copy */}
-        <div className="text-center lg:text-left">
+        <div className="text-center sm:text-left">
           <motion.span
             variants={fadeUp}
             initial="hidden"
@@ -82,7 +82,7 @@ export function Hero({ dict }: HeroProps) {
             initial="hidden"
             animate={reveal}
             custom={1}
-            className="mt-6 text-[clamp(2.6rem,5.6vw,4.4rem)] font-black leading-[1.03] tracking-tight text-[#0F172A]"
+            className="mt-6 text-[clamp(2.6rem,5.6vw,4.4rem)] sm:text-[clamp(2rem,4.6vw,3.2rem)] lg:text-[clamp(2.6rem,5.6vw,4.4rem)] font-black leading-[1.03] tracking-tight text-[#0F172A]"
           >
             {hero.titleLines.map((line) => (
               <span key={line} className="block">
@@ -97,7 +97,7 @@ export function Hero({ dict }: HeroProps) {
             initial="hidden"
             animate={reveal}
             custom={2}
-            className="mx-auto mt-7 max-w-lg text-[1.05rem] font-medium leading-[1.75] text-[#64748B] lg:mx-0"
+            className="mx-auto mt-7 max-w-lg text-[1.05rem] font-medium leading-[1.75] text-[#64748B] sm:mx-0 sm:text-[15px] md:text-base lg:text-[1.05rem]"
           >
             {hero.subtitle}
           </motion.p>
@@ -107,7 +107,7 @@ export function Hero({ dict }: HeroProps) {
             initial="hidden"
             animate={reveal}
             custom={3}
-            className="mt-8 flex flex-wrap items-center justify-center gap-5 lg:justify-start"
+            className="mt-8 flex flex-wrap items-center justify-center gap-5 sm:justify-start sm:gap-4 lg:gap-5"
           >
             <Link
               href="/login"
@@ -130,7 +130,7 @@ export function Hero({ dict }: HeroProps) {
             initial="hidden"
             animate={reveal}
             custom={4}
-            className="mt-10 flex items-center justify-center gap-4 lg:justify-start"
+            className="mt-10 flex items-center justify-center gap-4 sm:justify-start"
           >
             <div className="flex -space-x-3">
               {AVATARS.map((bg, i) => (
@@ -149,34 +149,6 @@ export function Hero({ dict }: HeroProps) {
             </div>
           </motion.div>
         </div>
-
-        {/* Right column: photo (mobile/tablet contained; on lg it lives full-bleed in the background) */}
-        <motion.div
-          initial={{ opacity: 0, x: 40, scale: 0.96 }}
-          animate={ready ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: 40, scale: 0.96 }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-          className="relative mx-auto h-[340px] w-full max-w-[520px] sm:h-[420px] lg:hidden"
-        >
-          <div className="absolute inset-0 overflow-hidden rounded-[2rem] shadow-[0_30px_60px_rgba(37,99,235,0.18)] ring-1 ring-white/60">
-            {imageOk ? (
-              <Image
-                src={BRAND.heroImage}
-                alt="Nova Mind Academy students"
-                fill
-                priority
-                sizes="(max-width: 640px) 90vw, 520px"
-                className="object-cover object-[70%_center]"
-                onError={() => setImageOk(false)}
-              />
-            ) : (
-              <div className="grid h-full w-full place-items-center bg-[linear-gradient(160deg,#eef4ff,#e0ecff)]">
-                <div className="grid h-40 w-40 place-items-center rounded-[2rem] bg-linear-to-br from-[#2563EB] to-[#38BDF8] text-white shadow-2xl">
-                  <GraduationCap size={80} strokeWidth={1.4} />
-                </div>
-              </div>
-            )}
-          </div>
-        </motion.div>
       </div>
     </section>
   );
