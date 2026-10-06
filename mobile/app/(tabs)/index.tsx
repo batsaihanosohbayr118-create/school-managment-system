@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useFocusEffect } from 'expo-router';
-import { Animated, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Animated, Image, Pressable, ScrollView, StyleSheet, type ImageSourcePropType } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
+import { AttendanceCard } from '@/components/AttendanceCard';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { SkeletonHome } from '@/components/Skeleton';
 import { Text, View, useThemeColor } from '@/components/Themed';
@@ -14,7 +15,9 @@ import { api } from '@/lib/api';
 import { useLanguage } from '@/lib/language-context';
 import { useApiData } from '@/lib/use-api';
 import { normalizeDayName, translateValue } from '@shared/i18n-tables';
-import type { AttendanceEntry, GradeEntry, TimetableSlot } from '@shared/api-types';
+import { computeAttendanceStats } from '@shared/attendance-stats';
+import type { GradeEntry, TimetableSlot } from '@shared/api-types';
+import { roleLabel } from '@shared/roles';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const today = DAY_NAMES[new Date().getDay()];
@@ -28,22 +31,10 @@ export default function HomeScreen() {
   const { language, t } = useLanguage();
   const mutedColor = useThemeColor({}, 'muted');
   const dangerColor = useThemeColor({}, 'danger');
-  const success = useThemeColor({}, 'success');
   const tint = useThemeColor({}, 'tint');
   const scheme = useColorScheme();
   const isLight = scheme === 'light';
-  const panelGradientColors: [string, string] = isLight
-    ? ['#eef4ff', '#dbeafe']
-    : ['#1f2a5c', '#141936'];
-  const panelBorderColor = isLight ? 'rgba(37,99,235,0.10)' : 'rgba(255,255,255,0.07)';
-  const panelGlowRgb = isLight ? '37,99,235' : '150,175,255';
-  const panelShadowColor = isLight ? '#2563eb' : '#000';
-  const avatarRingBorderColor = isLight ? 'rgba(37,99,235,0.35)' : tint;
-  const roleBadgeBg = isLight ? 'rgba(37,99,235,0.08)' : `${tint}20`;
-  const roleBadgeBorder = isLight ? 'rgba(37,99,235,0.18)' : `${tint}30`;
-  const profileIconBg = isLight ? 'rgba(37,99,235,0.08)' : 'rgba(255,255,255,0.12)';
-  const greetingLabelColor = isLight ? '#64748b' : 'rgba(255,255,255,0.65)';
-  const greetingNameColor = isLight ? '#111827' : '#fff';
+  const card = isLight ? PROFILE_CARD_LIGHT : PROFILE_CARD_DARK;
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -87,10 +78,7 @@ export default function HomeScreen() {
     const posted = new Date(entry.date);
     return !Number.isNaN(posted.getTime()) && posted >= weekAgo;
   }).length;
-  const attendanceEntries = attendance.data?.entries ?? [];
-  const attendedCount = attendanceEntries.filter(isPresentAttendance).length;
-  const attendanceTotal = attendanceEntries.length;
-  const attendancePercent = attendanceTotal ? Math.round((attendedCount / attendanceTotal) * 100) : 0;
+  const attendanceStats = computeAttendanceStats(attendance.data?.entries ?? []);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? t.common.goodMorning : hour < 18 ? t.common.goodAfternoon : t.common.goodEvening;
@@ -110,55 +98,68 @@ export default function HomeScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {(timetable.isOffline || grades.isOffline) ? <OfflineBanner /> : null}
 
-      <View style={[styles.greetingPanelWrap, { shadowColor: panelShadowColor }]}>
-        <View style={[styles.greetingPanel, { borderColor: panelBorderColor }]}>
-          <LinearGradient
-            colors={panelGradientColors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0.6 }}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
-          <LinearGradient
-            colors={[`rgba(${panelGlowRgb},${isLight ? 0.14 : 0.2})`, `rgba(${panelGlowRgb},0)`]}
-            start={{ x: 0.3, y: 0.3 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.greetingGlow}
-            pointerEvents="none"
-          />
-          <LinearGradient
-            colors={[`rgba(${panelGlowRgb},${isLight ? 0.06 : 0.1})`, `rgba(${panelGlowRgb},0)`]}
-            start={{ x: 1, y: 1 }}
-            end={{ x: 0.2, y: 0.2 }}
-            style={styles.greetingGlowSoft}
-            pointerEvents="none"
-          />
+      <View style={[styles.greetingPanelWrap, { shadowColor: card.shadow }]}>
+        <View style={[styles.greetingPanel, { borderColor: card.border, backgroundColor: card.base }]}>
+          {/* The photo sits in its own padding-free layer: a require()d image
+              otherwise takes its intrinsic pixel size, and percentage sizes
+              would resolve against the card's padded content box. */}
+          <View style={[StyleSheet.absoluteFill, styles.greetingBgLayer]} pointerEvents="none">
+            <Image
+              source={card.image}
+              style={styles.greetingBg}
+              resizeMode="cover"
+            />
+          </View>
+          {/* Dark mode only: a soft wash behind the text. */}
+          {card.overlay ? (
+            <LinearGradient
+              colors={card.overlay}
+              locations={[0, 0.6, 1]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+          ) : null}
 
-          <View style={[styles.avatarRing, { borderColor: avatarRingBorderColor }]}>
-            {session?.avatarUrl && !avatarLoadFailed ? (
-              <Image
-                source={{ uri: session.avatarUrl }}
-                style={styles.avatar}
-                onError={() => setAvatarLoadFailed(true)}
+          <View style={styles.greetingContent}>
+            <View style={styles.avatarRing}>
+              <LinearGradient
+                colors={card.ring}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarRingGradient}
               />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: tint }]}>
-                <Text style={styles.avatarText}>{initial}</Text>
+              <View style={[styles.avatarGap, { backgroundColor: card.ringGap }]}>
+                {session?.avatarUrl && !avatarLoadFailed ? (
+                  <Image
+                    source={{ uri: session.avatarUrl }}
+                    style={styles.avatar}
+                    onError={() => setAvatarLoadFailed(true)}
+                  />
+                ) : (
+                  <LinearGradient colors={card.avatar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
+                    <Text style={styles.avatarText}>{initial}</Text>
+                  </LinearGradient>
+                )}
               </View>
-            )}
-          </View>
-          <View style={styles.greetingText}>
-            <Text style={[styles.greetingLabel, { color: greetingLabelColor }]}>
-              {greetingEmoji} {greeting}
-            </Text>
-            <Text style={[styles.greetingName, { color: greetingNameColor }]}>{name}</Text>
-            <View style={[styles.roleBadge, { backgroundColor: roleBadgeBg, borderColor: roleBadgeBorder }]}>
-              <Ionicons name="shield-checkmark-outline" size={12} color={tint} />
-              <Text style={[styles.roleBadgeText, { color: tint }]}>{translateValue(session?.role ?? '', language)}</Text>
+              <View style={[styles.avatarStatus, { borderColor: card.ringGap }]} />
             </View>
-          </View>
-          <View style={[styles.profileIconWrap, { backgroundColor: profileIconBg }]}>
-            <Ionicons name="person-circle-outline" size={22} color={tint} />
+            <View style={styles.greetingText}>
+              <Text style={[styles.greetingLabel, { color: card.label }]} numberOfLines={1}>
+                {greetingEmoji} {greeting}
+              </Text>
+              <Text style={[styles.greetingName, { color: card.name }]} numberOfLines={1}>{name}</Text>
+              <LinearGradient
+                colors={['#3b82f6', '#6366f1']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.roleBadge}
+              >
+                <Ionicons name="shield-checkmark" size={11} color="#fff" />
+                <Text style={styles.roleBadgeText}>{roleLabel(session?.role ?? '', language)}</Text>
+              </LinearGradient>
+            </View>
           </View>
         </View>
       </View>
@@ -222,49 +223,60 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <AttendanceSummary
-        attendedCount={attendedCount}
-        totalCount={attendanceTotal}
-        percentage={attendancePercent}
-        tint={success}
-        mutedColor={mutedColor}
-        language={language}
-        isParent={session?.role === 'parent'}
-      />
+      <AttendanceCard stats={attendanceStats} language={language} isParent={session?.role === 'parent'} />
 
-      <SectionHeader icon="calendar-outline" label={isTeacher ? t.common.todaysClasses : t.common.todaysSchedule} />
+      <SectionHeader
+        icon="calendar-outline"
+        label={isTeacher ? t.common.todaysClasses : t.common.todaysSchedule}
+        href="/timetable"
+      />
       {timetable.loading ? (
         <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
       ) : timetable.error && !timetable.isOffline ? (
         <Text style={{ color: dangerColor }}>{timetable.error.message}</Text>
-      ) : todaysSlots.length === 0 ? (
-        <View style={[styles.emptySchedule, { borderColor: `${tint}80`, backgroundColor: `${tint}20` }]}>
-          <View style={[styles.emptyScheduleAccent, { backgroundColor: tint }]} />
-          <Animated.View
-            style={[
-              styles.emptyScheduleIcon,
-              { backgroundColor: `${tint}35` },
-              {
-                transform: [
-                  { scale: sunPulse },
-                  { rotate: sunRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }
-                ]
-              }
-            ]}
-          >
-            <Ionicons name="sunny-outline" size={25} color={tint} />
-          </Animated.View>
-          <Text style={[styles.emptyScheduleTitle, { color: tint }]}>{t.common.todayIsAQuietDay}</Text>
-          <Text style={[styles.emptyScheduleText, { color: mutedColor }]}>
-            {t.common.nothingScheduledFor(translateValue(today, language))}
-          </Text>
-        </View>
       ) : (
-        <Card style={styles.scheduleCard}>
-          {todaysSlots.map((slot, index) => (
-            <TimetableRow key={slot.id} slot={slot} isLast={index === todaysSlots.length - 1} />
-          ))}
-        </Card>
+        <Link href="/timetable" asChild>
+          {/* Plain style object: Link's asChild forwards it as-is (see paymentsLink). */}
+          <Pressable style={styles.scheduleLink}>
+            {({ pressed }) =>
+              todaysSlots.length === 0 ? (
+                <View
+                  style={[
+                    styles.emptySchedule,
+                    { borderColor: `${tint}80`, backgroundColor: `${tint}20` },
+                    pressed && styles.schedulePressed
+                  ]}
+                >
+                  <View style={[styles.emptyScheduleAccent, { backgroundColor: tint }]} />
+                  <Animated.View
+                    style={[
+                      styles.emptyScheduleIcon,
+                      { backgroundColor: `${tint}35` },
+                      {
+                        transform: [
+                          { scale: sunPulse },
+                          { rotate: sunRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }
+                        ]
+                      }
+                    ]}
+                  >
+                    <Ionicons name="sunny-outline" size={25} color={tint} />
+                  </Animated.View>
+                  <Text style={[styles.emptyScheduleTitle, { color: tint }]}>{t.common.todayIsAQuietDay}</Text>
+                  <Text style={[styles.emptyScheduleText, { color: mutedColor }]}>
+                    {t.common.nothingScheduledFor(translateValue(today, language))}
+                  </Text>
+                </View>
+              ) : (
+                <Card style={[styles.scheduleCard, pressed && styles.schedulePressed]}>
+                  {todaysSlots.map((slot, index) => (
+                    <TimetableRow key={slot.id} slot={slot} isLast={index === todaysSlots.length - 1} />
+                  ))}
+                </Card>
+              )
+            }
+          </Pressable>
+        </Link>
       )}
 
       {!isTeacher && (
@@ -304,84 +316,70 @@ export default function HomeScreen() {
   );
 }
 
-function isPresentAttendance(entry: AttendanceEntry) {
-  const status = entry.status.trim().toLowerCase();
-  return status === 'present' || status === 'ирсэн' || status === 'presented';
-}
+type ProfileCardPalette = {
+  base: string;
+  image: ImageSourcePropType;
+  overlay: [string, string, string] | null;
+  border: string;
+  shadow: string;
+  avatar: [string, string];
+  ring: [string, string, string];
+  ringGap: string;
+  label: string;
+  name: string;
+};
 
-function AttendanceSummary({
-  attendedCount,
-  totalCount,
-  percentage,
-  tint,
-  mutedColor,
-  language,
-  isParent
+// Light: the photo as-is; navy text directly on its pale left side.
+const PROFILE_CARD_LIGHT: ProfileCardPalette = {
+  base: '#9fd8dc',
+  image: require('@/assets/images/profile-card-bg.jpg'),
+  overlay: null,
+  border: 'rgba(37,99,235,0.12)',
+  shadow: '#2563eb',
+  avatar: ['#3b82f6', '#1d4ed8'],
+  ring: ['#38bdf8', '#818cf8', '#f472b6'],
+  ringGap: '#e6f7f8',
+  label: '#475569',
+  name: '#0f172a'
+};
+
+// Dark: night-desk photo, lightly darkened on the left; white text.
+const PROFILE_CARD_DARK: ProfileCardPalette = {
+  base: '#0b1a3f',
+  image: require('@/assets/images/profile-card-bg-dark.jpg'),
+  // Light touch: the photo is already dark, this just steadies the text side.
+  overlay: ['rgba(5,10,30,0.55)', 'rgba(5,10,30,0.15)', 'rgba(5,10,30,0)'],
+  border: 'rgba(96,165,250,0.22)',
+  shadow: '#000',
+  avatar: ['#3b82f6', '#1d4ed8'],
+  ring: ['#60a5fa', '#a78bfa', '#f472b6'],
+  ringGap: '#0b1a3f',
+  label: 'rgba(255,255,255,0.75)',
+  name: '#ffffff'
+};
+
+function SectionHeader({
+  icon,
+  label,
+  href
 }: {
-  attendedCount: number;
-  totalCount: number;
-  percentage: number;
-  tint: string;
-  mutedColor: string;
-  language: 'en' | 'mn';
-  isParent: boolean;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  href?: '/timetable';
 }) {
-  const cardColor = useThemeColor({}, 'card');
-  const borderColor = useThemeColor({}, 'border');
-  const shadowColor = useThemeColor({}, 'shadow');
-
-  return (
-    <Link href="/attendance" asChild>
-      <Pressable style={styles.attendanceSummary}>
-        {({ pressed }) => (
-          <View
-            style={[
-              styles.attendanceSummaryInner,
-              { backgroundColor: cardColor, borderColor, shadowColor },
-              pressed && { opacity: 0.72 }
-            ]}
-          >
-            <View style={styles.attendanceHeader}>
-              <View style={styles.attendanceTitleGroup}>
-                <View style={[styles.attendanceIcon, { backgroundColor: `${tint}22` }]}>
-                  <Ionicons name="stats-chart" size={18} color={tint} />
-                </View>
-                <Text style={styles.attendanceTitle}>
-                  {isParent
-                    ? language === 'mn' ? 'Хүүхдийн ирц' : "Child's attendance"
-                    : language === 'mn' ? 'Миний ирц' : 'My attendance'}
-                </Text>
-              </View>
-              <View style={styles.attendanceDetails}>
-                <Text style={[styles.attendanceDetailsText, { color: tint }]}>
-                  {language === 'mn' ? 'Дэлгэрэнгүй' : 'Details'}
-                </Text>
-                <Ionicons name="chevron-forward" size={17} color={tint} />
-              </View>
-            </View>
-            <View style={styles.attendanceMetricRow}>
-              <Text style={[styles.attendancePercent, { color: tint }]}>{percentage}%</Text>
-              <Text style={[styles.attendanceCount, { color: mutedColor }]}>
-                {attendedCount} / {totalCount} {language === 'mn' ? 'удаа' : 'sessions'}
-              </Text>
-            </View>
-            <View style={[styles.progressTrack, { backgroundColor: `${tint}18` }]}>
-              <View style={[styles.progressFill, { width: `${percentage}%`, backgroundColor: tint }]} />
-            </View>
-          </View>
-        )}
-      </Pressable>
-    </Link>
-  );
-}
-
-function SectionHeader({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
   return (
     <View style={styles.sectionHeader}>
       <Ionicons name={icon} size={14} color={tint} />
       <Text style={[styles.sectionTitle, { color: mutedColor }]}>{label}</Text>
+      {href ? (
+        <Link href={href} asChild>
+          <Pressable style={styles.sectionArrow} hitSlop={10}>
+            <Ionicons name="chevron-forward" size={20} color={tint} />
+          </Pressable>
+        </Link>
+      ) : null}
     </View>
   );
 }
@@ -460,73 +458,92 @@ const styles = StyleSheet.create({
   greetingPanel: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
     borderWidth: 1,
     borderRadius: 24,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+    padding: 14,
+    // Both profile-card-bg images are pre-cropped to this ratio, so they show whole.
+    aspectRatio: 2.3,
     overflow: 'hidden'
   },
-  greetingGlow: {
-    position: 'absolute',
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    right: -50,
-    top: -60
+  greetingBgLayer: {
+    backgroundColor: 'transparent'
   },
-  greetingGlowSoft: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    left: -40,
-    bottom: -50
+  greetingBg: {
+    width: '100%',
+    height: '100%'
+  },
+  greetingContent: {
+    // Leave the right side of the photo visible.
+    maxWidth: '72%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'transparent'
   },
   avatarRing: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 1.5,
-    padding: 3,
+    width: 62,
+    height: 62,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
-    shadowColor: '#1e3a8a',
+    shadowColor: '#7c3aed',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 3
+    elevation: 4
+  },
+  avatarRingGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 31
+  },
+  avatarGap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center'
   },
   avatarText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '700'
+    fontSize: 20,
+    fontWeight: '800'
+  },
+  avatarStatus: {
+    position: 'absolute',
+    right: 0,
+    bottom: 1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2.5,
+    backgroundColor: '#22c55e'
   },
   greetingText: {
-    flex: 1,
+    flexShrink: 1,
     backgroundColor: 'transparent'
   },
   greetingLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-    color: 'rgba(255,255,255,0.65)'
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3
   },
   greetingName: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 21,
+    fontWeight: '800',
     letterSpacing: -0.4,
-    lineHeight: 27,
-    marginTop: 2,
-    color: '#fff'
+    lineHeight: 26,
+    marginTop: 1
   },
   roleBadge: {
     alignSelf: 'flex-start',
@@ -534,21 +551,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    marginTop: 8
+    marginTop: 6
   },
   roleBadgeText: {
+    color: '#fff',
     fontSize: 11,
-    fontWeight: '700'
-  },
-  profileIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center'
+    fontWeight: '800',
+    letterSpacing: 0.2
   },
   statRow: {
     flexDirection: 'row',
@@ -620,77 +631,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'rgba(255,255,255,0.9)'
   },
-  attendanceSummary: {
-    marginTop: 12,
-    borderRadius: 17
-  },
-  attendanceSummaryInner: {
-    borderRadius: 17,
-    padding: 12,
-    gap: 7,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 2
-  },
-  attendanceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'transparent'
-  },
-  attendanceTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'transparent'
-  },
-  attendanceIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  attendanceTitle: {
-    fontSize: 15,
-    fontWeight: '800'
-  },
-  attendanceDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: 'transparent'
-  },
-  attendanceDetailsText: {
-    fontSize: 13,
-    fontWeight: '700'
-  },
-  attendanceMetricRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 12,
-    backgroundColor: 'transparent'
-  },
-  attendancePercent: {
-    fontSize: 29,
-    lineHeight: 33,
-    fontWeight: '900'
-  },
-  attendanceCount: {
-    fontSize: 14,
-    fontWeight: '600'
-  },
-  progressTrack: {
-    height: 7,
-    borderRadius: 4,
-    overflow: 'hidden'
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 5
-  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -709,6 +649,16 @@ const styles = StyleSheet.create({
     gap: 5,
     marginBottom: 9,
     borderRadius: 15
+  },
+  scheduleLink: {
+    borderRadius: 18
+  },
+  schedulePressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.99 }]
+  },
+  sectionArrow: {
+    marginLeft: 'auto'
   },
   scheduleCard: {
     paddingVertical: 2,

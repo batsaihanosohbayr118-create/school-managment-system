@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultRole, isRole, resolveRole, visibleTabsByRole } from "@shared/roles";
+import { defaultRole, isRole, resolveRole, roleLabel, visibleTabsByRole } from "@shared/roles";
 
 describe("isRole", () => {
   it("accepts the four known roles", () => {
@@ -45,5 +45,17 @@ describe("visibleTabsByRole", () => {
   it("gives the teacher attendance and grades, which they can write to", () => {
     expect(visibleTabsByRole.teacher).toContain("attendance");
     expect(visibleTabsByRole.teacher).toContain("grades");
+  });
+});
+
+describe("roleLabel", () => {
+  it("translates lowercase session roles", () => {
+    expect(roleLabel("teacher", "mn")).toBe("Багш");
+    expect(roleLabel("parent", "mn")).toBe("Эцэг эх");
+    expect(roleLabel("teacher", "en")).toBe("Teacher");
+  });
+
+  it("returns unknown values unchanged", () => {
+    expect(roleLabel("superadmin", "mn")).toBe("superadmin");
   });
 });
