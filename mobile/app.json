@@ -4,7 +4,7 @@
     "slug": "mobile",
     "version": "1.0.1",
     "runtimeVersion": {
-      "policy": "fingerprint"
+      "policy": "appVersion"
     },
     "updates": {
       "url": "https://u.expo.dev/a5258f88-974c-4acf-8ae3-e1869f6af911",
