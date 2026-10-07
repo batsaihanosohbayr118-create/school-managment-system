@@ -1,8 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as WebBrowser from 'expo-web-browser';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
   Pressable,
@@ -14,9 +16,8 @@ import {
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
-import { ExternalLink } from '@/components/ExternalLink';
 import { Text, View, useThemeColor } from '@/components/Themed';
-import { api, resolveApiUrl } from '@/lib/api';
+import { api, attachmentUrl, resolveApiUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { ApiError } from '@shared/api-error';
@@ -365,6 +366,7 @@ function LessonRow({
 }) {
   const url = lesson.fileUrl;
   const icon = lesson.fileUrl ? 'document-attach-outline' : 'reader-outline';
+  const openAttachment = useOpenAttachment();
 
   const row = (
     <View style={[styles.lessonRow, !isLast && { borderBottomColor: borderColor, borderBottomWidth: StyleSheet.hairlineWidth }]}>
@@ -379,11 +381,24 @@ function LessonRow({
 
   if (!url) return row;
 
-  return (
-    <ExternalLink href={resolveApiUrl(url)} asChild>
-      <Pressable>{row}</Pressable>
-    </ExternalLink>
-  );
+  return <Pressable onPress={() => openAttachment(url)}>{row}</Pressable>;
+}
+
+/**
+ * Opens a lesson attachment in the in-app browser. The file route needs auth
+ * a browser cannot send — handing it the bare URL answered 401 — so a
+ * short-lived signed link is fetched first (see attachmentUrl).
+ */
+function useOpenAttachment() {
+  const { t } = useLanguage();
+
+  return async (fileUrl: string) => {
+    try {
+      await WebBrowser.openBrowserAsync(await attachmentUrl(fileUrl));
+    } catch (error) {
+      Alert.alert(error instanceof ApiError ? error.message : t.subjectContent.openFailed);
+    }
+  };
 }
 
 /** One lesson per card, matching AssignmentCard/TopicCard's look on the standalone "Хичээл" category page — the shared-box-with-dividers treatment (LessonRow, still used nested inside a topic) reads as cramped as the only thing on a page. */
@@ -391,6 +406,7 @@ function LessonListItem({ lesson, accentColor, accentMuted }: { lesson: SubjectL
   const mutedColor = useThemeColor({}, 'muted');
   const url = lesson.fileUrl;
   const icon = lesson.fileUrl ? 'document-attach-outline' : 'reader-outline';
+  const openAttachment = useOpenAttachment();
 
   const card = (
     <Card style={[styles.card, styles.lessonCard]}>
@@ -408,9 +424,9 @@ function LessonListItem({ lesson, accentColor, accentMuted }: { lesson: SubjectL
   if (!url) return card;
 
   return (
-    <ExternalLink href={resolveApiUrl(url)} asChild>
-      <Pressable style={({ pressed }) => pressed && styles.pressed}>{card}</Pressable>
-    </ExternalLink>
+    <Pressable style={({ pressed }) => pressed && styles.pressed} onPress={() => openAttachment(url)}>
+      {card}
+    </Pressable>
   );
 }
 

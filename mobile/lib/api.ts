@@ -74,6 +74,19 @@ async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/**
+ * A URL a browser can open for a lesson attachment. Our own file route needs
+ * auth the browser cannot send, so it is swapped for a few-minute signed link;
+ * anything else (an external URL) is opened as is.
+ */
+export async function attachmentUrl(fileUrl: string): Promise<string> {
+  const match = fileUrl.match(/^\/api\/subjects\/files\/([^/?#]+)/);
+  if (!match) return resolveApiUrl(fileUrl);
+
+  const { path } = await request<{ path: string }>(`/api/subjects/files/${match[1]}/link`);
+  return resolveApiUrl(path);
+}
+
 export type PlacementQuestionInput = { level: string; question: string; options: string[]; answer: string };
 
 export const api = {

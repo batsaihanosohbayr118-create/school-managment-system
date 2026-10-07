@@ -1,9 +1,10 @@
 import { useCallback } from 'react';
-import { Link, Stack, useFocusEffect } from 'expo-router';
+import { Link, Stack, useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, RefreshControl, SectionList, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
+import { GradientHeaderButton, gradientHeaderItem } from '@/components/GradientHeaderButton';
 import { EmptyState } from '@/components/EmptyState';
 import { LevelPill } from '@/components/PlacementLevel';
 import { SkeletonList } from '@/components/Skeleton';
@@ -18,7 +19,8 @@ export default function PlacementQuestionsScreen() {
   const { data, error, loading, refetch } = useApiData('placement', api.placement);
   const { t } = useLanguage();
   const tint = useThemeColor({}, 'tint');
-  const tintMuted = useThemeColor({}, 'tintMuted');
+  const background = useThemeColor({}, 'background');
+  const router = useRouter();
   const mutedColor = useThemeColor({}, 'muted');
   const successColor = useThemeColor({}, 'success');
   const dangerColor = useThemeColor({}, 'danger');
@@ -30,20 +32,23 @@ export default function PlacementQuestionsScreen() {
     }, [])
   );
 
+  const backButton = <GradientHeaderButton icon="chevron-back" onPress={() => router.back()} accessibilityLabel={t.placement.back} />;
+  const addButton = (
+    <GradientHeaderButton icon="add" onPress={() => router.push('/placement-question-edit')} accessibilityLabel={t.placement.addQuestion} />
+  );
+
+  // Same header as the placement screen: blends into the page, gradient buttons.
   const header = (
     <Stack.Screen
       options={{
         title: t.placement.questions,
-        headerRight: () => (
-          <Link href="/placement-question-edit" asChild>
-            <Pressable
-              style={StyleSheet.flatten([styles.addButton, { backgroundColor: tintMuted }])}
-              accessibilityLabel={t.placement.addQuestion}
-            >
-              <Ionicons name="add" size={20} color={tint} />
-            </Pressable>
-          </Link>
-        )
+        headerShadowVisible: false,
+        headerStyle: { backgroundColor: background },
+        headerBackVisible: false,
+        headerLeft: () => backButton,
+        unstable_headerLeftItems: gradientHeaderItem(backButton),
+        headerRight: () => addButton,
+        unstable_headerRightItems: gradientHeaderItem(addButton)
       }}
     />
   );
@@ -126,13 +131,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 48
-  },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center'
   },
   sectionHeader: {
     flexDirection: 'row',

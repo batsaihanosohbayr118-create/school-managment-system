@@ -32,7 +32,8 @@ export default function HomeScreen() {
   const mutedColor = useThemeColor({}, 'muted');
   const dangerColor = useThemeColor({}, 'danger');
   const tint = useThemeColor({}, 'tint');
-  const placementColor = useThemeColor({}, 'purple');
+  // Dark mode's 'purple' (#a78bfa) is too pale behind white text; a deeper violet there.
+  const placementColor = useThemeColor({ dark: '#7c3aed' }, 'purple');
   const scheme = useColorScheme();
   const isLight = scheme === 'light';
   const card = isLight ? PROFILE_CARD_LIGHT : PROFILE_CARD_DARK;
@@ -263,7 +264,6 @@ export default function HomeScreen() {
                   >
                     <Ionicons name="sunny-outline" size={25} color={tint} />
                   </Animated.View>
-                  <Text style={[styles.emptyScheduleTitle, { color: tint }]}>{t.common.todayIsAQuietDay}</Text>
                   <Text style={[styles.emptyScheduleText, { color: mutedColor }]}>
                     {t.common.nothingScheduledFor(translateValue(today, language))}
                   </Text>
@@ -751,12 +751,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10
-  },
-  emptyScheduleTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 5
   },
   emptyScheduleText: {
     fontSize: 13,

@@ -73,3 +73,33 @@ export function verifyToken(token: string): TokenPayload | null {
     return null;
   }
 }
+
+/**
+ * Short-lived signed URLs for lesson attachments.
+ *
+ * A phone opens an attachment in the system browser, which cannot send the
+ * Authorization header the file route requires — the request arrived bare and
+ * got a 401. Instead the app, still authenticated, asks for a link signed for
+ * one file and a few minutes; the session token itself never goes in a URL.
+ * The "file:" prefix keeps these signatures from ever validating as a session
+ * token body, or the reverse.
+ */
+export const FILE_LINK_TTL_SECONDS = 5 * 60;
+
+function fileSignature(fileId: string, exp: number) {
+  return sign(`file:${fileId}.${exp}`);
+}
+
+export function issueFileSignature(fileId: string, now = Date.now()) {
+  const exp = Math.floor(now / 1000) + FILE_LINK_TTL_SECONDS;
+  return { exp, sig: fileSignature(fileId, exp) };
+}
+
+export function verifyFileSignature(fileId: string, exp: string | null, sig: string | null, now = Date.now()) {
+  const expiresAt = Number(exp);
+  if (!sig || !Number.isInteger(expiresAt) || expiresAt * 1000 <= now) return false;
+
+  const provided = Buffer.from(sig);
+  const expected = Buffer.from(fileSignature(fileId, expiresAt));
+  return provided.length === expected.length && timingSafeEqual(provided, expected);
+}

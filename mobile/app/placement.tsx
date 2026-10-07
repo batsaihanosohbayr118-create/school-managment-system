@@ -1,14 +1,18 @@
 import { useCallback, useState } from 'react';
-import { Link, Stack, useFocusEffect } from 'expo-router';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { Card } from '@/components/Card';
-import { EmptyState } from '@/components/EmptyState';
+import { GradientHeaderButton, gradientHeaderItem } from '@/components/GradientHeaderButton';
 import { OfflineBanner } from '@/components/OfflineBanner';
-import { LevelPill, LevelResultCard } from '@/components/PlacementLevel';
+import { PlacementNotice } from '@/components/PlacementNotice';
+import { LevelResultCard } from '@/components/PlacementLevel';
+import { PlacementTeacherView } from '@/components/PlacementTeacher';
 import { SkeletonList } from '@/components/Skeleton';
 import { Text, View, useThemeColor } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
@@ -26,8 +30,11 @@ import { ANSWER_LETTERS } from '@shared/placement';
 export default function PlacementScreen() {
   const { data, error, loading, refetch, isOffline } = useApiData('placement', api.placement);
   const { session } = useAuth();
+  const router = useRouter();
   const { t } = useLanguage();
   const dangerColor = useThemeColor({}, 'danger');
+  const scheme = useColorScheme();
+  const backdrop = BACKDROP[scheme === 'dark' ? 'dark' : 'light'];
 
   // Picks up questions the teacher just edited on another screen.
   useFocusEffect(
@@ -37,39 +44,53 @@ export default function PlacementScreen() {
     }, [])
   );
 
-  const header = <Stack.Screen options={{ title: t.placement.title }} />;
+  const backButton = <GradientHeaderButton icon="chevron-back" onPress={() => router.back()} accessibilityLabel={t.placement.back} />;
 
+  // The header takes the gradient's top color, so bar and page read as one.
+  const header = (
+    <Stack.Screen
+      options={{
+        title: t.placement.title,
+        headerShadowVisible: false,
+        headerStyle: { backgroundColor: backdrop[0] },
+        headerBackVisible: false,
+        headerLeft: () => backButton,
+        unstable_headerLeftItems: gradientHeaderItem(backButton),
+        headerTitle: ''
+      }}
+    />
+  );
+
+  let body: React.ReactNode;
   if (loading) {
-    return (
-      <>
-        {header}
-        <SkeletonList />
-      </>
-    );
-  }
-
-  if (!data) {
-    return (
-      <View style={styles.center}>
-        {header}
+    body = <SkeletonList />;
+  } else if (!data) {
+    body = (
+      <View style={[styles.center, styles.transparent]}>
         <Text style={{ color: dangerColor }}>{error?.message ?? t.common.loading}</Text>
       </View>
     );
+  } else if (session?.role === 'teacher') {
+    body = <PlacementTeacherView data={data} refetch={refetch} loading={loading} isOffline={isOffline} />;
+  } else if (session?.role === 'parent') {
+    body = <ParentView data={data} isOffline={isOffline} />;
+  } else {
+    body = <StudentView data={data} refetch={refetch} isOffline={isOffline} />;
   }
 
   return (
-    <>
+    <LinearGradient colors={backdrop} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.backdrop}>
       {header}
-      {session?.role === 'teacher' ? (
-        <TeacherView data={data} refetch={refetch} loading={loading} isOffline={isOffline} />
-      ) : session?.role === 'parent' ? (
-        <ParentView data={data} isOffline={isOffline} />
-      ) : (
-        <StudentView data={data} refetch={refetch} isOffline={isOffline} />
-      )}
-    </>
+      {body}
+    </LinearGradient>
   );
 }
+
+/** The page's soft blue → violet wash; the first color is also the header's. */
+const BACKDROP: Record<'light' | 'dark', [string, string]> = {
+  light: ['#e3ecff', '#f1e8ff'],
+  dark: ['#141a42', '#2a1c5c']
+};
 
 function StudentView({ data, refetch, isOffline }: { data: PlacementResponse; refetch: () => void; isOffline: boolean }) {
   const { t } = useLanguage();
@@ -81,7 +102,7 @@ function StudentView({ data, refetch, isOffline }: { data: PlacementResponse; re
   const result = finished ?? data.results[0] ?? null;
 
   if (!data.enrolled) {
-    return <EmptyState icon="school-outline" label={t.placement.notEnrolled} />;
+    return <PlacementNotice icon="school" title={t.placement.notEnrolledTitle} body={t.placement.notEnrolled} />;
   }
 
   if (result) {
@@ -94,7 +115,7 @@ function StudentView({ data, refetch, isOffline }: { data: PlacementResponse; re
   }
 
   if (data.questions.length === 0) {
-    return <EmptyState icon="help-circle-outline" label={t.placement.noQuestions} />;
+    return <PlacementNotice icon="help" title={t.placement.noQuestionsTitle} body={t.placement.noQuestions} />;
   }
 
   if (started) {
@@ -235,12 +256,12 @@ function ParentView({ data, isOffline }: { data: PlacementResponse; isOffline: b
   const { t } = useLanguage();
 
   if (!data.enrolled) {
-    return <EmptyState icon="school-outline" label={t.placement.notEnrolled} />;
+    return <PlacementNotice icon="school" title={t.placement.notEnrolledTitle} body={t.placement.notEnrolled} />;
   }
 
   const result = data.results[0];
   if (!result) {
-    return <EmptyState icon="hourglass-outline" label={t.placement.notTakenParent} />;
+    return <PlacementNotice icon="hourglass" title={t.placement.notTakenTitle} body={t.placement.notTakenParent} colors={['#f59e0b', '#ea580c']} />;
   }
 
   return (
@@ -251,89 +272,13 @@ function ParentView({ data, isOffline }: { data: PlacementResponse; isOffline: b
   );
 }
 
-function TeacherView({
-  data,
-  refetch,
-  loading,
-  isOffline
-}: {
-  data: PlacementResponse;
-  refetch: () => void;
-  loading: boolean;
-  isOffline: boolean;
-}) {
-  const { t } = useLanguage();
-  const tint = useThemeColor({}, 'tint');
-  const mutedColor = useThemeColor({}, 'muted');
-  const dangerColor = useThemeColor({}, 'danger');
-
-  if (!data.enrolled) {
-    return <EmptyState icon="lock-closed-outline" label={t.placement.notEnglishTeacher} />;
-  }
-
-  function confirmReset(result: PlacementResult) {
-    Alert.alert(t.placement.resetTitle, `${result.student} — ${t.placement.resetBody}`, [
-      { text: t.placement.cancel, style: 'cancel' },
-      {
-        text: t.placement.reset,
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.resetPlacementResult(result.id);
-            refetch();
-          } catch {
-            Alert.alert(t.common.deleteFailed);
-          }
-        }
-      }
-    ]);
-  }
-
-  return (
-    <FlatList
-      contentContainerStyle={styles.content}
-      data={data.results}
-      keyExtractor={(result) => result.id}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
-      ListHeaderComponent={
-        <>
-          {isOffline ? <OfflineBanner /> : null}
-          <Link href="/placement-questions" asChild>
-            {/* One flattened style object: Link's web asChild forwards it as-is. */}
-            <Pressable style={StyleSheet.flatten([styles.questionsLink, { backgroundColor: tint }])}>
-              <View style={styles.questionsLinkInner}>
-                <Ionicons name="create-outline" size={18} color="#fff" />
-                <Text style={styles.primaryButtonText}>
-                  {t.placement.editQuestions} ({data.questions.length})
-                </Text>
-              </View>
-            </Pressable>
-          </Link>
-          <Text style={styles.sectionTitle}>{t.placement.results}</Text>
-        </>
-      }
-      ListEmptyComponent={<EmptyState icon="people-outline" label={t.placement.noResults} />}
-      renderItem={({ item }) => (
-        <Card style={styles.resultRow}>
-          <LevelPill level={item.level} />
-          <View style={styles.resultCopy}>
-            <Text style={styles.resultName} numberOfLines={1}>
-              {item.student}
-            </Text>
-            <Text style={[styles.resultMeta, { color: mutedColor }]}>
-              {item.correct ?? '—'} / {item.total ?? '—'} · {item.date}
-            </Text>
-          </View>
-          <Pressable onPress={() => confirmReset(item)} hitSlop={10} accessibilityLabel={t.placement.reset}>
-            <Ionicons name="refresh-circle-outline" size={26} color={dangerColor} />
-          </Pressable>
-        </Card>
-      )}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1
+  },
+  transparent: {
+    backgroundColor: 'transparent'
+  },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -464,40 +409,5 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.4
-  },
-  questionsLink: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 20
-  },
-  questionsLinkInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'transparent'
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    marginBottom: 10
-  },
-  resultRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12
-  },
-  resultCopy: {
-    flex: 1,
-    gap: 2,
-    backgroundColor: 'transparent'
-  },
-  resultName: {
-    fontSize: 16,
-    fontWeight: '700'
-  },
-  resultMeta: {
-    fontSize: 13
   }
 });

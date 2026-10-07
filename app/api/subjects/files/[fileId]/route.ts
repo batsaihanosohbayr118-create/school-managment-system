@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readSubjectFile } from "@/lib/subject-storage";
 import { resolveRequestSession } from "@/lib/school-session-server";
+import { verifyFileSignature } from "@/lib/auth-token";
 
 export const runtime = "nodejs";
 
@@ -15,12 +16,15 @@ type RouteContext = {
  * session check — attachments are no longer readable by anyone with the link.
  */
 export async function GET(request: Request, context: RouteContext) {
-  const session = await resolveRequestSession(request);
-  if (!session) {
+  const { fileId } = await context.params;
+
+  // Either a session (web, which fetches with headers) or a short-lived link
+  // signed for this one file (mobile, which hands the URL to a browser).
+  const { searchParams } = new URL(request.url);
+  const signed = verifyFileSignature(fileId, searchParams.get("exp"), searchParams.get("sig"));
+  if (!signed && !(await resolveRequestSession(request))) {
     return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
   }
-
-  const { fileId } = await context.params;
 
   try {
     const file = await readSubjectFile(fileId);
