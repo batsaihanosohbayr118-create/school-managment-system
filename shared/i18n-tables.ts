@@ -493,7 +493,16 @@ export const translations = {
       noVideosYet: "No video lessons yet.",
       noAssignmentsYet: "No assignments yet.",
       loadFailed: "Could not load this subject's content.",
-      openFailed: "Could not open the file. Please try again."
+      openFailed: "Could not open the file. Please try again.",
+      deleteTitle: "Delete this?",
+      deleteBody: "Students will no longer see it. This cannot be undone.",
+      deleteTopicBody: (lessons: number) =>
+        lessons > 0
+          ? `The ${lessons} lesson(s) in this topic will be deleted too. This cannot be undone.`
+          : "This cannot be undone.",
+      deleteAction: "Delete",
+      cancel: "Cancel",
+      deleteFailed: "Could not delete. Please try again."
     },
     adminWebOnly: {
       title: "Admin tools live on the web",
@@ -940,7 +949,14 @@ export const translations = {
       noVideosYet: "Одоогоор видео хичээл алга байна.",
       noAssignmentsYet: "Одоогоор даалгавар алга байна.",
       loadFailed: "Ачааллаж чадсангүй.",
-      openFailed: "Файлыг нээж чадсангүй. Дахин оролдоно уу."
+      openFailed: "Файлыг нээж чадсангүй. Дахин оролдоно уу.",
+      deleteTitle: "Устгах уу?",
+      deleteBody: "Сурагчид үүнийг цаашид харахгүй. Буцаах боломжгүй.",
+      deleteTopicBody: (lessons: number) =>
+        lessons > 0 ? `Энэ сэдвийн ${lessons} хичээл мөн устгагдана. Буцаах боломжгүй.` : "Буцаах боломжгүй.",
+      deleteAction: "Устгах",
+      cancel: "Болих",
+      deleteFailed: "Устгаж чадсангүй. Дахин оролдоно уу."
     },
     adminWebOnly: {
       title: "Админы хэрэгслүүд вэб дээр байршдаг",

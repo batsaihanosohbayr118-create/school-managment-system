@@ -3,7 +3,10 @@ import path from "path";
 import type { SubjectContent, SubjectLesson, SubjectTopic } from "@/lib/types";
 import { resolveRequestSession } from "@/lib/school-session-server";
 import { preflight, withCors } from "@/lib/cors";
+import { requireSubjectContentAccess } from "@/lib/school-db";
+import { removedFileIds } from "@/lib/subject-files";
 import {
+  deleteSubjectFiles,
   readSubjectContent,
   storeSubjectFile,
   writeSubjectContent
@@ -147,14 +150,20 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return withCors(NextResponse.json({ message: "Unauthorized." }, { status: 401 }), req, METHODS);
     }
 
-    // Reading a subject's lesson content is open to any signed-in role (a
-    // student or parent needs to see it); adding to it is teacher/admin work,
-    // same split as every other resource's requireManageAccess.
-    if (session.role !== "admin" && session.role !== "teacher") {
-      return withCors(NextResponse.json({ message: "You do not have permission to do this." }, { status: 403 }), req, METHODS);
-    }
-
     const subjectId = await safeSubjectId(context);
+
+    // Reading a subject's lesson content is open to any signed-in role (a
+    // student or parent needs to see it); changing it is for an admin or that
+    // subject's own teacher. The check lives in the data layer.
+    try {
+      await requireSubjectContentAccess({ session }, subjectId);
+    } catch (error) {
+      return withCors(
+        NextResponse.json({ message: error instanceof Error ? error.message : "Forbidden." }, { status: 403 }),
+        req,
+        METHODS
+      );
+    }
     const contentType = req.headers.get("content-type") ?? "";
 
     if (contentType.includes("multipart/form-data")) {
@@ -162,7 +171,16 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     const content: SubjectContent = await req.json();
+    const previous = await readSubjectContent(subjectId);
     await writeSubjectContent(subjectId, { ...content, subjectId });
+
+    // A deleted file lesson takes its stored attachment with it, instead of
+    // leaving the bytes orphaned in subject_files.
+    try {
+      await deleteSubjectFiles(subjectId, removedFileIds(previous, content));
+    } catch (error) {
+      console.warn("Could not delete removed subject files.", error);
+    }
     return withCors(NextResponse.json({ success: true }), req, METHODS);
   } catch (error) {
     return withCors(

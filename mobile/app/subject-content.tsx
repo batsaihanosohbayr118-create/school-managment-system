@@ -85,6 +85,51 @@ export default function SubjectContentScreen() {
     }, [load])
   );
 
+  /**
+   * Content is saved as one document, so deleting = save it without the item.
+   * The latest copy is fetched first: editing the possibly-stale one on screen
+   * would also undo anything added from another device in the meantime.
+   */
+  async function removeFromContent(change: (current: SubjectContent) => SubjectContent) {
+    try {
+      const latest = (await api.subjectContent(subjectId)) ?? emptyContent(subjectId);
+      const next = change(latest);
+      await api.saveSubjectContent(subjectId, next);
+      setContent(next);
+    } catch (err) {
+      Alert.alert(err instanceof ApiError ? err.message : t.subjectContent.deleteFailed);
+    }
+  }
+
+  const deleteItem: DeleteItem | undefined = isTeacher
+    ? (item) => {
+        const lessonsInTopic = item.kind === 'topic' ? content.lessons.filter((lesson) => lesson.topicId === item.id).length : 0;
+        const body = item.kind === 'topic' ? t.subjectContent.deleteTopicBody(lessonsInTopic) : t.subjectContent.deleteBody;
+
+        Alert.alert(`${t.subjectContent.deleteTitle}`, `"${item.title}" — ${body}`, [
+          { text: t.subjectContent.cancel, style: 'cancel' },
+          {
+            text: t.subjectContent.deleteAction,
+            style: 'destructive',
+            onPress: () =>
+              removeFromContent((current) => {
+                if (item.kind === 'topic') {
+                  return {
+                    ...current,
+                    topics: current.topics.filter((topic) => topic.id !== item.id),
+                    lessons: current.lessons.filter((lesson) => lesson.topicId !== item.id)
+                  };
+                }
+                if (item.kind === 'lesson') {
+                  return { ...current, lessons: current.lessons.filter((lesson) => lesson.id !== item.id) };
+                }
+                return { ...current, assignments: current.assignments.filter((assignment) => assignment.id !== item.id) };
+              })
+          }
+        ]);
+      }
+    : undefined;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: name || t.nav.subjects.label }} />
@@ -96,7 +141,7 @@ export default function SubjectContentScreen() {
       ) : (
         <>
           {category ? (
-            <CategoryContent category={category} content={content} />
+            <CategoryContent category={category} content={content} onDelete={deleteItem} />
           ) : (
             <>
               <SectionHeader icon="grid-outline" label={t.subjectContent.addContent} />
@@ -181,10 +226,13 @@ function CategoryCard({
 
 function CategoryContent({
   category,
-  content
+  content,
+  onDelete
 }: {
   category: ContentCategory;
   content: SubjectContent;
+  /** Present only for a teacher. */
+  onDelete?: DeleteItem;
 }) {
   const { t } = useLanguage();
   const accent = CATEGORY_ACCENT[category];
@@ -215,25 +263,41 @@ function CategoryContent({
         content.topics.length === 0 ? (
           <CategoryEmptyState category={category} label={emptyLabel} accentColor={accentColor} accentMuted={accentMuted} />
         ) : content.topics.map((topic) => (
-          <TopicCard key={topic.id} topic={topic} lessons={[]} />
+          <TopicCard key={topic.id} topic={topic} lessons={[]} onDelete={onDelete ? () => onDelete({ kind: 'topic', id: topic.id, title: topic.title }) : undefined} />
         ))
       ) : category === 'assignment' ? (
         content.assignments.length === 0 ? (
           <CategoryEmptyState category={category} label={emptyLabel} accentColor={accentColor} accentMuted={accentMuted} />
         ) : content.assignments.map((assignment) => (
-          <AssignmentCard key={assignment.id} assignment={assignment} />
+          <AssignmentCard
+            key={assignment.id}
+            assignment={assignment}
+            onDelete={onDelete ? () => onDelete({ kind: 'assignment', id: assignment.id, title: assignment.title }) : undefined}
+          />
         ))
       ) : lessonItems.length === 0 ? (
         <CategoryEmptyState category={category} label={emptyLabel} accentColor={accentColor} accentMuted={accentMuted} />
       ) : category === 'video' ? (
         <Card style={styles.card}>
           <View style={styles.videoGrid}>
-            {lessonItems.map((lesson) => <VideoLessonCard key={lesson.id} lesson={lesson} />)}
+            {lessonItems.map((lesson) => (
+              <VideoLessonCard
+                key={lesson.id}
+                lesson={lesson}
+                onDelete={onDelete ? () => onDelete({ kind: 'lesson', id: lesson.id, title: lesson.title }) : undefined}
+              />
+            ))}
           </View>
         </Card>
       ) : (
         lessonItems.map((lesson) => (
-          <LessonListItem key={lesson.id} lesson={lesson} accentColor={accentColor} accentMuted={accentMuted} />
+          <LessonListItem
+            key={lesson.id}
+            lesson={lesson}
+            accentColor={accentColor}
+            accentMuted={accentMuted}
+            onDelete={onDelete ? () => onDelete({ kind: 'lesson', id: lesson.id, title: lesson.title }) : undefined}
+          />
         ))
       )}
     </>
@@ -282,7 +346,7 @@ function SectionHeader({
   );
 }
 
-function TopicCard({ topic, lessons }: { topic: SubjectTopic; lessons: SubjectLesson[] }) {
+function TopicCard({ topic, lessons, onDelete }: { topic: SubjectTopic; lessons: SubjectLesson[]; onDelete?: () => void }) {
   const { language } = useLanguage();
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
@@ -292,7 +356,10 @@ function TopicCard({ topic, lessons }: { topic: SubjectTopic; lessons: SubjectLe
 
   return (
     <Card style={styles.card}>
-      <Text style={styles.cardTitle}>{translateValue(topic.title, language)}</Text>
+      <View style={styles.cardHeaderRow}>
+        <Text style={styles.cardTitle}>{translateValue(topic.title, language)}</Text>
+        {onDelete ? <DeleteButton onPress={onDelete} /> : null}
+      </View>
       {topic.description ? <Text style={[styles.cardMeta, { color: mutedColor }]}>{translateValue(topic.description, language)}</Text> : null}
 
       {videoLessons.length > 0 ? (
@@ -311,7 +378,7 @@ function TopicCard({ topic, lessons }: { topic: SubjectTopic; lessons: SubjectLe
 }
 
 /** A thumbnail-style tile with a play button — visually distinct from a plain file/text row, since a video is watched, not opened like a document. */
-function VideoLessonCard({ lesson }: { lesson: SubjectLesson }) {
+function VideoLessonCard({ lesson, onDelete }: { lesson: SubjectLesson; onDelete?: () => void }) {
   const thumbnail = videoThumbnailUrl(lesson.videoUrl!);
 
   return (
@@ -331,6 +398,11 @@ function VideoLessonCard({ lesson }: { lesson: SubjectLesson }) {
           {lesson.duration ? (
             <View style={styles.videoDurationBadge}>
               <Text style={styles.videoDurationText}>{lesson.duration}</Text>
+            </View>
+          ) : null}
+          {onDelete ? (
+            <View style={styles.videoDeleteSlot}>
+              <DeleteButton onPress={onDelete} />
             </View>
           ) : null}
         </View>
@@ -402,7 +474,17 @@ function useOpenAttachment() {
 }
 
 /** One lesson per card, matching AssignmentCard/TopicCard's look on the standalone "Хичээл" category page — the shared-box-with-dividers treatment (LessonRow, still used nested inside a topic) reads as cramped as the only thing on a page. */
-function LessonListItem({ lesson, accentColor, accentMuted }: { lesson: SubjectLesson; accentColor: string; accentMuted: string }) {
+function LessonListItem({
+  lesson,
+  accentColor,
+  accentMuted,
+  onDelete
+}: {
+  lesson: SubjectLesson;
+  accentColor: string;
+  accentMuted: string;
+  onDelete?: () => void;
+}) {
   const mutedColor = useThemeColor({}, 'muted');
   const url = lesson.fileUrl;
   const icon = lesson.fileUrl ? 'document-attach-outline' : 'reader-outline';
@@ -418,6 +500,7 @@ function LessonListItem({ lesson, accentColor, accentMuted }: { lesson: SubjectL
         {lesson.duration ? <Text style={[styles.cardMeta, { color: mutedColor }]}>{lesson.duration}</Text> : null}
       </View>
       {url ? <Ionicons name="open-outline" size={18} color={accentColor} /> : null}
+      {onDelete ? <DeleteButton onPress={onDelete} /> : null}
     </Card>
   );
 
@@ -430,7 +513,7 @@ function LessonListItem({ lesson, accentColor, accentMuted }: { lesson: SubjectL
   );
 }
 
-function AssignmentCard({ assignment }: { assignment: SubjectAssignment }) {
+function AssignmentCard({ assignment, onDelete }: { assignment: SubjectAssignment; onDelete?: () => void }) {
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
 
@@ -438,9 +521,12 @@ function AssignmentCard({ assignment }: { assignment: SubjectAssignment }) {
     <Card style={styles.card}>
       <View style={styles.cardHeaderRow}>
         <Text style={styles.cardTitle}>{assignment.title}</Text>
-        {assignment.maxScore !== undefined ? (
-          <Text style={[styles.maxScore, { color: tint }]}>{assignment.maxScore}</Text>
-        ) : null}
+        <View style={styles.cardHeaderActions}>
+          {assignment.maxScore !== undefined ? (
+            <Text style={[styles.maxScore, { color: tint }]}>{assignment.maxScore}</Text>
+          ) : null}
+          {onDelete ? <DeleteButton onPress={onDelete} /> : null}
+        </View>
       </View>
       {assignment.description ? <Text style={[styles.cardMeta, { color: mutedColor }]}>{assignment.description}</Text> : null}
       {assignment.type || assignment.dueDate ? (
@@ -449,6 +535,32 @@ function AssignmentCard({ assignment }: { assignment: SubjectAssignment }) {
         </Text>
       ) : null}
     </Card>
+  );
+}
+
+type DeletableItem = { kind: 'topic' | 'lesson' | 'assignment'; id: string; title: string };
+type DeleteItem = (item: DeletableItem) => void;
+
+/**
+ * A small red trash button. It sits inside rows that are themselves
+ * pressable (a file lesson opens on tap), so it is its own Pressable and
+ * the row's press never fires underneath it.
+ */
+function DeleteButton({ onPress }: { onPress: () => void }) {
+  const { t } = useLanguage();
+  const dangerColor = useThemeColor({}, 'danger');
+  const dangerMuted = useThemeColor({}, 'dangerMuted');
+
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={t.subjectContent.deleteAction}
+      style={({ pressed }) => [styles.deleteButton, { backgroundColor: dangerMuted }, pressed && styles.pressed]}
+    >
+      <Ionicons name="trash-outline" size={16} color={dangerColor} />
+    </Pressable>
   );
 }
 
@@ -1028,6 +1140,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'transparent'
+  },
+  cardHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'transparent'
+  },
+  deleteButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  videoDeleteSlot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
     backgroundColor: 'transparent'
   },
   cardTitle: {

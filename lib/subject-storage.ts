@@ -150,3 +150,10 @@ export async function readSubjectFile(id: string): Promise<StoredFile | null> {
     data: row.data
   };
 }
+
+/** Deletes a subject's stored attachments by id; scoped to the subject so one subject's save can never remove another's files. */
+export async function deleteSubjectFiles(subjectId: string, ids: string[]) {
+  if (ids.length === 0) return;
+  await ensureReady();
+  await getPool().query(`DELETE FROM subject_files WHERE subject_id = $1 AND id = ANY($2::text[]);`, [subjectId, ids]);
+}

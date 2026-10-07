@@ -1799,3 +1799,31 @@ export async function submitPlacementTest(answers: Record<string, string>, conte
 
   return listResource("placementResults", context);
 }
+
+/**
+ * Who may change a subject's lesson content (topics, lessons, files,
+ * assignments): an admin, or the teacher of that subject. The content route
+ * used to check only "is a teacher", so any teacher could rewrite or delete
+ * any other subject's material.
+ *
+ * `subjectId` is the subjects table id (what web and mobile both send); a
+ * code is accepted too. Uses the same teacher → subject mapping as every
+ * other resource's row filter (allowedSubjectNames).
+ */
+export async function requireSubjectContentAccess(context: SchoolRequestContext, subjectId: string) {
+  const role = context.session.role;
+  if (role === "admin") return;
+  if (role !== "teacher") {
+    throw new Error("You do not have permission to do this.");
+  }
+
+  const token = normalizedToken(subjectId);
+  const subject = ((await subjectRows()) as DbRow[]).find(
+    (row) => normalizedToken(row.id) === token || normalizedToken(row.code) === token
+  );
+  const allowed = await allowedSubjectNames(context);
+
+  if (!subject || !allowed.has(normalizedToken(subject.name))) {
+    throw new Error("You do not have permission to manage this subject's content.");
+  }
+}
