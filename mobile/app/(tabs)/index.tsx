@@ -32,6 +32,7 @@ export default function HomeScreen() {
   const mutedColor = useThemeColor({}, 'muted');
   const dangerColor = useThemeColor({}, 'danger');
   const tint = useThemeColor({}, 'tint');
+  const placementColor = useThemeColor({}, 'purple');
   const scheme = useColorScheme();
   const isLight = scheme === 'light';
   const card = isLight ? PROFILE_CARD_LIGHT : PROFILE_CARD_DARK;
@@ -278,6 +279,24 @@ export default function HomeScreen() {
           </Pressable>
         </Link>
       )}
+
+      {/* Every role reaches the placement test from here: a student sits it,
+          a parent sees their child's level, the English teacher manages it. */}
+      <Link href="/placement" asChild>
+        <Pressable style={StyleSheet.flatten([styles.paymentsLink, styles.placementLink, { backgroundColor: placementColor }])}>
+          {({ pressed }) => (
+            <View style={[styles.paymentsLinkInner, pressed && styles.paymentsLinkPressed]}>
+              <View style={[styles.paymentsLinkCopy, styles.shrink]}>
+                <View style={[styles.paymentsLinkIcon, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
+                  <Ionicons name="language-outline" size={17} color="#fff" />
+                </View>
+                <Text style={[styles.paymentsLinkText, styles.shrink, { color: '#fff' }]}>{t.placement.homeLink}</Text>
+              </View>
+              <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
+            </View>
+          )}
+        </Pressable>
+      </Link>
 
       {!isTeacher && (
         <>
@@ -770,6 +789,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 3
+  },
+  placementLink: {
+    marginBottom: 4
+  },
+  shrink: {
+    flexShrink: 1
   },
   paymentsLinkInner: {
     flexDirection: 'row',

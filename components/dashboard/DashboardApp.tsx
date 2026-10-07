@@ -71,7 +71,8 @@ import { authService } from "@/lib/auth-client";
 import { dashboardPathForRole } from "@/lib/auth-flow";
 import { defaultStudentSubjectsValue, subjectOptions } from "@/lib/subjects";
 import type { NavModule, Role, SubjectAssignment, SubjectContent, SubjectLesson } from "@/lib/types";
-import type { SchoolResource } from "@/lib/school-db";
+/** The web dashboard's resources: one per navigation module. The data layer also has mobile-only ones. */
+type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
 
 type ResourceTableData = {
   columns: string[];

@@ -128,3 +128,37 @@ export type AttendanceResponse = { entries: AttendanceEntry[] };
 export type PaymentsResponse = { payments: PaymentEntry[] };
 export type AnnouncementsResponse = { announcements: AnnouncementEntry[] };
 export type SubjectsResponse = { subjects: SubjectEntry[] };
+
+/**
+ * One English placement test question. `answer` is present only for the
+ * English teacher — a student's response never carries it (the server blanks
+ * it in lib/school-db.ts and the projection drops the field).
+ */
+export type PlacementQuestion = {
+  id: string;
+  level: string;
+  question: string;
+  options: string[];
+  answer?: string;
+};
+
+export type PlacementResult = {
+  id: string;
+  student: string;
+  level: string;
+  correct: number | null;
+  total: number | null;
+  date: string;
+};
+
+export type PlacementResponse = {
+  subject: string;
+  /** Student/parent: enrolled in the subject. Teacher: teaches it, so may manage the test. */
+  enrolled: boolean;
+  /** Empty for a parent. */
+  questions: PlacementQuestion[];
+  results: PlacementResult[];
+};
+
+export type PlacementResultsResponse = { results: PlacementResult[] };
+export type PlacementQuestionsResponse = { questions: PlacementQuestion[] };

@@ -143,6 +143,9 @@ function RootLayoutNav() {
         <Stack.Screen name="payments" options={{ title: t.nav.payments.label }} />
         <Stack.Screen name="subject-content" />
         <Stack.Screen name="subject-add" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="placement" options={{ title: t.placement.title }} />
+        <Stack.Screen name="placement-questions" options={{ title: t.placement.questions }} />
+        <Stack.Screen name="placement-question-edit" options={{ presentation: 'modal' }} />
       </Stack>
     </NavigationThemeProvider>
   );

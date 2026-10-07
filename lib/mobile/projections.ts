@@ -1,5 +1,5 @@
 import type { ResourceTable } from "@/lib/school-db";
-import type { AnnouncementEntry, AttendanceEntry, GradeEntry, PaymentEntry, SubjectEntry, TimetableSlot } from "@shared/api-types";
+import type { AnnouncementEntry, AttendanceEntry, GradeEntry, PaymentEntry, PlacementQuestion, PlacementResult, SubjectEntry, TimetableSlot } from "@shared/api-types";
 import { columnIndex, parseMoney, parseScore, parseTimeRange } from "./table";
 
 export function toTimetableSlots(table: ResourceTable): TimetableSlot[] {
@@ -111,6 +111,47 @@ export function toAnnouncementEntries(table: ResourceTable): AnnouncementEntry[]
     title: row[title] ?? "",
     content: row[content] ?? "",
     audience: row[audience] ?? "",
+    date: row[date] ?? ""
+  }));
+}
+
+/**
+ * Questions sorted easiest level first, then by id, which is the order a
+ * student sits them in. `withAnswer` is for the English teacher only.
+ */
+export function toPlacementQuestions(table: ResourceTable, withAnswer: boolean): PlacementQuestion[] {
+  const level = columnIndex(table.columns, "Level");
+  const question = columnIndex(table.columns, "Question");
+  const options = ["Option A", "Option B", "Option C", "Option D"].map((name) => columnIndex(table.columns, name));
+  const answer = columnIndex(table.columns, "Answer");
+
+  return table.rows
+    .map((row, index) => {
+      const entry: PlacementQuestion = {
+        id: table.ids[index] ?? "",
+        level: row[level] ?? "",
+        question: row[question] ?? "",
+        options: options.map((optionIndex) => row[optionIndex] ?? "")
+      };
+      if (withAnswer) entry.answer = row[answer] ?? "";
+      return entry;
+    })
+    .sort((first, second) => first.level.localeCompare(second.level) || first.id.localeCompare(second.id));
+}
+
+export function toPlacementResults(table: ResourceTable): PlacementResult[] {
+  const student = columnIndex(table.columns, "Student");
+  const level = columnIndex(table.columns, "Level");
+  const correct = columnIndex(table.columns, "Correct");
+  const total = columnIndex(table.columns, "Total");
+  const date = columnIndex(table.columns, "Date");
+
+  return table.rows.map((row, index) => ({
+    id: table.ids[index] ?? "",
+    student: row[student] ?? "",
+    level: row[level] ?? "",
+    correct: parseScore(row[correct] ?? ""),
+    total: parseScore(row[total] ?? ""),
     date: row[date] ?? ""
   }));
 }

@@ -79,6 +79,12 @@ the existing `listResource` / `createResource` and project the result. They
 never write their own SQL and never re-implement a role check. Duplicating that
 logic is how a student ends up able to read another student's grades.
 
+**English placement test** (mobile only): `placementQuestions` / `placementResults`
+are `SchoolResource`s with no web `NavModule` — `DashboardApp.tsx` keeps its own
+narrower `SchoolResource` alias. Grading is `submitPlacementTest()` in
+`lib/school-db.ts`; the answer-keyed starter bank is `lib/placement-bank.ts` and
+must stay out of `shared/`, which is bundled into the phone app.
+
 `@shared/*` resolves to `shared/` — configured in both `tsconfig.json` and
 `vitest.config.ts`, so keep the two in sync.
 

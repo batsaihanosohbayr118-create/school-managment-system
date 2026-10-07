@@ -7,9 +7,15 @@ import type { NavModule, Role } from "@/lib/types";
 import { defaultStudentSubjects, defaultStudentSubjectsValue, subjectCatalog } from "@/lib/subjects";
 import { AccountConflictError, allPushTokens, createAccount, pushTokensForRole, setAccountPassword, syncAccountName } from "@/lib/auth-db";
 import { sendPushNotifications } from "@/lib/mobile/push";
+import { placementBank } from "@/lib/placement-bank";
+import { PLACEMENT_SUBJECT, isPlacementSubject, normalizeAnswerLetter, normalizeCefrLevel, scorePlacement } from "@shared/placement";
 import type { SchoolSession } from "./school-session";
 
-export type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
+/**
+ * The web navigation modules, plus the English placement test's two tables,
+ * which exist only for the mobile app and so have no NavModule of their own.
+ */
+export type SchoolResource = Exclude<NavModule, "dashboard" | "settings"> | "placementQuestions" | "placementResults";
 
 export type SchoolRequestMode = "summary" | "page";
 
@@ -53,7 +59,9 @@ const resourceColumns: Record<SchoolResource, string[]> = {
   payments: ["Student", "Amount", "Status", "Due Date"],
   timetable: ["Subject", "Day", "Time", "Teacher", "Class"],
   announcements: ["Title", "Content", "Audience", "Date"],
-  wellbeing: ["Question", "Category", "Note", "Date"]
+  wellbeing: ["Question", "Category", "Note", "Date"],
+  placementQuestions: ["Subject", "Level", "Question", "Option A", "Option B", "Option C", "Option D", "Answer"],
+  placementResults: ["Student", "Subject", "Level", "Correct", "Total", "Date"]
 };
 
 const localStoreRoot = process.env.VERCEL ? path.join(tmpdir(), "educore") : path.join(process.cwd(), ".local-data");
@@ -80,7 +88,20 @@ const localSeedData: LocalStore = {
   payments: [],
   timetable: [],
   announcements: [],
-  wellbeing: []
+  wellbeing: [],
+  placementQuestions: placementBank.map((question) => ({
+    id: question.id,
+    subject: PLACEMENT_SUBJECT,
+    level: question.level,
+    question: question.question,
+    option_a: question.options[0],
+    option_b: question.options[1],
+    option_c: question.options[2],
+    option_d: question.options[3],
+    answer: question.answer,
+    createdAt: "2026-10-07T00:00:00.000Z"
+  })),
+  placementResults: []
 };
 
 function getDatabaseUrl() {
@@ -282,6 +303,34 @@ async function initializeSchoolDatabase() {
       date TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS placement_questions (
+      id TEXT PRIMARY KEY,
+      subject_id TEXT NOT NULL DEFAULT '',
+      subject TEXT NOT NULL DEFAULT '',
+      level TEXT NOT NULL,
+      question TEXT NOT NULL,
+      option_a TEXT NOT NULL DEFAULT '',
+      option_b TEXT NOT NULL DEFAULT '',
+      option_c TEXT NOT NULL DEFAULT '',
+      option_d TEXT NOT NULL DEFAULT '',
+      answer TEXT NOT NULL,
+      created_by TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS placement_results (
+      id TEXT PRIMARY KEY,
+      student_id TEXT NOT NULL DEFAULT '',
+      subject_id TEXT NOT NULL DEFAULT '',
+      student TEXT NOT NULL DEFAULT '',
+      subject TEXT NOT NULL DEFAULT '',
+      level TEXT NOT NULL,
+      correct INTEGER NOT NULL DEFAULT 0,
+      total INTEGER NOT NULL DEFAULT 0,
+      date TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   await seedIfEmpty();
@@ -302,6 +351,22 @@ async function seedIfEmpty() {
        ON CONFLICT (id) DO NOTHING`,
       [subject.id, subject.code, subject.name, subject.description, subject.category, subject.gradeLevels]
     );
+  }
+
+  // The placement bank is the exception to the rule above, and only while the
+  // table is completely empty: a test with no questions is useless, whereas
+  // the teacher deleting one starter question must stay deleted.
+  const placementCount = await pool.query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM placement_questions`);
+  if (Number(placementCount.rows[0]?.count ?? 0) === 0) {
+    const english = subjectCatalog.find((subject) => isPlacementSubject(subject.name));
+    for (const question of placementBank) {
+      await pool.query(
+        `INSERT INTO placement_questions (id, subject_id, subject, level, question, option_a, option_b, option_c, option_d, answer)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (id) DO NOTHING`,
+        [question.id, english?.id ?? "", PLACEMENT_SUBJECT, question.level, question.question, ...question.options, question.answer]
+      );
+    }
   }
 }
 
@@ -453,6 +518,10 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
       return [values.Title, values.Content ?? "", values.Audience || "All", values.Date ?? new Date().toISOString().slice(0, 10)].map(stringValue);
     case "wellbeing":
       return [values.Question, values.Category || "General", values.Note ?? "", values.Date || new Date().toISOString().slice(0, 10)].map(stringValue);
+    case "placementQuestions":
+      return [PLACEMENT_SUBJECT, values.Level, values.Question, values["Option A"], values["Option B"], values["Option C"], values["Option D"], values.Answer].map(stringValue);
+    case "placementResults":
+      return [values.Student, values.Subject, values.Level, values.Correct, values.Total, values.Date || new Date().toISOString().slice(0, 10)].map(stringValue);
   }
 }
 
@@ -528,6 +597,10 @@ function rowToArray(resource: SchoolResource, row: QueryRow | DbRow | LocalResou
       return [row.title, row.content, row.audience, row.date].map(stringValue);
     case "wellbeing":
       return [row.question, row.category, row.note, row.date].map(stringValue);
+    case "placementQuestions":
+      return [row.subject, row.level, row.question, row.option_a, row.option_b, row.option_c, row.option_d, row.answer].map(stringValue);
+    case "placementResults":
+      return [row.student, row.subject, row.level, row.correct, row.total, row.date].map(stringValue);
   }
 }
 
@@ -544,7 +617,9 @@ function tableName(resource: SchoolResource) {
     payments: "payment_records",
     timetable: "timetable_slots",
     announcements: "announcements",
-    wellbeing: "wellbeing_prompts"
+    wellbeing: "wellbeing_prompts",
+    placementQuestions: "placement_questions",
+    placementResults: "placement_results"
   };
 
   return names[resource];
@@ -563,6 +638,11 @@ function csvList(value: unknown) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+/** A local-store row keeps its cells in `values`; a Postgres row only has fields. */
+function rawRowValues(resource: SchoolResource, row: DbRow | LocalResourceRow) {
+  return (row as LocalResourceRow).values ?? rowToArray(resource, row);
 }
 
 async function fetchRawTable(resource: SchoolResource): Promise<DbRow[] | LocalResourceRow[]> {
@@ -746,7 +826,26 @@ async function filterResourceTable(
     };
   }
 
-  if (resource === "assignments" || resource === "materials" || resource === "attendance" || resource === "grades" || resource === "timetable") {
+  if (resource === "placementQuestions") {
+    if (role === "admin") return table;
+    // A parent has no use for the questions, and seeing them ahead of time
+    // would only help coach the child.
+    if (role === "parent") return { ...table, ids: [], rows: [] };
+
+    const bySubject = filterByColumnValues(table, "Subject", accessibleSubjects);
+    if (role === "teacher") return bySubject;
+
+    // A student sitting the test must never receive the answer key — not
+    // even through the generic /api/school route. Grading happens server-side
+    // in submitPlacementTest, which reads the raw rows.
+    const answerIndex = bySubject.columns.findIndex((column) => column.toLowerCase() === "answer");
+    return {
+      ...bySubject,
+      rows: bySubject.rows.map((row) => row.map((value, index) => (index === answerIndex ? "" : value)))
+    };
+  }
+
+  if (resource === "assignments" || resource === "materials" || resource === "attendance" || resource === "grades" || resource === "timetable" || resource === "placementResults") {
     if (role === "admin") {
       const subjectId = normalizedToken(context.subjectId);
       if (subjectId) {
@@ -779,7 +878,7 @@ async function filterResourceTable(
     // students in the same subject would otherwise see each other's grades
     // and attendance. Assignments/materials/timetable stay subject-scoped —
     // they describe the class, not an individual student.
-    if ((resource === "attendance" || resource === "grades") && (role === "student" || role === "parent")) {
+    if ((resource === "attendance" || resource === "grades" || resource === "placementResults") && (role === "student" || role === "parent")) {
       const studentName = await ownStudentFullName(role, email);
       const studentIndex = bySubject.columns.findIndex((column) => column.toLowerCase() === "student");
       if (!studentName || studentIndex < 0) {
@@ -861,7 +960,7 @@ async function fetchFilteredTable(resource: SchoolResource, context: SchoolReque
   const table: ResourceTable = {
     columns: resourceColumns[resource],
     ids: rawRows.map((row) => stringValue((row as DbRow).id ?? (row as LocalResourceRow).id)),
-    rows: rawRows.map((row) => rowToArray(resource, row))
+    rows: rawRows.map((row) => rawRowValues(resource, row))
   };
 
   const accessibleSubjects = await allowedSubjectNames(context);
@@ -899,6 +998,8 @@ function manageRolesFor(resource: SchoolResource) {
     case "materials":
     case "timetable":
     case "announcements":
+    case "placementQuestions":
+    case "placementResults":
       return new Set<Role>(["admin", "teacher"]);
     default:
       return new Set<Role>(["admin"]);
@@ -1145,12 +1246,71 @@ async function notifyAnnouncement(audience: string, title: string) {
   });
 }
 
+/**
+ * Validates and normalizes a placement question before it is written. Runs
+ * outside the Postgres try block so an invalid question cannot slip into the
+ * local fallback store either.
+ */
+function placementQuestionValues(values: Record<string, string>): Record<string, string> {
+  if (values.Subject?.trim() && !isPlacementSubject(values.Subject)) {
+    throw new ValidationError(`Invalid subject: the placement test is for ${PLACEMENT_SUBJECT} only.`);
+  }
+
+  const level = normalizeCefrLevel(values.Level ?? "");
+  if (!level) throw new ValidationError("Invalid level: use A1, A2, B1, B2 or C1.");
+
+  const answer = normalizeAnswerLetter(values.Answer ?? "");
+  if (!answer) throw new ValidationError("Invalid answer: use A, B, C or D.");
+
+  const question = values.Question?.trim() ?? "";
+  if (!question) throw new ValidationError("Question is required.");
+
+  const options = ["Option A", "Option B", "Option C", "Option D"].map((key) => values[key]?.trim() ?? "");
+  if (options.some((option) => !option)) throw new ValidationError("All four options are required.");
+
+  return {
+    Subject: PLACEMENT_SUBJECT,
+    Level: level,
+    Question: question,
+    "Option A": options[0],
+    "Option B": options[1],
+    "Option C": options[2],
+    "Option D": options[3],
+    Answer: answer
+  };
+}
+
+/**
+ * manageRolesFor lets any teacher through; the placement test belongs to the
+ * English teacher alone. A ValidationError, so the fallback catch rethrows it.
+ */
+async function requirePlacementTeacher(pool: Pool, context?: SchoolRequestContext) {
+  if (context?.session.role !== "teacher") return;
+
+  const assignedSubject = await getAssignedSubjectNameForTeacher(pool, context.session.email);
+  if (!isPlacementSubject(assignedSubject)) {
+    throw new ValidationError(`Only the ${PLACEMENT_SUBJECT} teacher has permission to manage the placement test.`);
+  }
+}
+
+/** Results are only ever produced by grading a test, never typed in. */
+function rejectPlacementResultWrite(resource: SchoolResource) {
+  if (resource === "placementResults") {
+    throw new Error("Placement results are not allowed to be written directly; they come from the student taking the test.");
+  }
+}
+
 export async function createResource(resource: SchoolResource, values: Record<string, string>, context?: SchoolRequestContext) {
   // Deliberately outside the try block below: that block's catch treats every
   // failure as "Postgres is unreachable, fall back to the local store" and
   // still returns success. A permission denial must never be caught by that
   // path, or any role could write by tripping the fallback.
   requireManageAccess(resource, context?.session.role ?? "admin");
+  rejectPlacementResultWrite(resource);
+
+  if (resource === "placementQuestions") {
+    values = placementQuestionValues(values);
+  }
 
   if (resource === "students") {
     await applyLogin("create", "student", values);
@@ -1309,6 +1469,16 @@ export async function createResource(resource: SchoolResource, values: Record<st
           [id, values.Question, values.Category || "General", values.Note ?? "", values.Date || new Date().toISOString().slice(0, 10)]
         );
         break;
+      case "placementQuestions": {
+        await requirePlacementTeacher(pool, context);
+        const subject = await resolveSubjectByToken(pool, PLACEMENT_SUBJECT);
+        await pool.query(
+          `INSERT INTO placement_questions (id, subject_id, subject, level, question, option_a, option_b, option_c, option_d, answer, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          [id, subject ? stringValue(subject.id) : "", PLACEMENT_SUBJECT, values.Level, values.Question, values["Option A"], values["Option B"], values["Option C"], values["Option D"], values.Answer, context?.session.email ?? ""]
+        );
+        break;
+      }
     }
 
     if (resource === "announcements") {
@@ -1332,6 +1502,11 @@ export async function deleteResource(resource: SchoolResource, id: string, conte
 
   try {
     await ensureSchoolDatabase();
+
+    // Deleting a result is how the English teacher lets a student retake the test.
+    if (resource === "placementQuestions" || resource === "placementResults") {
+      await requirePlacementTeacher(getPool(), context);
+    }
 
     // Deleting a parent has to release the student too. students.parent_id is
     // what blocks a second parent, so leaving it set would strand that student:
@@ -1359,6 +1534,11 @@ export async function deleteResource(resource: SchoolResource, id: string, conte
 
 export async function updateResource(resource: SchoolResource, id: string, values: Record<string, string>, context?: SchoolRequestContext) {
   requireManageAccess(resource, context?.session.role ?? "admin");
+  rejectPlacementResultWrite(resource);
+
+  if (resource === "placementQuestions") {
+    values = placementQuestionValues(values);
+  }
 
   if (resource === "students") {
     await applyLogin("set", "student", values);
@@ -1526,6 +1706,15 @@ export async function updateResource(resource: SchoolResource, id: string, value
           [values.Question, values.Category, values.Note, values.Date, id]
         );
         break;
+      case "placementQuestions":
+        await requirePlacementTeacher(pool, context);
+        await pool.query(
+          `UPDATE placement_questions
+           SET level = $1, question = $2, option_a = $3, option_b = $4, option_c = $5, option_d = $6, answer = $7
+           WHERE id = $8`,
+          [values.Level, values.Question, values["Option A"], values["Option B"], values["Option C"], values["Option D"], values.Answer, id]
+        );
+        break;
     }
 
     return listResource(resource, context ?? { session: { role: "admin", email: "", name: "", avatarUrl: "", source: "neon" }, mode: "summary" });
@@ -1534,4 +1723,79 @@ export async function updateResource(resource: SchoolResource, id: string, value
     logDatabaseFallback(error);
     return updateLocalResource(resource, id, values);
   }
+}
+
+/**
+ * Grades a student's English placement test and records the level.
+ *
+ * Lives here rather than in the route so the route keeps to the mobile API
+ * rule — no SQL, no role checks of its own. The answer key is read from the
+ * raw table, which the student's own listResource view never exposes.
+ *
+ * One attempt per student: a second submission is refused until the English
+ * teacher deletes the first result.
+ */
+export async function submitPlacementTest(answers: Record<string, string>, context: SchoolRequestContext) {
+  if (context.session.role !== "student") {
+    throw new Error("Only students have permission to take the placement test.");
+  }
+
+  const enrolled = await allowedSubjectNames(context);
+  if (!enrolled.has(normalizedToken(PLACEMENT_SUBJECT))) {
+    throw new Error(`You are not allowed to take this test: you are not enrolled in ${PLACEMENT_SUBJECT}.`);
+  }
+
+  const email = normalizedToken(context.session.email);
+  const students = await fetchRawTable("students");
+  const student = students.find((row) => normalizedToken((row as DbRow).email) === email) as DbRow | undefined;
+  if (!student) {
+    throw new Error("A student record is required to take the placement test.");
+  }
+  const studentName = stringValue(student.full_name);
+
+  const results = await fetchRawTable("placementResults");
+  const alreadyTaken = results.some((row) => {
+    const [name, subject] = rawRowValues("placementResults", row);
+    return normalizedToken(name) === normalizedToken(studentName) && isPlacementSubject(subject ?? "");
+  });
+  if (alreadyTaken) {
+    throw new Error("Retaking the placement test is not allowed until your teacher resets your result.");
+  }
+
+  const questions = (await fetchRawTable("placementQuestions"))
+    .map((row) => {
+      const [subject, level, , , , , , answer] = rawRowValues("placementQuestions", row);
+      return { id: stringValue((row as DbRow).id), subject: subject ?? "", level: level ?? "", answer: answer ?? "" };
+    })
+    .filter((question) => isPlacementSubject(question.subject));
+
+  if (questions.length === 0) {
+    throw new Error("Placement questions are required before the test can be taken.");
+  }
+
+  const score = scorePlacement(questions, answers);
+  const values = {
+    Student: studentName,
+    Subject: PLACEMENT_SUBJECT,
+    Level: score.level,
+    Correct: String(score.correct),
+    Total: String(score.total),
+    Date: new Date().toISOString().slice(0, 10)
+  };
+
+  try {
+    await ensureSchoolDatabase();
+    const pool = getPool();
+    const subject = await resolveSubjectByToken(pool, PLACEMENT_SUBJECT);
+    await pool.query(
+      `INSERT INTO placement_results (id, student_id, subject_id, student, subject, level, correct, total, date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [`PR-${Date.now().toString().slice(-6)}`, stringValue(student.id), subject ? stringValue(subject.id) : "", studentName, PLACEMENT_SUBJECT, score.level, score.correct, score.total, values.Date]
+    );
+  } catch (error) {
+    logDatabaseFallback(error);
+    await createLocalResource("placementResults", values);
+  }
+
+  return listResource("placementResults", context);
 }

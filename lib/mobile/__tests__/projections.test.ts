@@ -5,6 +5,8 @@ import {
   toAttendanceEntries,
   toGradeEntries,
   toPaymentEntries,
+  toPlacementQuestions,
+  toPlacementResults,
   toSubjectEntries,
   toTimetableSlots
 } from "@/lib/mobile/projections";
@@ -180,5 +182,42 @@ describe("toSubjectEntries", () => {
     expect(() =>
       toSubjectEntries({ ...subjects, columns: ["Name", "Code", "Description", "Teacher", "Category", "Grades"] })
     ).toThrow(/Grade Levels/);
+  });
+});
+
+const placementQuestions: ResourceTable = {
+  columns: ["Subject", "Level", "Question", "Option A", "Option B", "Option C", "Option D", "Answer"],
+  ids: ["PQ-B1-1", "PQ-A1-2", "PQ-A1-1"],
+  rows: [
+    ["English", "B1", "If it rains...", "stay", "will stay", "would stay", "stayed", "B"],
+    ["English", "A1", "I have two ___.", "cat", "cats", "a cat", "cates", "B"],
+    ["English", "A1", "She ___ a student.", "is", "are", "am", "be", "A"]
+  ]
+};
+
+describe("toPlacementQuestions", () => {
+  it("orders questions easiest level first, then by id", () => {
+    expect(toPlacementQuestions(placementQuestions, false).map((question) => question.id)).toEqual(["PQ-A1-1", "PQ-A1-2", "PQ-B1-1"]);
+  });
+
+  it("collects the four options in order", () => {
+    expect(toPlacementQuestions(placementQuestions, false)[0].options).toEqual(["is", "are", "am", "be"]);
+  });
+
+  it("leaves the answer key out unless asked for it", () => {
+    const [question] = toPlacementQuestions(placementQuestions, false);
+    expect("answer" in question).toBe(false);
+    expect(toPlacementQuestions(placementQuestions, true)[0].answer).toBe("A");
+  });
+});
+
+describe("toPlacementResults", () => {
+  it("parses the score counts", () => {
+    const [result] = toPlacementResults({
+      columns: ["Student", "Subject", "Level", "Correct", "Total", "Date"],
+      ids: ["PR-1"],
+      rows: [["Bilguun", "English", "B1", "17", "25", "2026-10-07"]]
+    });
+    expect(result).toEqual({ id: "PR-1", student: "Bilguun", level: "B1", correct: 17, total: 25, date: "2026-10-07" });
   });
 });

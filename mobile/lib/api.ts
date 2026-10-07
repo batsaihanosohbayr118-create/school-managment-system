@@ -6,6 +6,9 @@ import type {
   MobileErrorBody,
   MobileProfile,
   PaymentsResponse,
+  PlacementQuestionsResponse,
+  PlacementResponse,
+  PlacementResultsResponse,
   SubjectContent,
   SubjectsResponse,
   TimetableResponse
@@ -71,6 +74,8 @@ async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export type PlacementQuestionInput = { level: string; question: string; options: string[]; answer: string };
+
 export const api = {
   me: () => request<MobileProfile>("/api/mobile/me"),
   timetable: () => request<TimetableResponse>("/api/mobile/timetable"),
@@ -102,6 +107,20 @@ export const api = {
     request<TimetableResponse>(`/api/mobile/timetable?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
   deleteAnnouncement: (id: string) =>
     request<AnnouncementsResponse>(`/api/mobile/announcements?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
+  placement: () => request<PlacementResponse>("/api/mobile/placement"),
+  submitPlacement: (answers: Record<string, string>) =>
+    request<PlacementResultsResponse>("/api/mobile/placement", { method: "POST", body: JSON.stringify({ answers }) }),
+  resetPlacementResult: (id: string) =>
+    request<PlacementResultsResponse>(`/api/mobile/placement?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
+  createPlacementQuestion: (body: PlacementQuestionInput) =>
+    request<PlacementQuestionsResponse>("/api/mobile/placement/questions", { method: "POST", body: JSON.stringify(body) }),
+  updatePlacementQuestion: (id: string, body: PlacementQuestionInput) =>
+    request<PlacementQuestionsResponse>(`/api/mobile/placement/questions?id=${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body)
+    }),
+  deletePlacementQuestion: (id: string) =>
+    request<PlacementQuestionsResponse>(`/api/mobile/placement/questions?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
   registerPushToken: (token: string) =>
     request<{ ok: true }>("/api/mobile/push-token", { method: "POST", body: JSON.stringify({ token }) })
 };
