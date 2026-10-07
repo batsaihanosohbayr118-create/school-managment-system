@@ -14,7 +14,7 @@ import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
-import { accentForSubjectName, iconForSubjectName } from '@/lib/subject-visual';
+import { accentForSubjectName } from '@/lib/subject-visual';
 import { useApiData } from '@/lib/use-api';
 import type { GradeEntry } from '@shared/api-types';
 
@@ -100,7 +100,6 @@ function GradeRow({ grade }: { grade: GradeEntry }) {
   // By the subject's own name, not the row's index — two rows for the same
   // subject (different students) must look the same, not alternate.
   const accent = accentForSubjectName(grade.subject);
-  const icon = iconForSubjectName(grade.subject);
   const mutedColor = useThemeColor({}, 'muted');
   const accentColor = useThemeColor({}, accent);
   const accentMuted = useThemeColor({}, `${accent}Muted` as const);
@@ -114,7 +113,8 @@ function GradeRow({ grade }: { grade: GradeEntry }) {
     <Card style={[styles.card, { borderLeftColor: accentColor }]}>
       <View style={styles.row}>
         <View style={[styles.icon, { backgroundColor: accentMuted }]}>
-          <Ionicons name={icon} size={20} color={accentColor} />
+          {/* The grades tab's own icon, matching the tab bar. */}
+          <Ionicons name="bar-chart" size={20} color={accentColor} />
         </View>
         <View style={styles.info}>
           <Text style={styles.subject} numberOfLines={1}>{grade.subject}</Text>

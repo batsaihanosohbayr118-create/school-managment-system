@@ -13,7 +13,7 @@ import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
-import { accentForSubjectName, iconForSubjectName } from '@/lib/subject-visual';
+import { accentForSubjectName } from '@/lib/subject-visual';
 import { useApiData } from '@/lib/use-api';
 import { translateValue } from '@shared/i18n-tables';
 import type { TimetableSlot } from '@shared/api-types';
@@ -104,13 +104,13 @@ function SlotRow({ slot }: { slot: TimetableSlot }) {
   // look the same everywhere it appears (also on the grades/attendance tabs).
   const accentColor = useThemeColor({}, accentForSubjectName(slot.subject));
   const accentMuted = useThemeColor({}, `${accentForSubjectName(slot.subject)}Muted` as const);
-  const icon = iconForSubjectName(slot.subject);
 
   return (
     <Card style={[styles.card, { borderLeftColor: accentColor }]}>
       <View style={styles.row}>
         <View style={[styles.icon, { backgroundColor: accentMuted }]}>
-          <Ionicons name={icon} size={20} color={accentColor} />
+          {/* The timetable tab's own icon, matching the tab bar. */}
+          <Ionicons name="calendar" size={20} color={accentColor} />
         </View>
         <View style={styles.info}>
           <Text style={styles.subject} numberOfLines={1}>{slot.subject}</Text>

@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
+import * as Haptics from 'expo-haptics';
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +17,7 @@ import {
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
+import { SwipeableRow } from '@/components/SwipeableRow';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api, attachmentUrl, resolveApiUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -101,31 +103,35 @@ export default function SubjectContentScreen() {
     }
   }
 
+  // Same as grades/attendance/timetable: the swipe is the deliberate step,
+  // the tap on the revealed button deletes. The one exception is a topic that
+  // still holds lessons — those go with it, so that alone asks first.
   const deleteItem: DeleteItem | undefined = isTeacher
     ? (item) => {
-        const lessonsInTopic = item.kind === 'topic' ? content.lessons.filter((lesson) => lesson.topicId === item.id).length : 0;
-        const body = item.kind === 'topic' ? t.subjectContent.deleteTopicBody(lessonsInTopic) : t.subjectContent.deleteBody;
+        const remove = () =>
+          removeFromContent((current) => {
+            if (item.kind === 'topic') {
+              return {
+                ...current,
+                topics: current.topics.filter((topic) => topic.id !== item.id),
+                lessons: current.lessons.filter((lesson) => lesson.topicId !== item.id)
+              };
+            }
+            if (item.kind === 'lesson') {
+              return { ...current, lessons: current.lessons.filter((lesson) => lesson.id !== item.id) };
+            }
+            return { ...current, assignments: current.assignments.filter((assignment) => assignment.id !== item.id) };
+          });
 
-        Alert.alert(`${t.subjectContent.deleteTitle}`, `"${item.title}" — ${body}`, [
+        const lessonsInTopic = item.kind === 'topic' ? content.lessons.filter((lesson) => lesson.topicId === item.id).length : 0;
+        if (lessonsInTopic === 0) {
+          remove();
+          return;
+        }
+
+        Alert.alert(t.subjectContent.deleteTitle, `"${item.title}" — ${t.subjectContent.deleteTopicBody(lessonsInTopic)}`, [
           { text: t.subjectContent.cancel, style: 'cancel' },
-          {
-            text: t.subjectContent.deleteAction,
-            style: 'destructive',
-            onPress: () =>
-              removeFromContent((current) => {
-                if (item.kind === 'topic') {
-                  return {
-                    ...current,
-                    topics: current.topics.filter((topic) => topic.id !== item.id),
-                    lessons: current.lessons.filter((lesson) => lesson.topicId !== item.id)
-                  };
-                }
-                if (item.kind === 'lesson') {
-                  return { ...current, lessons: current.lessons.filter((lesson) => lesson.id !== item.id) };
-                }
-                return { ...current, assignments: current.assignments.filter((assignment) => assignment.id !== item.id) };
-              })
-          }
+          { text: t.subjectContent.deleteAction, style: 'destructive', onPress: remove }
         ]);
       }
     : undefined;
@@ -347,7 +353,7 @@ function SectionHeader({
 }
 
 function TopicCard({ topic, lessons, onDelete }: { topic: SubjectTopic; lessons: SubjectLesson[]; onDelete?: () => void }) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
   const borderColor = useThemeColor({}, 'border');
@@ -355,35 +361,50 @@ function TopicCard({ topic, lessons, onDelete }: { topic: SubjectTopic; lessons:
   const otherLessons = lessons.filter((lesson) => !lesson.videoUrl);
 
   return (
-    <Card style={styles.card}>
-      <View style={styles.cardHeaderRow}>
+    <SwipeableRow deleteLabel={t.common.delete} onDelete={onDelete}>
+      <Card style={[styles.card, styles.swipeCard]}>
         <Text style={styles.cardTitle}>{translateValue(topic.title, language)}</Text>
-        {onDelete ? <DeleteButton onPress={onDelete} /> : null}
-      </View>
-      {topic.description ? <Text style={[styles.cardMeta, { color: mutedColor }]}>{translateValue(topic.description, language)}</Text> : null}
+        {topic.description ? <Text style={[styles.cardMeta, { color: mutedColor }]}>{translateValue(topic.description, language)}</Text> : null}
 
-      {videoLessons.length > 0 ? (
-        <View style={styles.videoGrid}>
-          {videoLessons.map((lesson) => (
-            <VideoLessonCard key={lesson.id} lesson={lesson} />
-          ))}
-        </View>
-      ) : null}
+        {videoLessons.length > 0 ? (
+          <View style={styles.videoGrid}>
+            {videoLessons.map((lesson) => (
+              <VideoLessonCard key={lesson.id} lesson={lesson} />
+            ))}
+          </View>
+        ) : null}
 
-      {otherLessons.map((lesson, index) => (
-        <LessonRow key={lesson.id} lesson={lesson} isLast={index === otherLessons.length - 1} borderColor={borderColor} tint={tint} mutedColor={mutedColor} />
-      ))}
-    </Card>
+        {otherLessons.map((lesson, index) => (
+          <LessonRow key={lesson.id} lesson={lesson} isLast={index === otherLessons.length - 1} borderColor={borderColor} tint={tint} mutedColor={mutedColor} />
+        ))}
+      </Card>
+    </SwipeableRow>
   );
 }
 
 /** A thumbnail-style tile with a play button — visually distinct from a plain file/text row, since a video is watched, not opened like a document. */
+/**
+ * A teacher deletes a video by long-pressing it: the tiles sit two to a row,
+ * too narrow for the swipe the other lists use.
+ */
 function VideoLessonCard({ lesson, onDelete }: { lesson: SubjectLesson; onDelete?: () => void }) {
+  const { t } = useLanguage();
   const thumbnail = videoThumbnailUrl(lesson.videoUrl!);
+
+  function confirmDelete() {
+    if (!onDelete) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Alert.alert(t.subjectContent.deleteTitle, `"${lesson.title}" — ${t.subjectContent.deleteBody}`, [
+      { text: t.subjectContent.cancel, style: 'cancel' },
+      { text: t.subjectContent.deleteAction, style: 'destructive', onPress: onDelete }
+    ]);
+  }
 
   return (
     <Pressable
       onPress={() => Linking.openURL(resolveApiUrl(lesson.videoUrl!))}
+      onLongPress={onDelete ? confirmDelete : undefined}
+      delayLongPress={450}
       style={({ pressed }) => [styles.videoCard, pressed && styles.pressed]}
     >
         <View style={styles.videoThumb}>
@@ -398,11 +419,6 @@ function VideoLessonCard({ lesson, onDelete }: { lesson: SubjectLesson; onDelete
           {lesson.duration ? (
             <View style={styles.videoDurationBadge}>
               <Text style={styles.videoDurationText}>{lesson.duration}</Text>
-            </View>
-          ) : null}
-          {onDelete ? (
-            <View style={styles.videoDeleteSlot}>
-              <DeleteButton onPress={onDelete} />
             </View>
           ) : null}
         </View>
@@ -485,13 +501,14 @@ function LessonListItem({
   accentMuted: string;
   onDelete?: () => void;
 }) {
+  const { t } = useLanguage();
   const mutedColor = useThemeColor({}, 'muted');
   const url = lesson.fileUrl;
   const icon = lesson.fileUrl ? 'document-attach-outline' : 'reader-outline';
   const openAttachment = useOpenAttachment();
 
   const card = (
-    <Card style={[styles.card, styles.lessonCard]}>
+    <Card style={[styles.card, styles.lessonCard, styles.swipeCard]}>
       <View style={[styles.lessonIconBubble, { backgroundColor: accentMuted }]}>
         <Ionicons name={icon} size={19} color={accentColor} />
       </View>
@@ -500,69 +517,49 @@ function LessonListItem({
         {lesson.duration ? <Text style={[styles.cardMeta, { color: mutedColor }]}>{lesson.duration}</Text> : null}
       </View>
       {url ? <Ionicons name="open-outline" size={18} color={accentColor} /> : null}
-      {onDelete ? <DeleteButton onPress={onDelete} /> : null}
     </Card>
   );
 
-  if (!url) return card;
-
   return (
-    <Pressable style={({ pressed }) => pressed && styles.pressed} onPress={() => openAttachment(url)}>
-      {card}
-    </Pressable>
+    <SwipeableRow deleteLabel={t.common.delete} onDelete={onDelete}>
+      {url ? (
+        <Pressable style={({ pressed }) => pressed && styles.pressed} onPress={() => openAttachment(url)}>
+          {card}
+        </Pressable>
+      ) : (
+        card
+      )}
+    </SwipeableRow>
   );
 }
 
 function AssignmentCard({ assignment, onDelete }: { assignment: SubjectAssignment; onDelete?: () => void }) {
+  const { t } = useLanguage();
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
 
   return (
-    <Card style={styles.card}>
-      <View style={styles.cardHeaderRow}>
-        <Text style={styles.cardTitle}>{assignment.title}</Text>
-        <View style={styles.cardHeaderActions}>
+    <SwipeableRow deleteLabel={t.common.delete} onDelete={onDelete}>
+      <Card style={[styles.card, styles.swipeCard]}>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.cardTitle}>{assignment.title}</Text>
           {assignment.maxScore !== undefined ? (
             <Text style={[styles.maxScore, { color: tint }]}>{assignment.maxScore}</Text>
           ) : null}
-          {onDelete ? <DeleteButton onPress={onDelete} /> : null}
         </View>
-      </View>
-      {assignment.description ? <Text style={[styles.cardMeta, { color: mutedColor }]}>{assignment.description}</Text> : null}
-      {assignment.type || assignment.dueDate ? (
-        <Text style={[styles.cardMeta, { color: mutedColor }]}>
-          {[assignment.type, assignment.dueDate].filter(Boolean).join(' · ')}
-        </Text>
-      ) : null}
-    </Card>
+        {assignment.description ? <Text style={[styles.cardMeta, { color: mutedColor }]}>{assignment.description}</Text> : null}
+        {assignment.type || assignment.dueDate ? (
+          <Text style={[styles.cardMeta, { color: mutedColor }]}>
+            {[assignment.type, assignment.dueDate].filter(Boolean).join(' · ')}
+          </Text>
+        ) : null}
+      </Card>
+    </SwipeableRow>
   );
 }
 
 type DeletableItem = { kind: 'topic' | 'lesson' | 'assignment'; id: string; title: string };
 type DeleteItem = (item: DeletableItem) => void;
-
-/**
- * A small red trash button. It sits inside rows that are themselves
- * pressable (a file lesson opens on tap), so it is its own Pressable and
- * the row's press never fires underneath it.
- */
-function DeleteButton({ onPress }: { onPress: () => void }) {
-  const { t } = useLanguage();
-  const dangerColor = useThemeColor({}, 'danger');
-  const dangerMuted = useThemeColor({}, 'dangerMuted');
-
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={8}
-      accessibilityRole="button"
-      accessibilityLabel={t.subjectContent.deleteAction}
-      style={({ pressed }) => [styles.deleteButton, { backgroundColor: dangerMuted }, pressed && styles.pressed]}
-    >
-      <Ionicons name="trash-outline" size={16} color={dangerColor} />
-    </Pressable>
-  );
-}
 
 type Status = { type: 'idle' | 'success' | 'error'; message?: string };
 
@@ -1143,24 +1140,9 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: 'transparent'
   },
-  cardHeaderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'transparent'
-  },
-  deleteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  videoDeleteSlot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: 'transparent'
+  // SwipeableRow carries the row's bottom margin; see its doc comment.
+  swipeCard: {
+    marginBottom: 0
   },
   cardTitle: {
     fontSize: 16,

@@ -14,7 +14,7 @@ import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
-import { accentForSubjectName, iconForSubjectName } from '@/lib/subject-visual';
+import { accentForSubjectName } from '@/lib/subject-visual';
 import { useApiData } from '@/lib/use-api';
 import { translateValue } from '@shared/i18n-tables';
 import type { AttendanceEntry } from '@shared/api-types';
@@ -98,6 +98,17 @@ export default function AttendanceScreen() {
   );
 }
 
+/**
+ * The attendance tab's checkmark (as on the tab bar), varied by status so a
+ * missed class reads at a glance: a cross for absent, a clock for late.
+ */
+function attendanceIcon(status: string): keyof typeof Ionicons.glyphMap {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === 'absent' || normalized === 'тасалсан') return 'close-circle';
+  if (normalized === 'late' || normalized === 'хоцорсон') return 'time';
+  return 'checkmark-circle';
+}
+
 function AttendanceRow({ entry }: { entry: AttendanceEntry }) {
   const { language } = useLanguage();
   const mutedColor = useThemeColor({}, 'muted');
@@ -105,7 +116,7 @@ function AttendanceRow({ entry }: { entry: AttendanceEntry }) {
   // look the same everywhere it appears (also on the grades/subjects tabs).
   const accentColor = useThemeColor({}, accentForSubjectName(entry.subject));
   const accentMuted = useThemeColor({}, `${accentForSubjectName(entry.subject)}Muted` as const);
-  const icon = iconForSubjectName(entry.subject);
+  const icon = attendanceIcon(entry.status);
 
   return (
     <Card style={[styles.card, { borderLeftColor: accentColor }]}>
