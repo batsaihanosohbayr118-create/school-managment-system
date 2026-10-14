@@ -71,7 +71,7 @@ export function Hero({ dict }: HeroProps) {
             initial="hidden"
             animate={reveal}
             custom={0}
-            className="inline-flex items-center gap-2 rounded-full border border-[#bbf7d0] bg-[#ecfdf3] px-4 py-2 text-[13px] font-bold text-[#15803d] shadow-sm"
+            className="inline-flex items-center gap-2 rounded-full bg-[#ecfdf3] px-4 py-2 text-[13px] font-bold text-[#15803d] shadow-sm"
           >
             <Star size={14} className="fill-[#f59e0b] text-[#f59e0b]" />
             {hero.badge}

@@ -35,9 +35,7 @@ export function BrandPanel() {
           transition={{ duration: 0.5 }}
           className="flex items-center gap-3"
         >
-          <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur">
-            <Image src={BRAND.logo} alt={BRAND.name} width={544} height={420} className="h-7 w-auto object-contain" priority />
-          </span>
+          <Image src={BRAND.logo} alt={BRAND.name} width={544} height={420} className="h-14 w-auto object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.35)]" priority />
           <span className="leading-tight">
             <strong className="block text-[18px] font-extrabold text-white">{BRAND.name}</strong>
             <small className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">{BRAND.suffix}</small>

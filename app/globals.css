@@ -5207,3 +5207,16 @@ button {
 .file-open-action:hover {
   background: rgba(99, 102, 241, 0.24);
 }
+
+/* Number fields (max score, amounts) without the browser's up/down spinner;
+   typing and the keyboard arrows still work. */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}

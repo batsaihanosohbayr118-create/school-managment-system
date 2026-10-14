@@ -20,7 +20,7 @@ export const BRAND = {
   logo: "/logo-mark.png",
   logoWidth: 544,
   logoHeight: 420,
-  heroImage: "/hero-students.jpg"
+  heroImage: "/hero-students.png"
 } as const;
 
 export const SOCIALS = [

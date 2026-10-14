@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { AnimatedCounter } from "./AnimatedCounter";
 import type { LandingDict, StatCard } from "./types";
 
@@ -50,7 +50,8 @@ export function Stats({ dict }: StatsProps) {
         <div className="relative grid items-center gap-12 lg:grid-cols-2 lg:gap-14">
           {/* Left: copy */}
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#bbf7d0] bg-white/80 px-4 py-1.5 text-[12px] font-bold text-[#15803d] shadow-sm">
+            <span className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#16a34a] to-[#10b981] px-4 py-2 text-[13px] font-bold text-white shadow-[0_8px_20px_rgba(22,163,74,0.28)]">
+              <Sparkles size={14} className="text-[#fef08a]" />
               {why.eyebrow}
             </span>
             <h2 className="mt-5 text-[clamp(2rem,4vw,2.9rem)] font-black tracking-tight text-[#0F172A]">

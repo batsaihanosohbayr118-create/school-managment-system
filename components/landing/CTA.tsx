@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Rocket } from "lucide-react";
 import type { LandingDict } from "./types";
 
@@ -9,19 +9,26 @@ interface CTAProps {
   dict: LandingDict;
 }
 
+// Each star twinkles and drifts on its own period and delay, so the field
+// never pulses in unison.
 const STARS = [
-  { top: "18%", left: "12%", size: 3 },
-  { top: "32%", left: "26%", size: 2 },
-  { top: "22%", left: "68%", size: 4 },
-  { top: "60%", left: "16%", size: 2 },
-  { top: "70%", left: "40%", size: 3 },
-  { top: "40%", left: "84%", size: 2 },
-  { top: "76%", left: "72%", size: 3 },
-  { top: "14%", left: "48%", size: 2 }
+  { top: "18%", left: "12%", size: 3, duration: 3.2, delay: 0 },
+  { top: "32%", left: "26%", size: 2, duration: 2.6, delay: 0.8 },
+  { top: "22%", left: "68%", size: 4, duration: 4.1, delay: 0.3 },
+  { top: "60%", left: "16%", size: 2, duration: 2.9, delay: 1.6 },
+  { top: "70%", left: "40%", size: 3, duration: 3.6, delay: 0.5 },
+  { top: "40%", left: "84%", size: 2, duration: 2.4, delay: 1.2 },
+  { top: "76%", left: "72%", size: 3, duration: 3.9, delay: 2 },
+  { top: "14%", left: "48%", size: 2, duration: 3.1, delay: 1.4 },
+  { top: "84%", left: "8%", size: 2, duration: 2.8, delay: 2.4 },
+  { top: "12%", left: "90%", size: 3, duration: 3.4, delay: 0.9 },
+  { top: "52%", left: "58%", size: 2, duration: 4.4, delay: 1.9 },
+  { top: "88%", left: "52%", size: 2, duration: 3, delay: 0.2 }
 ];
 
 export function CTA({ dict }: CTAProps) {
   const { cta } = dict;
+  const reduceMotion = useReducedMotion();
   return (
     <section className="relative mx-auto w-full max-w-7xl px-5 pb-24 pt-4 sm:px-8 lg:pb-32">
       <motion.div
@@ -33,12 +40,40 @@ export function CTA({ dict }: CTAProps) {
       >
         {/* Stars */}
         {STARS.map((star, i) => (
-          <span
+          <motion.span
             key={i}
-            className="absolute rounded-full bg-white/70"
-            style={{ top: star.top, left: star.left, width: star.size, height: star.size }}
+            aria-hidden="true"
+            className="pointer-events-none absolute rounded-full bg-white"
+            style={{
+              top: star.top,
+              left: star.left,
+              width: star.size,
+              height: star.size,
+              boxShadow: `0 0 ${star.size * 3}px ${star.size / 2}px rgba(191, 219, 254, 0.7)`
+            }}
+            initial={{ opacity: 0.5 }}
+            animate={
+              reduceMotion
+                ? { opacity: 0.7 }
+                : { opacity: [0.25, 1, 0.25], scale: [0.7, 1.35, 0.7], y: [0, -6, 0], x: [0, 3, 0] }
+            }
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { duration: star.duration, delay: star.delay, repeat: Infinity, ease: "easeInOut" }
+            }
           />
         ))}
+        {/* Shooting star: a short streak crossing the banner every few seconds. */}
+        {reduceMotion ? null : (
+          <motion.span
+            aria-hidden="true"
+            className="pointer-events-none absolute left-[8%] top-[10%] h-px w-28 rotate-[18deg] rounded-full bg-linear-to-r from-transparent via-white to-transparent"
+            initial={{ opacity: 0, x: 0, y: 0 }}
+            animate={{ opacity: [0, 1, 0], x: [0, 520], y: [0, 170] }}
+            transition={{ duration: 1.4, ease: "easeOut", repeat: Infinity, repeatDelay: 5.5, delay: 2 }}
+          />
+        )}
         <div className="pointer-events-none absolute -right-10 -top-10 h-52 w-52 rounded-full bg-[#38BDF8]/20 blur-3xl" />
 
         <div className="relative flex flex-col items-center gap-8 md:flex-row md:justify-between md:gap-10">
