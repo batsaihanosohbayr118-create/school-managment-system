@@ -7,7 +7,6 @@ import MotionProvider from "@/components/MotionProvider";
 export const metadata: Metadata = {
   title: "Nova Mind Academy",
   description: "School management system for Nova Mind Academy",
-  manifest: "/manifest.json",
   icons: {
     icon: [
       { url: "/favicon.ico" },
@@ -15,11 +14,6 @@ export const metadata: Metadata = {
       { url: "/icon-512.png", sizes: "512x512", type: "image/png" }
     ],
     apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }]
-  },
-  appleWebApp: {
-    capable: true,
-    title: "Nova Mind",
-    statusBarStyle: "default"
   }
 };
 

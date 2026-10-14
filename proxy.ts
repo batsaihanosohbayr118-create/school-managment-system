@@ -47,6 +47,7 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on application routes; skip Next internals, the PWA assets, and static files.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|workbox-|offline.html|icon-|data/).*)"]
+  // Run on application routes; skip Next internals, the service-worker
+  // cleanup script, and static files.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|sw.js|icon-|data/).*)"]
 };

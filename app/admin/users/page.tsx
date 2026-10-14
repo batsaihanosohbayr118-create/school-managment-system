@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
+  Check,
+  ChevronDown,
   KeyRound,
   Pencil,
   Plus,
@@ -38,6 +40,79 @@ type StudentOption = {
   name: string;
   email: string;
 };
+
+type SelectOption = { value: string; label: string };
+
+/** Dark, on-theme replacement for <select>, whose native popup cannot be styled. */
+function UmSelect({
+  label,
+  onChange,
+  options,
+  placeholder,
+  value
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+  value: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <div
+      className={`um-dropdown${open ? " open" : ""}`}
+      onBlur={(event) => {
+        const next = event.relatedTarget;
+        if (!(next instanceof Node) || !event.currentTarget.contains(next)) setOpen(false);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setOpen(false);
+      }}
+    >
+      <button
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={label}
+        className={`um-dropdown-trigger${selected ? "" : " placeholder"}`}
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <span>{selected ? selected.label : placeholder}</span>
+        <ChevronDown aria-hidden="true" size={17} />
+      </button>
+      {open ? (
+        <div className="um-dropdown-menu" role="listbox">
+          {options.length === 0 ? (
+            <p className="um-dropdown-empty">{placeholder}</p>
+          ) : (
+            options.map((option) => {
+              const isSelected = option.value === value;
+              return (
+                <button
+                  aria-selected={isSelected}
+                  className={isSelected ? "selected" : ""}
+                  key={option.value}
+                  onClick={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                  role="option"
+                  title={option.label}
+                  type="button"
+                >
+                  <span>{option.label}</span>
+                  {isSelected ? <Check aria-hidden="true" size={16} /> : null}
+                </button>
+              );
+            })
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 type ModalState =
   | { kind: "create" }
@@ -526,14 +601,15 @@ function UserFormModal({
           <span>Email</span>
           <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="jane@novamind.mn" required />
         </label>
-        <label className="um-field">
+        <div className="um-field">
           <span>Role</span>
-          <select className="um-select" value={role} onChange={(event) => setRole(event.target.value as Role)}>
-            {ROLES.map((option) => (
-              <option key={option} value={option}>{roleLabels[option]}</option>
-            ))}
-          </select>
-        </label>
+          <UmSelect
+            label="Role"
+            onChange={(value) => setRole(value as Role)}
+            options={ROLES.map((option) => ({ value: option, label: roleLabels[option] }))}
+            value={role}
+          />
+        </div>
         {/* Free text on purpose — a teacher may be hired for a subject that is
             not in the catalogue yet, so this is never checked against the DB. */}
         {role === "teacher" ? (
@@ -556,28 +632,25 @@ function UserFormModal({
 
         {/* Must resolve to a real student — the server rejects anything else. */}
         {role === "parent" ? (
-          <label className="um-field">
+          <div className="um-field">
             <span>Guardian for</span>
-            <select
-              className="um-select"
-              value={studentEmail}
-              onChange={(event) => setStudentEmail(event.target.value)}
-              required
-            >
-              <option value="">
-                {students.length > 0
+            <UmSelect
+              label="Guardian for"
+              onChange={setStudentEmail}
+              options={students.map((student) => ({
+                value: student.email,
+                label: student.name ? `${student.name} — ${student.email}` : student.email
+              }))}
+              placeholder={
+                students.length > 0
                   ? "Select a student…"
                   : totalStudents === 0
                     ? "No students in the database yet"
-                    : "Every student already has a guardian"}
-              </option>
-              {students.map((student) => (
-                <option key={student.email} value={student.email}>
-                  {student.name ? `${student.name} — ${student.email}` : student.email}
-                </option>
-              ))}
-            </select>
-          </label>
+                    : "Every student already has a guardian"
+              }
+              value={studentEmail}
+            />
+          </div>
         ) : null}
 
         <label className="um-field">

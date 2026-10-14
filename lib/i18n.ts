@@ -3,14 +3,28 @@
  * client can use the same strings. What stays here is web-only: it reads
  * window.localStorage, which the mobile client doesn't have.
  */
+import { translateColumn as translateSharedColumn, type Language } from "@shared/i18n-tables";
+
 export {
   languages,
   translations,
-  translateColumn,
   translateValue,
   type Language,
   type AppCopy
 } from "@shared/i18n-tables";
+
+/**
+ * Columns only the web dashboard shows. Kept here rather than in shared/ so
+ * adding one does not change what ships in the mobile app.
+ */
+const webColumns: Record<Language, Record<string, string>> = {
+  en: { File: "File", "File Type": "File Type", "Uploaded By": "Uploaded By" },
+  mn: { File: "Файл", "File Type": "Файлын төрөл", "Uploaded By": "Оруулсан" }
+};
+
+export function translateColumn(column: string, language: Language) {
+  return webColumns[language][column] ?? translateSharedColumn(column, language);
+}
 
 export const languageStorageKey = "educore_language";
 

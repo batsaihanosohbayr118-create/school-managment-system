@@ -14,14 +14,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  ExternalLink,
   FileUp,
   House,
+  Inbox,
   LogOut,
   Menu,
   Pencil,
   Plus,
   Printer,
   Search,
+  SearchX,
   Trash2,
   UserCog,
   Video,
@@ -58,7 +61,7 @@ import {
   translateValue,
   translations
 } from "@/lib/i18n";
-import { loadSubjectContent, saveSubjectContent, uploadSubjectFiles } from "@/lib/subjectContent";
+import { loadSubjectContent, openStoredFile, saveSubjectContent, uploadMaterialFile, uploadSubjectFiles } from "@/lib/subjectContent";
 import { getInitialDarkMode, setStoredDarkMode } from "@/lib/theme";
 import {
   createSchoolResource,
@@ -69,7 +72,7 @@ import {
 } from "@/lib/school-api";
 import { authService } from "@/lib/auth-client";
 import { dashboardPathForRole } from "@/lib/auth-flow";
-import { defaultStudentSubjectsValue, subjectOptions } from "@/lib/subjects";
+import { defaultStudentSubjectsValue, subjectCatalog, subjectOptions } from "@/lib/subjects";
 import type { NavModule, Role, SubjectAssignment, SubjectContent, SubjectLesson } from "@/lib/types";
 /** The web dashboard's resources: one per navigation module. The data layer also has mobile-only ones. */
 type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
@@ -139,6 +142,25 @@ function countMatching(table: ResourceTableData, name: string, expected: string)
 function parseAmount(value: string | undefined) {
   const parsed = parseFloat((value ?? "").replace(/[^\d.-]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Payments are recorded in Mongolian tögrög: 150000 → "150,000₮". */
+function formatTugrik(amount: number) {
+  return `${Math.round(amount).toLocaleString("en-US")}₮`;
+}
+
+/**
+ * Stores a typed payment amount as tögrög. A new payment with no status or due
+ * date counts as paid today, so it lands in the revenue chart straight away.
+ */
+function normalizePaymentValues(values: Record<string, string>, mode: ModalMode) {
+  const next = { ...values };
+  if (next.Amount?.trim()) next.Amount = formatTugrik(parseAmount(next.Amount));
+  if (mode === "create") {
+    if (!next.Status?.trim()) next.Status = "Paid";
+    if (!next["Due Date"]?.trim()) next["Due Date"] = new Date().toISOString().slice(0, 10);
+  }
+  return next;
 }
 
 function averageScore(table: ResourceTableData) {
@@ -229,8 +251,8 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
   // "Password" provisions the parent's login, the same way it does for students.
   parents: { fields: ["Name", "Student", "Phone", "Password", "Email"] },
   subjects: { fields: ["Name", "Code", "Description", "Teacher", "Category", "Grade Levels"] },
-  assignments: { fields: ["Subject", "Title", "Type", "Due Date", "Max Score", "Description"] },
-  materials: { fields: ["Subject", "Title", "File Type", "File URL"] },
+  assignments: { fields: ["Subject", "Title", "File", "Due Date", "Max Score", "Description"] },
+  materials: { fields: ["Subject", "Title", "File"] },
   attendance: { fields: ["Student", "Subject", "Date", "Status"] },
   grades: { fields: ["Student", "Subject", "Score", "Semester"] },
   payments: { fields: ["Student", "Amount", "Status", "Due Date"] },
@@ -375,6 +397,8 @@ function editFieldsFor(module: NavModule, columns: string[]) {
   // those slots set the person's password instead.
   if (module === "parents") return columns.map((column) => (column === "Occupation" ? "Password" : column));
   if (module === "teachers") return columns.map((column) => (column === "Experience" ? "Password" : column));
+  // File type and uploader come from the upload itself, not the form.
+  if (module === "materials") return ["Subject", "Title", "File"];
   if (module !== "students") return columns;
 
   // Password is not a table column, so it has no slot of its own — put it
@@ -509,13 +533,13 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
       };
     case "assignments":
       return {
-        columns: ["Subject", "Title", "Type", "Due Date", "Max Score", "Description"],
+        columns: ["Subject", "Title", "File", "Due Date", "Max Score", "Description"],
         ids: [],
         rows: []
       };
     case "materials":
       return {
-        columns: ["Subject", "Title", "File Type", "Uploaded By"],
+        columns: ["Subject", "Title", "File Type", "Uploaded By", "File"],
         ids: [],
         rows: []
       };
@@ -657,6 +681,68 @@ async function deleteResourceData(resource: SchoolResource, recordId: string) {
   });
 }
 
+/**
+ * Places an open dropdown list with position: fixed beside its trigger, so a
+ * scrolling container (the record modal has overflow-y: auto) cannot clip it.
+ * Opens upward when there is more room above. Re-measures on scroll/resize.
+ */
+function useFloatingMenu(open: boolean) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<CSSProperties>({});
+
+  useLayoutEffect(() => {
+    if (!open) return;
+
+    function place() {
+      const trigger = triggerRef.current;
+      const menu = menuRef.current;
+      if (!trigger || !menu) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const gap = 8;
+      const margin = 12;
+      const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
+      const spaceAbove = rect.top - gap - margin;
+      const wanted = Math.min(menu.scrollHeight, 240);
+      const openUp = spaceBelow < wanted && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(120, Math.min(240, openUp ? spaceAbove : spaceBelow));
+      const height = Math.min(wanted, maxHeight);
+      const top = openUp ? rect.top - gap - height : rect.bottom + gap;
+
+      menu.style.position = "fixed";
+      menu.style.top = `${top}px`;
+      menu.style.left = `${rect.left}px`;
+      menu.style.width = `${rect.width}px`;
+      menu.style.maxHeight = `${maxHeight}px`;
+
+      // An ancestor with backdrop-filter or transform turns "fixed" into
+      // "relative to that ancestor"; measure and cancel any such offset.
+      const actual = menu.getBoundingClientRect();
+      const nextStyle: CSSProperties = {
+        position: "fixed",
+        top: top - (actual.top - top),
+        left: rect.left - (actual.left - rect.left),
+        width: rect.width,
+        maxHeight,
+        zIndex: 1000
+      };
+      Object.assign(menu.style, { top: `${nextStyle.top}px`, left: `${nextStyle.left}px` });
+      setStyle(nextStyle);
+    }
+
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
+  return { triggerRef, menuRef, menuStyle: style };
+}
+
 function StatusDropdown({
   labels,
   language,
@@ -674,6 +760,7 @@ function StatusDropdown({
   value: string;
 }) {
   const [open, setOpen] = useState(false);
+  const { triggerRef, menuRef, menuStyle } = useFloatingMenu(open);
   const optionLabel = (option: string) => labels?.[option] ?? translateValue(option, language);
   const selectedLabel = value ? optionLabel(value) : placeholder;
 
@@ -691,13 +778,14 @@ function StatusDropdown({
         aria-expanded={open}
         className={`ec-input ec-select-trigger${value ? " selected" : ""}`}
         onClick={() => setOpen((current) => !current)}
+        ref={triggerRef}
         type="button"
       >
         <span>{selectedLabel}</span>
         <ChevronDown aria-hidden="true" size={18} />
       </button>
       {open ? (
-        <div className="ec-select-menu" role="listbox">
+        <div className="ec-select-menu" ref={menuRef} role="listbox" style={menuStyle}>
           {options.map((option) => {
             const selected = option === value;
 
@@ -711,6 +799,7 @@ function StatusDropdown({
                   setOpen(false);
                 }}
                 role="option"
+                title={optionLabel(option)}
                 type="button"
               >
                 <span>{optionLabel(option)}</span>
@@ -795,8 +884,7 @@ function AssignmentTypeDropdown({
   value: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const { triggerRef, menuRef, menuStyle } = useFloatingMenu(open);
   const options = [
     { value: "Homework", labelEn: "Homework", labelMn: "Гэрийн даалгавар" },
     { value: "Quiz", labelEn: "Quiz", labelMn: "Тест" },
@@ -805,18 +893,6 @@ function AssignmentTypeDropdown({
   ];
   const selected = options.find((option) => option.value === value);
   const selectedLabel = selected ? (language === "mn" ? selected.labelMn : selected.labelEn) : "";
-
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    setMenuStyle({
-      position: "fixed",
-      top: rect.bottom + 8,
-      left: rect.left,
-      width: rect.width,
-      zIndex: 9999
-    });
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -827,10 +903,10 @@ function AssignmentTypeDropdown({
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  }, [open, triggerRef]);
 
   const menu = open ? createPortal(
-    <div className="ec-select-menu" role="listbox" style={menuStyle}>
+    <div className="ec-select-menu portal-dark" ref={menuRef} role="listbox" style={{ ...menuStyle, zIndex: 9999 }}>
       {options.map((option) => {
         const isSelected = option.value === value;
         return (
@@ -1034,6 +1110,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const [currentUserName, setCurrentUserName] = useState("");
   const [currentUserAvatar, setCurrentUserAvatar] = useState("");
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [materialFile, setMaterialFile] = useState<File | null>(null);
   const [notificationPageOpen, setNotificationPageOpen] = useState(false);
   const [activityNotifications, setActivityNotifications] = useState<ActivityNotification[]>([]);
   const [selectedSubjectContent, setSelectedSubjectContent] = useState<SubjectContentTarget>(null);
@@ -1207,6 +1284,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
     // Pre-fill the school-wide subject set so a new student can see their
     // assignments and grades without the admin typing catalogue names by hand.
     setFormValues(activeModule === "students" ? { Subjects: defaultStudentSubjectsValue } : {});
+    setMaterialFile(null);
     setModalOpen(true);
 
     if (activeModule === "parents") {
@@ -1240,6 +1318,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
     }
 
     setFormValues(values);
+    setMaterialFile(null);
     setModalOpen(true);
 
     if (activeModule === "parents") {
@@ -1531,13 +1610,13 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
 
             {activeModule === "dashboard" ? <Dashboard copy={copy} currentUserEmail={currentUserEmail} language={language} role={role} /> : null}
             {activeModule === "students" ? (
-              <StudentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+              <StudentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
             {activeModule === "teachers" ? (
-              <TeachersModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+              <TeachersModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
             {activeModule === "parents" ? (
-              <ParentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+              <ParentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
             {activeModule === "subjects" ? (
               selectedSubjectContent ? (
@@ -1561,7 +1640,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
                   loading={resourceLoading}
                   onAdd={openCreateModal}
                   onDelete={requestDeleteRecord}
-                  onEdit={openEditModal}
+                  emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal}
                   onOpenContent={openSubjectContent}
                 />
               )
@@ -1572,29 +1651,29 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
                   <SubjectScopeTabs language={language} onChange={setSubjectScope} options={subjectScopeOptions} value={subjectScope} />
                 ) : null}
                 {subjectScopeOptions.length === 0 && scopeThisResource ? null : activeModule === "assignments" ? (
-                  <AssignmentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
+                  <AssignmentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
                 ) : (
-                  <MaterialsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
+                  <MaterialsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
                 )}
               </>
             ) : null}
             {activeModule === "attendance" ? (
-              <AttendanceModule apiData={resourceData} canManage={canManageAttendance} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+              <AttendanceModule apiData={resourceData} canManage={canManageAttendance} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
             {activeModule === "grades" ? (
-              <GradesModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+              <GradesModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
             {activeModule === "payments" ? (
-              <PaymentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+              <PaymentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
             {activeModule === "timetable" ? (
-              <TimetableModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+              <TimetableModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
             {activeModule === "announcements" ? (
-              <AnnouncementsModule apiData={resourceData} canManage={canManageAttendance} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+              <AnnouncementsModule apiData={resourceData} canManage={canManageAttendance} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
             {activeModule === "wellbeing" ? (
-              <WellbeingModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} onEdit={openEditModal} />
+              <WellbeingModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
             {activeModule === "settings" ? (
               <SettingsModule
@@ -1652,12 +1731,36 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               }
 
               try {
-                const data = await saveResourceData(activeResource, modalMode, editingRecordId, formValues);
-                const nextData = modalMode === "edit" ? mergeSubmittedValues(data, editingRecordId, formValues) : data;
+                let values = activeResource === "payments" ? normalizePaymentValues(formValues, modalMode) : formValues;
 
-                addActivityNotification(activeResource, modalMode === "edit" ? "updated" : "created", Object.values(formValues).find(Boolean) ?? "");
+                // Materials and assignments carry a stored file: upload it first,
+                // then save the row pointing at it. Editing without a new file
+                // keeps the old one. Only a material must have a file.
+                if (activeResource === "materials" || activeResource === "assignments") {
+                  let fileUrl = formValues.File ?? "";
+                  let fileType = formValues["File Type"] ?? "";
+                  if (materialFile) {
+                    const subject = subjectCatalog.find((item) => item.name === formValues.Subject);
+                    if (!subject) throw new Error(language === "mn" ? "Эхлээд хичээлээ сонгоно уу" : "Choose a subject first");
+                    const uploaded = await uploadMaterialFile(subject.id, materialFile);
+                    fileUrl = uploaded.url;
+                    fileType = uploaded.fileType;
+                  }
+                  if (activeResource === "materials") {
+                    if (!fileUrl) throw new Error(language === "mn" ? "Файл сонгоно уу" : "Choose a file");
+                    values = { Subject: formValues.Subject ?? "", Title: formValues.Title ?? "", "File URL": fileUrl, "File Type": fileType, File: fileUrl };
+                  } else {
+                    values = { ...formValues, "File URL": fileUrl, File: fileUrl };
+                  }
+                }
+
+                const data = await saveResourceData(activeResource, modalMode, editingRecordId, values);
+                const nextData = modalMode === "edit" ? mergeSubmittedValues(data, editingRecordId, values) : data;
+
+                addActivityNotification(activeResource, modalMode === "edit" ? "updated" : "created", Object.values(values).find(Boolean) ?? "");
                 setResourceData(nextData);
                 setFormValues({});
+                setMaterialFile(null);
                 setEditingRecordId(null);
                 setModalOpen(false);
                 setToast(modalMode === "edit" ? copy.common.recordUpdated : copy.common.savedToDatabase(createCopy.action));
@@ -1676,6 +1779,24 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               // A parent is attached to a student who does not have one yet, so
               // that field is a live list rather than a typed name.
               const picksStudent = activeModule === "parents" && field === "Student";
+              const isTugrikField = activeResource === "payments" && field === "Amount";
+
+              if ((activeResource === "materials" || activeResource === "assignments") && field === "File") {
+                return (
+                  <label className="record-field" key={field}>
+                    <span>{translateColumn(field, language)}</span>
+                    <Input
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,image/*,video/*,audio/*"
+                      onChange={(event) => setMaterialFile(event.target.files?.[0] ?? null)}
+                      required={modalMode === "create" && activeResource === "materials"}
+                      type="file"
+                    />
+                    {modalMode === "edit" && formValues.File && !materialFile ? (
+                      <small className="record-hint">{language === "mn" ? "Шинэ файл сонгохгүй бол одоогийн файл хэвээр үлдэнэ." : "Leave empty to keep the current file."}</small>
+                    ) : null}
+                  </label>
+                );
+              }
               const options = picksStudent
                 ? (studentOptions ?? []).map((student) => student.value)
                 : statusOptionsFor(activeModule, field);
@@ -1697,11 +1818,12 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
                 </div>
               ) : (
                 <label className="record-field" key={field}>
-                  <span>{translateColumn(field, language)}</span>
+                  <span>{isTugrikField ? `${translateColumn(field, language)} (₮)` : translateColumn(field, language)}</span>
                   <Input
                     autoComplete={field === "Password" ? "new-password" : undefined}
+                    inputMode={isTugrikField ? "numeric" : undefined}
                     onChange={(event) => setFormValues((current) => ({ ...current, [field]: event.target.value }))}
-                    placeholder={translateColumn(field, language)}
+                    placeholder={isTugrikField ? (language === "mn" ? "Жишээ нь: 150000" : "e.g. 150000") : translateColumn(field, language)}
                     required={index === 0}
                     type={field === "Password" ? "password" : "text"}
                     value={formValues[field] ?? ""}
@@ -1908,7 +2030,7 @@ function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; 
           setLiveStats([
             stat(0, students.rows.length.toString(), mn ? `${withLogin} төлсөн` : `${withLogin} paid`),
             stat(1, teachers.rows.length.toString(), mn ? `${subjectCount} хичээл` : `${subjectCount} subjects`),
-            stat(2, `$${paidTotal.toLocaleString()}`, revenueHelper),
+            stat(2, formatTugrik(paidTotal), revenueHelper),
             stat(3, `${attPct}%`, attendanceHelper)
           ]);
         }
@@ -1965,7 +2087,7 @@ function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; 
           setLiveStats([
             stat(0, `${attPct}%`, attendanceHelper),
             stat(1, gpa, gradeHelper),
-            stat(2, `$${openPayments.toLocaleString()}`, mn ? `${unpaidCount} төлөөгүй` : `${unpaidCount} unpaid`),
+            stat(2, formatTugrik(openPayments), mn ? `${unpaidCount} төлөөгүй` : `${unpaidCount} unpaid`),
             stat(3, announcements.rows.length.toString(), mn ? `${recent} шинэ` : `${recent} this week`)
           ]);
         }
@@ -2022,9 +2144,12 @@ function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; 
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.32)" />
                   <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.3)", borderRadius: 14, color: "#e5eefc" }} />
-                  <Area dataKey="revenue" fill="url(#revenue)" stroke="#4f46e5" strokeWidth={3} />
+                  <YAxis tickFormatter={(value: number) => formatTugrik(value)} width={90} />
+                  <Tooltip
+                    contentStyle={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.3)", borderRadius: 14, color: "#e5eefc" }}
+                    formatter={(value) => formatTugrik(Number(value))}
+                  />
+                  <Area dataKey="revenue" fill="url(#revenue)" name={language === "mn" ? "Орлого" : "Revenue"} stroke="#4f46e5" strokeWidth={3} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -2196,7 +2321,7 @@ function AssignmentsModule({ apiData, copy, error, language, loading, scopeLabel
       language={language}
       loading={loading}
       title={scopeLabel ? `${copy.tables.assignments} — ${translateValue(scopeLabel, language)}` : copy.tables.assignments}
-      columns={["Subject", "Title", "Type", "Due Date", "Max Score", "Description"]}
+      columns={["Subject", "Title", "File", "Due Date", "Max Score", "Description"]}
       rows={[]}
       {...controls}
     />
@@ -2212,7 +2337,7 @@ function MaterialsModule({ apiData, copy, error, language, loading, scopeLabel, 
       language={language}
       loading={loading}
       title={scopeLabel ? `${copy.tables.materials} — ${translateValue(scopeLabel, language)}` : copy.tables.materials}
-      columns={["Subject", "Title", "File Type", "Uploaded By"]}
+      columns={["Subject", "Title", "File Type", "Uploaded By", "File"]}
       rows={[]}
       {...controls}
     />
@@ -3762,6 +3887,8 @@ type ModuleControls = {
   onDelete: (recordId: string, row: string[]) => void;
   onEdit: (recordId: string, row: string[], columns: string[]) => void;
   contentActionLabel?: string;
+  /** What this table holds ("Зарлал"), for the empty state. */
+  emptyLabel?: string;
   onOpenContent?: (recordId: string, row: string[]) => void;
 };
 
@@ -3776,6 +3903,7 @@ function ModuleTable({
   loading,
   canManage,
   contentActionLabel,
+  emptyLabel,
   onAdd,
   onDelete,
   onEdit,
@@ -3849,7 +3977,22 @@ function ModuleTable({
               <div className="ec-table-row" key={id ?? row.join("-")} style={{ gridTemplateColumns: gridColumns }}>
                 {row.map((cell, index) => (
                   <span data-label={translateColumn(displayColumns[index], language)} key={`${cell}-${index}`}>
-                    {["Paid", "Unpaid", "Partial", "Present", "Absent", "Late"].includes(cell) ? (
+                    {displayColumns[index] === "File" ? (
+                      /^(\/|https?:\/\/)/.test(cell) ? (
+                        <button
+                          className="file-open-action"
+                          onClick={() => {
+                            openStoredFile(cell).catch(() => window.alert(language === "mn" ? "Файлыг нээж чадсангүй" : "Could not open the file"));
+                          }}
+                          type="button"
+                        >
+                          <ExternalLink size={14} />
+                          {language === "mn" ? "Нээх" : "Open"}
+                        </button>
+                      ) : (
+                        "—"
+                      )
+                    ) : ["Paid", "Unpaid", "Partial", "Present", "Absent", "Late"].includes(cell) ? (
                       <Badge tone={statusTone(cell)}>{translateValue(cell, language)}</Badge>
                     ) : (
                       translateValue(cell, language)
@@ -3879,8 +4022,21 @@ function ModuleTable({
             ))
           ) : (
             <div className="table-empty">
-              <strong>{language === "mn" ? "Бүртгэл олдсонгүй" : "No records found"}</strong>
-              <p>{language === "mn" ? "Хайлтын үгээ өөрчлөөд дахин оролдоно уу." : "Try a different filter term."}</p>
+              <span className="table-empty-icon" aria-hidden="true">
+                {normalizedFilter ? <SearchX size={22} /> : <Inbox size={22} />}
+              </span>
+              <strong>
+                {normalizedFilter
+                  ? (language === "mn" ? "Илэрц олдсонгүй" : "No matches found")
+                  : language === "mn"
+                    ? `Одоогоор ${(emptyLabel || "бүртгэл").toLocaleLowerCase("mn")} алга`
+                    : `No ${(emptyLabel || "").toLowerCase()} records yet`.replace("  ", " ")}
+              </strong>
+              <p>
+                {normalizedFilter
+                  ? (language === "mn" ? "Хайлтын үгээ өөрчлөөд дахин оролдоно уу." : "Try a different filter term.")
+                  : (language === "mn" ? "Шинэ бүртгэл нэмэгдмэгц энд харагдана." : "New records will appear here once they are added.")}
+              </p>
             </div>
           )}
         </div>

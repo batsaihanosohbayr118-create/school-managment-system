@@ -52,8 +52,8 @@ const resourceColumns: Record<SchoolResource, string[]> = {
   teachers: ["Name", "Email", "Subject", "Experience", "Salary", "Contact"],
   parents: ["Name", "Email", "Student", "Phone", "Occupation"],
   subjects: ["Name", "Code", "Description", "Teacher", "Category", "Grade Levels"],
-  assignments: ["Subject", "Title", "Type", "Due Date", "Max Score", "Description"],
-  materials: ["Subject", "Title", "File Type", "Uploaded By"],
+  assignments: ["Subject", "Title", "File", "Due Date", "Max Score", "Description"],
+  materials: ["Subject", "Title", "File Type", "Uploaded By", "File"],
   attendance: ["Student", "Subject", "Date", "Status"],
   grades: ["Student", "Subject", "Score", "Semester"],
   payments: ["Student", "Amount", "Status", "Due Date"],
@@ -241,6 +241,8 @@ async function initializeSchoolDatabase() {
       due_date TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE assignments ADD COLUMN IF NOT EXISTS file_url TEXT NOT NULL DEFAULT '';
 
     CREATE TABLE IF NOT EXISTS assignment_submissions (
       id TEXT PRIMARY KEY,
@@ -503,15 +505,15 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
     case "subjects":
       return [values.Name, values.Code, values.Description, values.Teacher, values.Category, values["Grade Levels"]].map(stringValue);
     case "assignments":
-      return [values.Subject, values.Title, values.Type ?? "Homework", values["Due Date"] ?? "", values["Max Score"] ?? "100", values.Description ?? ""].map(stringValue);
+      return [values.Subject, values.Title, values["File URL"] ?? "", values["Due Date"] ?? "", values["Max Score"] ?? "100", values.Description ?? ""].map(stringValue);
     case "materials":
-      return [values.Subject, values.Title, values["File Type"] ?? "", values["Uploaded By"] ?? ""].map(stringValue);
+      return [values.Subject, values.Title, values["File Type"] ?? "", values["Uploaded By"] ?? "", values["File URL"] ?? ""].map(stringValue);
     case "attendance":
       return [values.Student, values.Subject, values.Date || new Date().toISOString().slice(0, 10), values.Status || "Present"].map(stringValue);
     case "grades":
       return [values.Student, values.Subject, `${numberValue(values.Score)}`, values.Semester ?? ""].map(stringValue);
     case "payments":
-      return [values.Student, values.Amount || "$0", values.Status || "Unpaid", values["Due Date"] ?? ""].map(stringValue);
+      return [values.Student, values.Amount || "0₮", values.Status || "Unpaid", values["Due Date"] ?? ""].map(stringValue);
     case "timetable":
       return [values.Subject, values.Day, values.Time ?? "", values.Teacher ?? "", values.Class ?? ""].map(stringValue);
     case "announcements":
@@ -582,9 +584,9 @@ function rowToArray(resource: SchoolResource, row: QueryRow | DbRow | LocalResou
     case "subjects":
       return [row.name, row.code, row.description, row.teacher, row.category, row.grade_levels].map(stringValue);
     case "assignments":
-      return [row.subject, row.title, row.type, row.due_date, row.max_score, row.description].map(stringValue);
+      return [row.subject, row.title, row.file_url, row.due_date, row.max_score, row.description].map(stringValue);
     case "materials":
-      return [row.subject, row.title, row.file_type, row.uploaded_by_name || row.uploaded_by].map(stringValue);
+      return [row.subject, row.title, row.file_type, row.uploaded_by_name || row.uploaded_by, row.file_url].map(stringValue);
     case "attendance":
       return [row.student, row.subject, row.date, row.status].map(stringValue);
     case "grades":
@@ -1393,10 +1395,10 @@ export async function createResource(resource: SchoolResource, values: Record<st
         const teacherName = context?.session.role === "teacher" ? (await getAssignedSubjectNameForTeacher(pool, context.session.email)) : values.Teacher ?? "";
         await pool.query(
           `
-          INSERT INTO assignments (id, subject_id, subject, teacher_id, teacher, title, description, type, max_score, due_date)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          INSERT INTO assignments (id, subject_id, subject, teacher_id, teacher, title, description, type, max_score, due_date, file_url)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         `,
-          [id, subject ? stringValue(subject.id) : "", subjectName, "", teacherName, values.Title, values.Description ?? "", values.Type ?? "Homework", numberValue(values["Max Score"] ?? 100), values["Due Date"] ?? ""]
+          [id, subject ? stringValue(subject.id) : "", subjectName, "", teacherName, values.Title, values.Description ?? "", values.Type ?? "Homework", numberValue(values["Max Score"] ?? 100), values["Due Date"] ?? "", values["File URL"] ?? ""]
         );
         break;
       }
@@ -1625,10 +1627,10 @@ export async function updateResource(resource: SchoolResource, id: string, value
         await pool.query(
           `
           UPDATE assignments
-          SET subject_id = $1, subject = $2, title = $3, description = $4, type = $5, max_score = $6, due_date = $7
+          SET subject_id = $1, subject = $2, title = $3, description = $4, max_score = $5, due_date = $6, file_url = $7
           WHERE id = $8
         `,
-          [subject ? stringValue(subject.id) : "", subject ? stringValue(subject.name) : values.Subject, values.Title, values.Description ?? "", values.Type ?? "Homework", numberValue(values["Max Score"] ?? 100), values["Due Date"] ?? "", id]
+          [subject ? stringValue(subject.id) : "", subject ? stringValue(subject.name) : values.Subject, values.Title, values.Description ?? "", numberValue(values["Max Score"] ?? 100), values["Due Date"] ?? "", values["File URL"] ?? "", id]
         );
         break;
       }

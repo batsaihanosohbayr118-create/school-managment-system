@@ -749,13 +749,19 @@ button {
   gap: 6px;
   width: 100%;
   max-height: 240px;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 8px;
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid rgba(129, 140, 248, 0.32);
   border-radius: 16px;
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
-  scrollbar-width: thin;
+  /* Still scrolls (wheel, touch, keyboard); only the bar is hidden. */
+  scrollbar-width: none;
+}
+
+.ec-select-menu::-webkit-scrollbar {
+  display: none;
 }
 
 .ec-select-menu button {
@@ -763,6 +769,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  min-width: 0;
   min-height: 40px;
   padding: 0 11px;
   color: var(--ink);
@@ -790,6 +797,7 @@ button {
 }
 
 .ec-select-menu button span {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -801,18 +809,24 @@ button {
   background: rgba(30, 41, 59, 0.92);
 }
 
-.educore-shell.dark .ec-select-menu {
+.educore-shell.dark .ec-select-menu,
+.ec-select-menu.portal-dark {
   background: rgba(15, 23, 42, 0.98);
   border-color: rgba(129, 140, 248, 0.32);
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.36);
 }
 
-.educore-shell.dark .ec-select-menu button {
+.educore-shell.dark .ec-select-menu button,
+.ec-select-menu.portal-dark button {
   color: #f8fafc;
 }
 
+/* .portal-dark: a menu portalled to <body> sits outside .educore-shell and
+   would otherwise fall back to the light styles. */
 .educore-shell.dark .ec-select-menu button:hover,
-.educore-shell.dark .ec-select-menu button.selected {
+.educore-shell.dark .ec-select-menu button.selected,
+.ec-select-menu.portal-dark button:hover,
+.ec-select-menu.portal-dark button.selected {
   color: #c7d2fe;
   background: rgba(129, 140, 248, 0.16);
 }
@@ -949,7 +963,7 @@ button {
   min-height: 46px;
   padding: 4px;
   background: var(--panel-strong);
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 15px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
 }
@@ -2091,28 +2105,50 @@ button {
 
 .table-empty {
   display: grid;
-  gap: 5px;
-  min-height: 120px;
+  gap: 6px;
+  min-height: 140px;
   place-content: center;
-  padding: 18px;
+  justify-items: center;
+  padding: 26px 20px;
   color: var(--ink);
-  border: 1px dashed rgba(148, 163, 184, 0.36);
-  border-radius: 16px;
+  background: radial-gradient(120% 90% at 50% 0%, rgba(99, 102, 241, 0.08), transparent 70%);
+  border: 0;
+  border-radius: 18px;
   text-align: center;
+}
+
+.table-empty-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 6px;
+  place-items: center;
+  color: var(--primary);
+  background: rgba(99, 102, 241, 0.12);
+  border-radius: 16px;
 }
 
 .table-empty strong {
   font-size: 16px;
+  font-weight: 800;
 }
 
 .table-empty p {
+  max-width: 340px;
   margin: 0;
   color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .educore-shell.dark .table-empty {
   color: #f8fafc;
-  border-color: rgba(148, 163, 184, 0.24);
+  background: radial-gradient(120% 90% at 50% 0%, rgba(99, 102, 241, 0.14), transparent 70%);
+}
+
+.educore-shell.dark .table-empty-icon {
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.18);
 }
 
 .activity-row {
@@ -3175,7 +3211,7 @@ button {
     min-height: 66px;
     padding: 6px;
     background: rgba(255, 255, 255, 0.9);
-    border: 1px solid var(--line);
+    border: 0;
     border-radius: 20px;
     box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
     backdrop-filter: blur(22px);
@@ -3219,7 +3255,6 @@ button {
 
   .educore-shell.dark .mobile-bottom-nav {
     background: rgba(15, 23, 42, 0.92);
-    border-color: rgba(148, 163, 184, 0.22);
   }
 
   .mobile-settings-card {
@@ -4391,7 +4426,7 @@ button {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  border: 1px solid var(--um-line);
+  border: 0;
   background: var(--um-surface);
   color: var(--um-ink);
   text-decoration: none;
@@ -4447,6 +4482,7 @@ button {
   align-items: center;
   gap: 9px;
   flex: 1 1 260px;
+  max-width: 420px;
   padding: 0 14px;
   height: 44px;
   border-radius: 12px;
@@ -4546,21 +4582,19 @@ button {
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  border: 1px solid var(--um-line);
+  border: 0;
   background: #fff;
   color: var(--um-muted);
   cursor: pointer;
-  transition: color 0.12s ease, border-color 0.12s ease;
+  transition: color 0.12s ease;
 }
 
 .um-row-actions button:hover {
   color: var(--um-primary);
-  border-color: var(--um-primary);
 }
 
 .um-row-actions button.um-danger:hover {
   color: var(--um-danger);
-  border-color: var(--um-danger);
 }
 
 .um-empty {
@@ -4626,7 +4660,7 @@ button {
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
+  border: 0;
   background: #fff;
   color: #5b6b86;
   cursor: pointer;
@@ -4659,6 +4693,148 @@ button {
   padding: 0 12px;
   font-size: 0.94rem;
   cursor: pointer;
+}
+
+.um-dropdown {
+  position: relative;
+  min-width: 0;
+}
+
+.um-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  height: 44px;
+  padding: 0 12px 0 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 11px;
+  background: #101c39;
+  color: #e8eefc;
+  font: inherit;
+  font-size: 0.94rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.um-dropdown-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.um-dropdown-trigger.placeholder span {
+  color: #97a6c4;
+}
+
+.um-dropdown-trigger svg {
+  flex: 0 0 auto;
+  color: #97a6c4;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.um-dropdown-trigger:hover,
+.um-dropdown.open .um-dropdown-trigger {
+  border-color: rgba(99, 102, 241, 0.6);
+}
+
+.um-dropdown.open .um-dropdown-trigger {
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.um-dropdown.open .um-dropdown-trigger svg {
+  color: #a5b4fc;
+  transform: rotate(180deg);
+}
+
+.um-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 4px;
+  max-height: 240px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid rgba(129, 140, 248, 0.28);
+  border-radius: 14px;
+  background: #0b1430;
+  box-shadow: 0 18px 44px rgba(2, 6, 23, 0.6);
+  scrollbar-width: thin;
+  animation: um-dropdown-in 0.14s ease-out;
+}
+
+.um-dropdown-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #dbe4f8;
+  font: inherit;
+  font-size: 0.92rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.um-dropdown-menu button span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.um-dropdown-menu button:hover {
+  background: rgba(99, 102, 241, 0.16);
+  color: #fff;
+}
+
+.um-dropdown-menu button.selected {
+  background: rgba(99, 102, 241, 0.26);
+  color: #c7d2fe;
+  font-weight: 650;
+}
+
+.um-dropdown-menu button svg {
+  flex: 0 0 auto;
+  color: #a5b4fc;
+}
+
+.um-dropdown-empty {
+  margin: 0;
+  padding: 10px 12px;
+  color: #97a6c4;
+  font-size: 0.88rem;
+}
+
+@keyframes um-dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .um-dropdown-menu {
+    animation: none;
+  }
 }
 
 .um-form-error {
@@ -5012,4 +5188,22 @@ button {
   font-size: 12px;
   font-weight: 600;
   line-height: 1.5;
+}
+
+.file-open-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.file-open-action:hover {
+  background: rgba(99, 102, 241, 0.24);
 }
