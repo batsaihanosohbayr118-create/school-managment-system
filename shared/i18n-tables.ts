@@ -574,6 +574,21 @@ export const translations = {
         B2: { name: "Upper-intermediate", description: "Understands complex texts and speaks fluently and clearly." },
         C1: { name: "Advanced", description: "Understands long, demanding texts and uses English flexibly." }
       }
+    },
+    qpay: {
+      payButton: "Pay with QPay",
+      title: "QPay payment",
+      creating: "Creating invoice…",
+      createFailed: "Could not create the QPay invoice. Try again.",
+      scanQr: "Scan this QR code with your bank app, or choose your bank below.",
+      banks: "Pay with a bank app",
+      bankNotInstalled: "That bank app is not installed on this phone.",
+      checkPayment: "I've paid — check",
+      notPaidYet: "Payment not received yet. Finish paying in your bank app, then check again.",
+      checkFailed: "Could not check the payment. Try again.",
+      paid: "Payment received. Thank you!",
+      done: "Done",
+      retry: "Try again"
     }
   },
   mn: {
@@ -1028,6 +1043,21 @@ export const translations = {
         B2: { name: "Дундаас дээш", description: "Нарийн төвөгтэй текстийг ойлгож, чөлөөтэй, тодорхой ярьдаг." },
         C1: { name: "Ахисан", description: "Урт, хүнд текстийг ойлгож, англи хэлийг уян хатан хэрэглэнэ." }
       }
+    },
+    qpay: {
+      payButton: "QPay-ээр төлөх",
+      title: "QPay төлбөр",
+      creating: "Нэхэмжлэх үүсгэж байна…",
+      createFailed: "QPay нэхэмжлэх үүсгэж чадсангүй. Дахин оролдоно уу.",
+      scanQr: "Энэ QR кодыг банкны аппаараа уншуулах эсвэл доороос банкаа сонгоно уу.",
+      banks: "Банкны аппаар төлөх",
+      bankNotInstalled: "Энэ банкны апп утсанд суугаагүй байна.",
+      checkPayment: "Төлсөн — шалгах",
+      notPaidYet: "Төлбөр хараахан орж ирээгүй байна. Банкны аппаа дуусгаад дахин шалгана уу.",
+      checkFailed: "Төлбөр шалгаж чадсангүй. Дахин оролдоно уу.",
+      paid: "Төлбөр амжилттай төлөгдлөө. Баярлалаа!",
+      done: "Болсон",
+      retry: "Дахин оролдох"
     }
   }
 };

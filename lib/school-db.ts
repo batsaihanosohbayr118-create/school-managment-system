@@ -7,6 +7,7 @@ import type { NavModule, Role } from "@/lib/types";
 import { defaultStudentSubjects, defaultStudentSubjectsValue, subjectCatalog } from "@/lib/subjects";
 import { AccountConflictError, allPushTokens, createAccount, pushTokensForRole, setAccountPassword, syncAccountName } from "@/lib/auth-db";
 import { sendPushNotifications } from "@/lib/mobile/push";
+import { parseMoney } from "@/lib/mobile/table";
 import { placementBank } from "@/lib/placement-bank";
 import { PLACEMENT_SUBJECT, isPlacementSubject, normalizeAnswerLetter, normalizeCefrLevel, scorePlacement } from "@shared/placement";
 import type { SchoolSession } from "./school-session";
@@ -1737,6 +1738,36 @@ export async function updateResource(resource: SchoolResource, id: string, value
  * One attempt per student: a second submission is refused until the English
  * teacher deletes the first result.
  */
+const QPAY_SYSTEM_SESSION: SchoolSession = { role: "admin", email: "qpay@system", name: "QPay", avatarUrl: "", source: "neon" };
+
+/**
+ * Marks a payment Paid once QPay has confirmed `paidAmount` against it.
+ * The caller verifies the money with QPay; this only checks it covers the
+ * recorded amount, then writes through updateResource like the admin
+ * dashboard does. Returns whether the payment is now Paid.
+ */
+export async function settleQpayPayment(id: string, paidAmount: number): Promise<boolean> {
+  const context: SchoolRequestContext = { session: QPAY_SYSTEM_SESSION };
+  const table = await listResource("payments", context);
+  const index = table.ids.indexOf(id);
+  if (index < 0) return false;
+
+  const row = table.rows[index];
+  const value = (column: string) => row[table.columns.indexOf(column)] ?? "";
+  if (value("Status").trim().toLowerCase() === "paid") return true;
+
+  const amount = parseMoney(value("Amount"));
+  if (amount === null || amount <= 0 || paidAmount < amount) return false;
+
+  await updateResource(
+    "payments",
+    id,
+    { Student: value("Student"), Amount: value("Amount"), Status: "Paid", "Due Date": value("Due Date") },
+    context
+  );
+  return true;
+}
+
 export async function submitPlacementTest(answers: Record<string, string>, context: SchoolRequestContext) {
   if (context.session.role !== "student") {
     throw new Error("Only students have permission to take the placement test.");

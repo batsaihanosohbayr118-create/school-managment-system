@@ -9,6 +9,8 @@ import type {
   PlacementQuestionsResponse,
   PlacementResponse,
   PlacementResultsResponse,
+  QpayCheckResponse,
+  QpayInvoiceResponse,
   SubjectContent,
   SubjectsResponse,
   TimetableResponse
@@ -96,6 +98,10 @@ export const api = {
   attendance: () => request<AttendanceResponse>("/api/mobile/attendance"),
   announcements: () => request<AnnouncementsResponse>("/api/mobile/announcements"),
   payments: () => request<PaymentsResponse>("/api/mobile/payments"),
+  createQpayInvoice: (paymentId: string) =>
+    request<QpayInvoiceResponse>("/api/mobile/payments/qpay", { method: "POST", body: JSON.stringify({ paymentId }) }),
+  checkQpayPayment: (body: { paymentId: string; invoiceId: string; checkToken: string }) =>
+    request<QpayCheckResponse>("/api/mobile/payments/qpay/check", { method: "POST", body: JSON.stringify(body) }),
   subjects: () => request<SubjectsResponse>("/api/mobile/subjects"),
   subjectContent: (subjectId: string) =>
     request<SubjectContent | null>(`/api/subjects/${encodeURIComponent(subjectId)}/content`),

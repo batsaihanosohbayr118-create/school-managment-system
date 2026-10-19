@@ -1,5 +1,7 @@
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { useCallback, useRef } from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { Badge, statusTone } from '@/components/Badge';
 import { Card } from '@/components/Card';
@@ -18,6 +20,16 @@ export default function PaymentsScreen() {
   const { t } = useLanguage();
   const dangerColor = useThemeColor({}, 'danger');
   const tint = useThemeColor({}, 'tint');
+
+  // Coming back from the QPay screen should show the new Paid status; the
+  // first focus is skipped because useApiData already fetches on mount.
+  const focusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (focusedOnce.current) refetch();
+      focusedOnce.current = true;
+    }, [refetch])
+  );
 
   if (loading) {
     return <SkeletonList />;
@@ -50,6 +62,8 @@ function PaymentRow({ payment }: { payment: PaymentEntry }) {
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
   const tintMuted = useThemeColor({}, 'tintMuted');
+  const router = useRouter();
+  const payable = payment.status.trim().toLowerCase() !== 'paid' && (payment.amount ?? 0) > 0;
 
   return (
     <Card style={styles.card}>
@@ -74,6 +88,17 @@ function PaymentRow({ payment }: { payment: PaymentEntry }) {
           </Text>
         </View>
       </View>
+      {payable ? (
+        <Pressable
+          style={({ pressed }) => [styles.payButton, { backgroundColor: tint }, pressed && styles.payButtonPressed]}
+          onPress={() =>
+            router.push({ pathname: '/qpay', params: { paymentId: payment.id, amountLabel: payment.amountLabel } })
+          }
+        >
+          <Ionicons name="qr-code-outline" size={16} color="#fff" />
+          <Text style={styles.payButtonText}>{t.qpay.payButton}</Text>
+        </Pressable>
+      ) : null}
     </Card>
   );
 }
@@ -138,5 +163,22 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 12,
     fontWeight: '500'
+  },
+  payButton: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 11,
+    borderRadius: 10
+  },
+  payButtonPressed: {
+    opacity: 0.8
+  },
+  payButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700'
   }
 });

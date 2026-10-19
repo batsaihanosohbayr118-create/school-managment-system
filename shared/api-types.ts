@@ -126,6 +126,22 @@ export type TimetableResponse = { slots: TimetableSlot[] };
 export type GradesResponse = { grades: GradeEntry[] };
 export type AttendanceResponse = { entries: AttendanceEntry[] };
 export type PaymentsResponse = { payments: PaymentEntry[] };
+
+/** One bank app QPay offers for an invoice; `link` is that app's deeplink. */
+export type QpayBankLink = { name: string; description: string; logo: string; link: string };
+
+export type QpayInvoiceResponse = {
+  invoiceId: string;
+  /** Server-signed proof that this invoice belongs to this payment; sent back on every check. */
+  checkToken: string;
+  amount: number;
+  /** Base64 PNG, no data: prefix. */
+  qrImage: string;
+  shortUrl: string;
+  banks: QpayBankLink[];
+};
+
+export type QpayCheckResponse = { paid: boolean };
 export type AnnouncementsResponse = { announcements: AnnouncementEntry[] };
 export type SubjectsResponse = { subjects: SubjectEntry[] };
 
