@@ -15,11 +15,14 @@ export const HEADER_GRADIENT: [string, string] = ['#3b82f6', '#7c3aed'];
 export function GradientHeaderButton({
   icon,
   onPress,
-  accessibilityLabel
+  accessibilityLabel,
+  colors = HEADER_GRADIENT
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   accessibilityLabel: string;
+  /** Defaults to the placement screens' blue→purple. */
+  colors?: readonly [string, string, ...string[]];
 }) {
   const [scale] = useState(() => new Animated.Value(1));
 
@@ -40,7 +43,7 @@ export function GradientHeaderButton({
       accessibilityLabel={accessibilityLabel}
     >
       <Animated.View style={[styles.shadow, { transform: [{ scale }] }]}>
-        <LinearGradient colors={HEADER_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.button}>
+        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.button}>
           <Ionicons
             name={icon}
             size={22}

@@ -348,9 +348,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16
   },
+  // Flexible rather than a fixed 280: it takes whatever height is left under
+  // the card, so the screen fits without scrolling. minHeight keeps the
+  // four-line "Better Students…" message clear of the card; the ScrollView
+  // still scrolls on short phones and when the keyboard is up.
   footerImageWrap: {
     width: '100%',
-    height: 280,
+    flex: 1,
+    minHeight: 210,
+    maxHeight: 280,
     position: 'relative',
     marginTop: 18,
     marginBottom: 0
@@ -380,6 +386,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     width: '54%',
-    height: 240
+    height: '100%',
+    maxHeight: 240
   }
 });

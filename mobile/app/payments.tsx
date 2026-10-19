@@ -1,25 +1,54 @@
 import { useCallback, useRef } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import { FlatList, Image, Platform, Pressable, RefreshControl, StyleSheet, View as RNView, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Badge, statusTone } from '@/components/Badge';
-import { Card } from '@/components/Card';
+import { statusTone } from '@/components/Badge';
+import { GradientHeaderButton, gradientHeaderItem } from '@/components/GradientHeaderButton';
 import { EmptyState } from '@/components/EmptyState';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { SkeletonList } from '@/components/Skeleton';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
 import { api } from '@/lib/api';
 import { useLanguage } from '@/lib/language-context';
 import { useApiData } from '@/lib/use-api';
 import { translateValue } from '@shared/i18n-tables';
+import { formatAmountLabel } from '@shared/money';
 import type { PaymentEntry } from '@shared/api-types';
+import { type Palette, paymentPalettes as palettes } from '@/components/payment-palette';
+
+const PAYMENT_ART = require('@/assets/images/payment.png');
+const PAYMENT_ART_RATIO = 1086 / 1448;
+
+/** Status pills are solid gradients with a soft glow of their own color — no outline. */
+const statusStyles = {
+  success: { icon: 'checkmark-circle', colors: ['#34d399', '#059669'], glow: '#10b981' },
+  danger: { icon: 'alert-circle', colors: ['#ff6b81', '#e11d48'], glow: '#f43f5e' },
+  warning: { icon: 'time', colors: ['#fbbf24', '#ea580c'], glow: '#f59e0b' },
+  neutral: { icon: 'ellipse', colors: ['#7c8db5', '#4b5878'], glow: '#64748b' }
+} as const;
 
 export default function PaymentsScreen() {
   const { data, error, loading, refetch, isOffline } = useApiData('payments', api.payments);
   const { t } = useLanguage();
-  const dangerColor = useThemeColor({}, 'danger');
-  const tint = useThemeColor({}, 'tint');
+  const isDark = useColorScheme() === 'dark';
+  const palette = isDark ? palettes.dark : palettes.light;
+  // expo-router (SDK 56+) forbids importing @react-navigation/* for useHeaderHeight;
+  // on iOS the list insets itself under the transparent header, elsewhere a
+  // fixed allowance for the standard header height is enough.
+  const headerHeight = useSafeAreaInsets().top + 56;
+  const isIOS = Platform.OS === 'ios';
+  // Explicit pixel size: a percentage width with aspectRatio let the Image
+  // fall back to the PNG's own 1086px height and push the art off screen.
+  const artWidth = Math.min(useWindowDimensions().width * 0.58, 230);
+  const router = useRouter();
+  const backButton = (
+    <GradientHeaderButton icon="chevron-back" colors={palette.button} onPress={() => router.back()} accessibilityLabel={t.qpay.back} />
+  );
 
   // Coming back from the QPay screen should show the new Paid status; the
   // first focus is skipped because useApiData already fetches on mount.
@@ -31,84 +60,193 @@ export default function PaymentsScreen() {
     }, [refetch])
   );
 
+  let body;
   if (loading) {
-    return <SkeletonList />;
-  }
-
-  if (error && !isOffline) {
-    return (
-      <View style={styles.center}>
-        <Text style={{ color: dangerColor }}>{error.message}</Text>
+    body = (
+      <RNView style={{ paddingTop: headerHeight }}>
+        <SkeletonList />
+      </RNView>
+    );
+  } else if (error && !isOffline) {
+    body = (
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
+        <Text style={{ color: isDark ? '#fca5a5' : '#b91c1c' }}>{error.message}</Text>
       </View>
+    );
+  } else {
+    body = (
+      <FlatList
+        style={styles.list}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[styles.content, { paddingTop: isIOS ? 12 : headerHeight + 12 }]}
+        data={data?.payments ?? []}
+        keyExtractor={(payment) => payment.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={refetch}
+            tintColor={palette.icon}
+            colors={[palette.icon]}
+            progressViewOffset={isIOS ? undefined : headerHeight}
+          />
+        }
+        ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
+        ListEmptyComponent={<EmptyState icon="card-outline" label={t.common.noPaymentsYet} />}
+        ListFooterComponent={
+          <RNView style={styles.promo}>
+            <Image
+              source={PAYMENT_ART}
+              style={{ width: artWidth, height: artWidth * PAYMENT_ART_RATIO }}
+              resizeMode="contain"
+              accessibilityIgnoresInvertColors
+            />
+            <Text style={[styles.promoTitle, { color: palette.text }]}>{t.qpay.promoTitle}</Text>
+            <Text style={[styles.promoSubtitle, { color: palette.meta }]}>{t.qpay.promoSubtitle}</Text>
+          </RNView>
+        }
+        renderItem={({ item }) => <PaymentCard payment={item} palette={palette} />}
+      />
     );
   }
 
   return (
-    <FlatList
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      data={data?.payments ?? []}
-      keyExtractor={(payment) => payment.id}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
-      ListHeaderComponent={isOffline ? <OfflineBanner /> : null}
-      ListEmptyComponent={<EmptyState icon="card-outline" label={t.common.noPaymentsYet} />}
-      renderItem={({ item }) => <PaymentRow payment={item} />}
-    />
+    <RNView style={styles.screen}>
+      <Stack.Screen
+        options={{
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: 'transparent' },
+          headerTintColor: palette.text,
+          headerBackVisible: false,
+          headerLeft: () => backButton,
+          unstable_headerLeftItems: gradientHeaderItem(backButton),
+          headerTitleStyle: { color: palette.text, fontWeight: '800' }
+        }}
+      />
+      <LinearGradient colors={palette.background} start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 1 }} style={StyleSheet.absoluteFill} />
+      <RNView pointerEvents="none" style={[styles.orb, styles.orbTop, { backgroundColor: palette.orbA }]} />
+      <RNView pointerEvents="none" style={[styles.orb, styles.orbBottom, { backgroundColor: palette.orbB }]} />
+      {body}
+    </RNView>
   );
 }
 
-function PaymentRow({ payment }: { payment: PaymentEntry }) {
+function PaymentCard({ payment, palette }: { payment: PaymentEntry; palette: Palette }) {
   const { language, t } = useLanguage();
-  const mutedColor = useThemeColor({}, 'muted');
-  const tint = useThemeColor({}, 'tint');
-  const tintMuted = useThemeColor({}, 'tintMuted');
   const router = useRouter();
   const payable = payment.status.trim().toLowerCase() !== 'paid' && (payment.amount ?? 0) > 0;
+  const status = statusStyles[toneKey(payment.status)];
 
   return (
-    <Card style={styles.card}>
-      <View style={styles.rowHeader}>
-        <View style={styles.amountRow}>
-          <View style={[styles.iconBadge, { backgroundColor: tintMuted }]}>
-            <Ionicons name="card" size={15} color={tint} />
-          </View>
-          <Text style={styles.amount}>{payment.amountLabel}</Text>
-        </View>
-        <Badge label={translateValue(payment.status, language)} tone={statusTone(payment.status)} />
-      </View>
-      <View style={styles.metaRow}>
-        <View style={styles.metaGroup}>
-          <Ionicons name="person-outline" size={13} color={mutedColor} />
-          <Text style={styles.student} numberOfLines={1}>{payment.student}</Text>
-        </View>
-        <View style={styles.metaGroup}>
-          <Ionicons name="calendar-outline" size={12} color={mutedColor} />
-          <Text style={[styles.date, { color: mutedColor }]}>
-            {t.columns['Due date']} {payment.dueDate}
-          </Text>
-        </View>
-      </View>
-      {payable ? (
-        <Pressable
-          style={({ pressed }) => [styles.payButton, { backgroundColor: tint }, pressed && styles.payButtonPressed]}
-          onPress={() =>
-            router.push({ pathname: '/qpay', params: { paymentId: payment.id, amountLabel: payment.amountLabel } })
-          }
-        >
-          <Ionicons name="qr-code-outline" size={16} color="#fff" />
-          <Text style={styles.payButtonText}>{t.qpay.payButton}</Text>
-        </Pressable>
-      ) : null}
-    </Card>
+    <RNView style={[styles.cardShadow, { shadowColor: palette.glow }]}>
+      <LinearGradient
+        colors={palette.card}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.card, { borderColor: palette.cardBorder }]}
+      >
+        <RNView style={styles.cardHeader}>
+          <RNView style={styles.amountRow}>
+            <RNView style={[styles.iconCircle, { backgroundColor: palette.iconBg, borderColor: palette.iconBorder }]}>
+              <Ionicons name="wallet" size={24} color={palette.icon} />
+            </RNView>
+            <Text style={[styles.amount, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit>
+              {formatAmountLabel(payment.amountLabel)}
+            </Text>
+          </RNView>
+          <RNView style={[styles.pillShadow, { shadowColor: status.glow }]}>
+            <LinearGradient colors={status.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pill}>
+              <Ionicons name={status.icon} size={15} color="#fff" />
+              <Text style={styles.pillText}>{translateValue(payment.status, language)}</Text>
+            </LinearGradient>
+          </RNView>
+        </RNView>
+
+        {/* Stacked rather than side by side so a long name is never cut off. */}
+        <RNView style={[styles.meta, { borderTopColor: palette.divider }]}>
+          <RNView style={styles.metaGroup}>
+            <Ionicons name="person-outline" size={17} color={palette.meta} />
+            <Text style={[styles.student, { color: palette.text }]}>{payment.student}</Text>
+          </RNView>
+          <RNView style={styles.metaGroup}>
+            <Ionicons name="calendar-outline" size={16} color={palette.meta} />
+            <Text style={[styles.date, { color: palette.meta }]}>
+              {t.columns['Due date']} {payment.dueDate}
+            </Text>
+          </RNView>
+        </RNView>
+
+        {payable ? (
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              router.push({ pathname: '/qpay', params: { paymentId: payment.id, amountLabel: formatAmountLabel(payment.amountLabel) } });
+            }}
+            style={({ pressed }) => [styles.buttonShadow, { shadowColor: palette.glow }, pressed && styles.buttonPressed]}
+            accessibilityRole="button"
+          >
+            <LinearGradient colors={palette.button} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.button}>
+              <Ionicons name="qr-code-outline" size={22} color="#fff" />
+              <Text style={styles.buttonText}>{t.qpay.payButton}</Text>
+            </LinearGradient>
+          </Pressable>
+        ) : null}
+      </LinearGradient>
+    </RNView>
   );
+}
+
+function toneKey(status: string): keyof typeof statusStyles {
+  const tone = statusTone(status);
+  return tone === 'success' || tone === 'danger' || tone === 'warning' ? tone : 'neutral';
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1
   },
+  orb: {
+    position: 'absolute',
+    borderRadius: 999
+  },
+  orbTop: {
+    width: 360,
+    height: 360,
+    top: -160,
+    left: -140
+  },
+  orbBottom: {
+    width: 420,
+    height: 420,
+    bottom: -200,
+    right: -160
+  },
+  list: {
+    flex: 1
+  },
+  promo: {
+    alignItems: 'center',
+    marginTop: 24,
+    paddingHorizontal: 12
+  },
+  promoTitle: {
+    marginTop: 6,
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: -0.3
+  },
+  promoSubtitle: {
+    marginTop: 6,
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+    textAlign: 'center'
+  },
   content: {
-    padding: 16
+    paddingHorizontal: 18,
+    paddingBottom: 24,
+    gap: 16
   },
   center: {
     flex: 1,
@@ -116,69 +254,110 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20
   },
-  card: {
-    gap: 6
+  cardShadow: {
+    borderRadius: 26,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 6
   },
-  rowHeader: {
+  card: {
+    borderRadius: 26,
+    borderWidth: 1,
+    padding: 18,
+    gap: 16,
+    overflow: 'hidden'
+  },
+  cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'transparent'
+    justifyContent: 'space-between',
+    gap: 10
   },
   amountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'transparent'
+    gap: 14,
+    flexShrink: 1
   },
-  iconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center'
   },
   amount: {
-    fontSize: 20,
-    fontWeight: '800'
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    flexShrink: 1
   },
-  metaRow: {
+  pill: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'transparent'
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999
+  },
+  pillShadow: {
+    borderRadius: 999,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 4
+  },
+  pillText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  meta: {
+    gap: 8,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth
   },
   metaGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    flexShrink: 1,
-    backgroundColor: 'transparent'
+    gap: 8
   },
   student: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     flexShrink: 1
   },
   date: {
-    fontSize: 12,
-    fontWeight: '500'
+    fontSize: 13,
+    fontWeight: '500',
+    flexShrink: 1
   },
-  payButton: {
-    marginTop: 6,
+  buttonShadow: {
+    borderRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.55,
+    shadowRadius: 14,
+    elevation: 6
+  },
+  buttonPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }]
+  },
+  button: {
+    height: 54,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 11,
-    borderRadius: 10
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)'
   },
-  payButtonPressed: {
-    opacity: 0.8
-  },
-  payButtonText: {
+  buttonText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '700'
   }
 });

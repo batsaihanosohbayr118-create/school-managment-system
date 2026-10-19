@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS students (
   address TEXT NOT NULL DEFAULT '',
   parent_name TEXT NOT NULL DEFAULT '',
   parent_email TEXT,
-  class_name TEXT NOT NULL,
+  class_name TEXT NOT NULL DEFAULT '',
   roll_number TEXT NOT NULL,
   attendance INTEGER NOT NULL DEFAULT 0,
   gpa NUMERIC NOT NULL DEFAULT 0,

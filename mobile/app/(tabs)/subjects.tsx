@@ -72,6 +72,10 @@ export default function SubjectsScreen() {
     );
   }
 
+  const emptyState = (
+    <EmptyState icon="book-outline" label={query ? t.common.noSubjectsMatchSearch : t.common.noSubjectsYet} />
+  );
+
   return (
     <View style={styles.container}>
       {isOffline ? <OfflineBanner /> : null}
@@ -79,34 +83,43 @@ export default function SubjectsScreen() {
         <SearchBar value={query} onChangeText={setQuery} placeholder={t.common.searchSubjects} />
       ) : null}
 
-      <FlatList
-        style={styles.flex}
-        contentContainerStyle={isReadOnlyViewer ? styles.contentHorizontal : styles.content}
-        data={filteredSubjects}
-        keyExtractor={(subject) => subject.id}
-        horizontal={isReadOnlyViewer}
-        showsHorizontalScrollIndicator={false}
-        pagingEnabled={isReadOnlyViewer}
-        snapToInterval={isReadOnlyViewer ? horizontalCardWidth + 16 : undefined}
-        decelerationRate={isReadOnlyViewer ? 'fast' : undefined}
-        refreshControl={isReadOnlyViewer ? undefined : <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
-        keyboardShouldPersistTaps="handled"
-        ListEmptyComponent={
-          <EmptyState
-            icon="book-outline"
-            label={query ? t.common.noSubjectsMatchSearch : t.common.noSubjectsYet}
-          />
-        }
-        renderItem={({ item }) =>
-          isReadOnlyViewer ? (
-            <View style={[styles.horizontalCard, { width: horizontalCardWidth }]}>
+      {/* A horizontal list lays its empty component out at content width, off
+          center; render the empty state outside it so it sits like every other tab's. */}
+      {isReadOnlyViewer && filteredSubjects.length === 0 ? (
+        // An empty vertical list, laid out exactly like the other tabs' empty states.
+        <FlatList
+          style={styles.flex}
+          contentContainerStyle={styles.content}
+          data={[]}
+          renderItem={null}
+          ListEmptyComponent={emptyState}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
+        />
+      ) : (
+        <FlatList
+          style={styles.flex}
+          contentContainerStyle={isReadOnlyViewer ? styles.contentHorizontal : styles.content}
+          data={filteredSubjects}
+          keyExtractor={(subject) => subject.id}
+          horizontal={isReadOnlyViewer}
+          showsHorizontalScrollIndicator={false}
+          pagingEnabled={isReadOnlyViewer}
+          snapToInterval={isReadOnlyViewer ? horizontalCardWidth + 16 : undefined}
+          decelerationRate={isReadOnlyViewer ? 'fast' : undefined}
+          refreshControl={isReadOnlyViewer ? undefined : <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={emptyState}
+          renderItem={({ item }) =>
+            isReadOnlyViewer ? (
+              <View style={[styles.horizontalCard, { width: horizontalCardWidth }]}>
+                <SubjectRow subject={item} />
+              </View>
+            ) : (
               <SubjectRow subject={item} />
-            </View>
-          ) : (
-            <SubjectRow subject={item} />
-          )
-        }
-      />
+            )
+          }
+        />
+      )}
     </View>
   );
 }

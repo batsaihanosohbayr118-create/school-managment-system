@@ -4,11 +4,13 @@ import { ActivityIndicator, Alert, AppState, Image, Linking, Pressable, ScrollVi
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
+import { PaymentSuccess } from '@/components/PaymentSuccess';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { useLanguage } from '@/lib/language-context';
 import { ApiError } from '@shared/api-error';
 import type { QpayInvoiceResponse } from '@shared/api-types';
+import { groupThousands } from '@shared/money';
 
 /** How often the screen re-checks QPay on its own while an invoice is open. */
 const POLL_MS = 5000;
@@ -20,7 +22,6 @@ export default function QpayScreen() {
   const tint = useThemeColor({}, 'tint');
   const mutedColor = useThemeColor({}, 'muted');
   const dangerColor = useThemeColor({}, 'danger');
-  const successColor = useThemeColor({}, 'success');
   const borderColor = useThemeColor({}, 'border');
 
   const [invoice, setInvoice] = useState<QpayInvoiceResponse | null>(null);
@@ -95,14 +96,13 @@ export default function QpayScreen() {
 
   if (paid) {
     return (
-      <View style={styles.center}>
-        <Stack.Screen options={{ title: t.qpay.title }} />
-        <Ionicons name="checkmark-circle" size={72} color={successColor} />
-        <Text style={styles.paidText}>{t.qpay.paid}</Text>
-        <Pressable style={[styles.button, styles.wide, { backgroundColor: tint }]} onPress={() => router.back()}>
-          <Text style={styles.buttonText}>{t.qpay.done}</Text>
-        </Pressable>
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <PaymentSuccess
+          amountLabel={amountLabel || (invoice ? `${groupThousands(String(invoice.amount))}₮` : '')}
+          onDone={() => router.back()}
+        />
+      </>
     );
   }
 
@@ -131,7 +131,7 @@ export default function QpayScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: t.qpay.title }} />
-      <Text style={styles.amount}>{amountLabel || `${invoice.amount.toLocaleString()}₮`}</Text>
+      <Text style={styles.amount}>{amountLabel || `${groupThousands(String(invoice.amount))}₮`}</Text>
 
       {invoice.qrImage ? (
         <View style={styles.qrFrame}>
@@ -210,11 +210,6 @@ const styles = StyleSheet.create({
   },
   message: {
     fontSize: 14,
-    textAlign: 'center'
-  },
-  paidText: {
-    fontSize: 18,
-    fontWeight: '700',
     textAlign: 'center'
   },
   button: {

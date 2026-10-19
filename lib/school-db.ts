@@ -245,6 +245,11 @@ async function initializeSchoolDatabase() {
 
     ALTER TABLE assignments ADD COLUMN IF NOT EXISTS file_url TEXT NOT NULL DEFAULT '';
 
+    -- A students table created from database/supabase-schema.sql had class_name
+    -- NOT NULL with no default; the student INSERT never sets it, so every add
+    -- failed and silently fell back to the JSON store.
+    ALTER TABLE students ALTER COLUMN class_name SET DEFAULT '';
+
     CREATE TABLE IF NOT EXISTS assignment_submissions (
       id TEXT PRIMARY KEY,
       assignment_id TEXT NOT NULL,
