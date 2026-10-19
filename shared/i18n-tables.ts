@@ -577,6 +577,9 @@ export const translations = {
     },
     qpay: {
       payButton: "Pay with QPay",
+      lockTitle: "Payment due",
+      lockHeading: "Pay to continue",
+      lockBody: "Your school fee is due. The app unlocks as soon as it is paid.",
       paidTitle: "Payment successful!",
       paidSubtitle: "Thank you — your payment has been received and recorded.",
       amountPaid: "Amount paid",
@@ -1054,6 +1057,9 @@ export const translations = {
     },
     qpay: {
       payButton: "QPay-ээр төлөх",
+      lockTitle: "Төлбөр төлөх",
+      lockHeading: "Төлбөрөө төлсний дараа апп нээгдэнэ",
+      lockBody: "Сургалтын төлбөрийн хугацаа болсон байна. Төлбөр төлөгдмөгц апп шууд нээгдэнэ.",
       paidTitle: "Төлбөр амжилттай!",
       paidSubtitle: "Баярлалаа — таны төлбөр хүлээн авагдаж, бүртгэгдлээ.",
       amountPaid: "Төлсөн дүн",
