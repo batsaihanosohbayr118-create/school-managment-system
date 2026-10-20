@@ -66,6 +66,7 @@ export function toPaymentEntries(table: ResourceTable): PaymentEntry[] {
   const amount = columnIndex(table.columns, "Amount");
   const status = columnIndex(table.columns, "Status");
   const dueDate = columnIndex(table.columns, "Due Date");
+  const feeType = columnIndex(table.columns, "Fee Type");
 
   return table.rows.map((row, index) => {
     const amountLabel = row[amount] ?? "";
@@ -76,7 +77,8 @@ export function toPaymentEntries(table: ResourceTable): PaymentEntry[] {
       amountLabel,
       amount: parseMoney(amountLabel),
       status: row[status] ?? "",
-      dueDate: row[dueDate] ?? ""
+      dueDate: row[dueDate] ?? "",
+      kind: /^app\b/i.test((row[feeType] ?? "").trim()) ? "app" : "tuition"
     };
   });
 }

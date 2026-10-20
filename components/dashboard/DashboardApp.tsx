@@ -159,6 +159,7 @@ function normalizePaymentValues(values: Record<string, string>, mode: ModalMode)
   if (mode === "create") {
     if (!next.Status?.trim()) next.Status = "Paid";
     if (!next["Due Date"]?.trim()) next["Due Date"] = new Date().toISOString().slice(0, 10);
+    if (!next["Fee Type"]?.trim()) next["Fee Type"] = "Tuition";
   }
   return next;
 }
@@ -255,7 +256,7 @@ const createConfig: Record<NavModule, { fields: string[] }> = {
   materials: { fields: ["Subject", "Title", "File"] },
   attendance: { fields: ["Student", "Subject", "Date", "Status"] },
   grades: { fields: ["Student", "Subject", "Score", "Semester"] },
-  payments: { fields: ["Student", "Amount", "Status", "Due Date"] },
+  payments: { fields: ["Student", "Fee Type", "Amount", "Status", "Due Date"] },
   timetable: { fields: ["Day", "Time", "Subject", "Teacher", "Class"] },
   announcements: { fields: ["Title", "Audience", "Content"] },
   wellbeing: { fields: ["Question", "Category", "Note", "Date"] },
@@ -308,6 +309,7 @@ function statusOptionsFor(resource: NavModule, field: string) {
   if ((resource === "teachers" || resource === "grades" || resource === "timetable" || resource === "attendance" || resource === "assignments" || resource === "materials") && field === "Subject") return subjectOptions;
   if (resource === "students" && field === "Payment") return ["Unpaid", "Partial", "Paid"];
   if (resource === "payments" && field === "Status") return ["Unpaid", "Partial", "Paid"];
+  if (resource === "payments" && field === "Fee Type") return ["Tuition", "App fee"];
   if (resource === "attendance" && field === "Status") return ["Present", "Late", "Absent"];
   if (resource === "wellbeing" && field === "Category") return ["General", "Mood", "Stress", "Sleep", "Friendship", "Family", "Focus"];
   return null;
@@ -557,7 +559,7 @@ function demoResourceData(resource: SchoolResource): ResourceTableData {
       };
     case "payments":
       return {
-        columns: ["Student", "Amount", "Status", "Due Date"],
+        columns: ["Student", "Amount", "Status", "Due Date", "Fee Type"],
         ids: [],
         rows: []
       };
@@ -3588,7 +3590,7 @@ function PaymentsModule({ apiData, copy, error, language, loading, ...controls }
       language={language}
       loading={loading}
       title={copy.tables.payments}
-      columns={["Student", "Amount", "Status", "Due Date"]}
+      columns={["Student", "Amount", "Status", "Due Date", "Fee Type"]}
       rows={[]}
       {...controls}
     />

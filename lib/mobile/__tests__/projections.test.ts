@@ -108,11 +108,11 @@ describe("toAttendanceEntries", () => {
 });
 
 const payments: ResourceTable = {
-  columns: ["Student", "Amount", "Status", "Due Date"],
+  columns: ["Student", "Amount", "Status", "Due Date", "Fee Type"],
   ids: ["PA-1", "PA-2"],
   rows: [
-    ["Бат", "$2,840", "Unpaid", "2026-06-01"],
-    ["Бат", "Waived", "Paid", "2026-05-01"]
+    ["Бат", "$2,840", "Unpaid", "2026-06-01", "App fee"],
+    ["Бат", "Waived", "Paid", "2026-05-01", ""]
   ]
 };
 
@@ -130,6 +130,12 @@ describe("toPaymentEntries", () => {
     const [, second] = toPaymentEntries(payments);
     expect(second.amount).toBeNull();
     expect(second.amountLabel).toBe("Waived");
+  });
+
+  it("marks only an App fee row as kind app", () => {
+    const [first, second] = toPaymentEntries(payments);
+    expect(first.kind).toBe("app");
+    expect(second.kind).toBe("tuition");
   });
 
   it("resolves the two-word Due Date column", () => {

@@ -8,10 +8,13 @@ import { useAuth } from './auth-context';
 /** Roles held on the payment screen while they have an outstanding payment. */
 export const LOCKED_ROLES: readonly string[] = ['student'];
 
-/** Unpaid or Partial with a real amount — what keeps the app locked. */
-export function isOutstandingPayment(payment: PaymentEntry): boolean {
+/**
+ * An app usage fee that is Unpaid or Partial with a real amount — what keeps
+ * the app locked. Tuition never locks; it is only listed on the payments tab.
+ */
+export function isOutstandingAppFee(payment: PaymentEntry): boolean {
   const status = payment.status.trim().toLowerCase();
-  return (status === 'unpaid' || status === 'partial') && (payment.amount ?? 0) > 0;
+  return payment.kind === 'app' && (status === 'unpaid' || status === 'partial') && (payment.amount ?? 0) > 0;
 }
 
 /**
@@ -28,7 +31,7 @@ type PaymentLockValue = {
 const PaymentLockContext = createContext<PaymentLockValue | null>(null);
 
 /**
- * A user in LOCKED_ROLES with an outstanding payment is held on the payment
+ * A user in LOCKED_ROLES with an outstanding app fee is held on the payment
  * screen until it is paid; every other role is never locked.
  *
  * A failed check unlocks rather than locks, so someone who opens the app
@@ -48,7 +51,7 @@ export function PaymentLockProvider({ children }: { children: ReactNode }) {
     }
     try {
       const { payments } = await api.payments();
-      setState(payments.some(isOutstandingPayment) ? 'locked' : 'unlocked');
+      setState(payments.some(isOutstandingAppFee) ? 'locked' : 'unlocked');
     } catch {
       setState((current) => (current === 'locked' ? 'locked' : 'unlocked'));
     }

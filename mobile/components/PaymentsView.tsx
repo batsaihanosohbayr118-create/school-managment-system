@@ -15,7 +15,7 @@ import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import { api } from '@/lib/api';
 import { useLanguage } from '@/lib/language-context';
-import { isOutstandingPayment, usePaymentLock } from '@/lib/payment-lock';
+import { isOutstandingAppFee, usePaymentLock } from '@/lib/payment-lock';
 import { useAuth } from '@/lib/auth-context';
 import { useApiData } from '@/lib/use-api';
 import { translateValue } from '@shared/i18n-tables';
@@ -91,7 +91,7 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
         style={styles.list}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.content, { paddingTop: isIOS ? 12 : headerHeight + 12 }]}
-        data={locked ? (data?.payments ?? []).filter(isOutstandingPayment) : (data?.payments ?? [])}
+        data={locked ? (data?.payments ?? []).filter(isOutstandingAppFee) : (data?.payments ?? [])}
         keyExtractor={(payment) => payment.id}
         refreshControl={
           <RefreshControl
@@ -206,6 +206,12 @@ function PaymentCard({ payment, palette }: { payment: PaymentEntry; palette: Pal
           <RNView style={styles.metaGroup}>
             <Ionicons name="person-outline" size={17} color={palette.meta} />
             <Text style={[styles.student, { color: palette.text }]}>{payment.student}</Text>
+          </RNView>
+          <RNView style={styles.metaGroup}>
+            <Ionicons name="pricetag-outline" size={16} color={palette.meta} />
+            <Text style={[styles.date, { color: palette.meta }]}>
+              {translateValue(payment.kind === 'app' ? 'App fee' : 'Tuition', language)}
+            </Text>
           </RNView>
           <RNView style={styles.metaGroup}>
             <Ionicons name="calendar-outline" size={16} color={palette.meta} />

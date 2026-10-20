@@ -57,7 +57,7 @@ const resourceColumns: Record<SchoolResource, string[]> = {
   materials: ["Subject", "Title", "File Type", "Uploaded By", "File"],
   attendance: ["Student", "Subject", "Date", "Status"],
   grades: ["Student", "Subject", "Score", "Semester"],
-  payments: ["Student", "Amount", "Status", "Due Date"],
+  payments: ["Student", "Amount", "Status", "Due Date", "Fee Type"],
   timetable: ["Subject", "Day", "Time", "Teacher", "Class"],
   announcements: ["Title", "Content", "Audience", "Date"],
   wellbeing: ["Question", "Category", "Note", "Date"],
@@ -279,8 +279,12 @@ async function initializeSchoolDatabase() {
       amount TEXT NOT NULL,
       status TEXT NOT NULL,
       due_date TEXT NOT NULL,
+      fee_type TEXT NOT NULL DEFAULT 'Tuition',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    -- Only an unpaid "App fee" locks the mobile app; existing rows are tuition.
+    ALTER TABLE payment_records ADD COLUMN IF NOT EXISTS fee_type TEXT NOT NULL DEFAULT 'Tuition';
 
     CREATE TABLE IF NOT EXISTS timetable_slots (
       id TEXT PRIMARY KEY,
@@ -416,6 +420,10 @@ function normalizeLocalRow(resource: SchoolResource, row: LocalResourceRow): Loc
     values.push(seedValues?.[columns.length - 1] ?? "");
   }
 
+  if (resource === "payments" && values.length === columns.length - 1) {
+    values.push("Tuition");
+  }
+
   return {
     ...row,
     values: columns.map((_, index) => stringValue(values[index] ?? seedValues?.[index] ?? "")),
@@ -519,7 +527,7 @@ function valuesForCreatedResource(resource: SchoolResource, values: Record<strin
     case "grades":
       return [values.Student, values.Subject, `${numberValue(values.Score)}`, values.Semester ?? ""].map(stringValue);
     case "payments":
-      return [values.Student, values.Amount || "0₮", values.Status || "Unpaid", values["Due Date"] ?? ""].map(stringValue);
+      return [values.Student, values.Amount || "0₮", values.Status || "Unpaid", values["Due Date"] ?? "", values["Fee Type"] || "Tuition"].map(stringValue);
     case "timetable":
       return [values.Subject, values.Day, values.Time ?? "", values.Teacher ?? "", values.Class ?? ""].map(stringValue);
     case "announcements":
@@ -598,7 +606,7 @@ function rowToArray(resource: SchoolResource, row: QueryRow | DbRow | LocalResou
     case "grades":
       return [row.student, row.subject, `${row.score}`, row.semester].map(stringValue);
     case "payments":
-      return [row.student, row.amount, row.status, row.due_date].map(stringValue);
+      return [row.student, row.amount, row.status, row.due_date, row.fee_type || "Tuition"].map(stringValue);
     case "timetable":
       return [row.subject, row.day, row.time, row.teacher, row.class_name].map(stringValue);
     case "announcements":
@@ -975,11 +983,64 @@ async function fetchFilteredTable(resource: SchoolResource, context: SchoolReque
   return await filterResourceTable(resource, table, context, accessibleSubjects, allSubjects);
 }
 
+const APP_FEE_AMOUNT = "30,000₮";
+const APP_FEE_TYPE = "App fee";
+
+/** The current month in Mongolia (UTC+8) and its last day, which is the fee's due date. */
+function currentAppFeePeriod(now = new Date()) {
+  const local = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const year = local.getUTCFullYear();
+  const month = local.getUTCMonth();
+  const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return { key, dueDate: `${key}-${String(lastDay).padStart(2, "0")}` };
+}
+
+/**
+ * Bills every student the monthly app fee, once per month. The id is
+ * `AF-<month>-<student id>`, so running this on every payments read is
+ * idempotent and a student registered mid-month is billed on their next read.
+ * A deleted fee is re-issued; to waive one, mark it Paid instead.
+ */
+async function issueMonthlyAppFees() {
+  const { key, dueDate } = currentAppFeePeriod();
+
+  try {
+    await ensureSchoolDatabase();
+    await getPool().query(
+      `INSERT INTO payment_records (id, student, amount, status, due_date, fee_type)
+       SELECT 'AF-' || $1 || '-' || id, full_name, $2, 'Unpaid', $3, $4
+       FROM students
+       WHERE full_name <> ''
+       ON CONFLICT (id) DO NOTHING`,
+      [key, APP_FEE_AMOUNT, dueDate, APP_FEE_TYPE]
+    );
+  } catch (error) {
+    logDatabaseFallback(error);
+    const store = await readLocalStore();
+    const existing = new Set(store.payments.map((row) => row.id));
+    const issued = store.students
+      .map((row) => ({ id: `AF-${key}-${row.id}`, name: stringValue((row.values ?? rowToArray("students", row))[0]) }))
+      .filter((fee) => fee.name && !existing.has(fee.id))
+      .map((fee) => ({ id: fee.id, values: [fee.name, APP_FEE_AMOUNT, "Unpaid", dueDate, APP_FEE_TYPE], createdAt: new Date().toISOString() }));
+
+    if (issued.length > 0) {
+      store.payments = [...issued, ...store.payments];
+      await writeLocalStore(store);
+    }
+  }
+}
+
 export async function listResource(resource: SchoolResource, context: SchoolRequestContext): Promise<ResourceTable> {
   if (context.mode === "page" && (resource === "attendance" || resource === "grades" || resource === "assignments" || resource === "materials" || resource === "timetable")) {
     if ((context.session.role === "student" || context.session.role === "parent") && !context.subjectId) {
       throw new Error("subjectId is required.");
     }
+  }
+
+  if (resource === "payments") {
+    // Billing must never stop anyone from seeing their payments.
+    await issueMonthlyAppFees().catch((error) => console.warn("Monthly app fee issuing failed:", error));
   }
 
   try {
@@ -1447,9 +1508,9 @@ export async function createResource(resource: SchoolResource, values: Record<st
       }
       case "payments":
         await pool.query(
-          `INSERT INTO payment_records (id, student, amount, status, due_date)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [id, values.Student, values.Amount ?? "$0", values.Status ?? "Unpaid", values["Due Date"] ?? ""]
+          `INSERT INTO payment_records (id, student, amount, status, due_date, fee_type)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [id, values.Student, values.Amount ?? "$0", values.Status ?? "Unpaid", values["Due Date"] ?? "", values["Fee Type"] || "Tuition"]
         );
         break;
       case "timetable": {
@@ -1681,9 +1742,9 @@ export async function updateResource(resource: SchoolResource, id: string, value
       case "payments":
         await pool.query(
           `UPDATE payment_records
-           SET student = $1, amount = $2, status = $3, due_date = $4
-           WHERE id = $5`,
-          [values.Student, values.Amount, values.Status, values["Due Date"], id]
+           SET student = $1, amount = $2, status = $3, due_date = $4, fee_type = COALESCE(NULLIF($5, ''), fee_type)
+           WHERE id = $6`,
+          [values.Student, values.Amount, values.Status, values["Due Date"], values["Fee Type"] ?? "", id]
         );
         break;
       case "timetable": {
@@ -1767,7 +1828,7 @@ export async function settleQpayPayment(id: string, paidAmount: number): Promise
   await updateResource(
     "payments",
     id,
-    { Student: value("Student"), Amount: value("Amount"), Status: "Paid", "Due Date": value("Due Date") },
+    { Student: value("Student"), Amount: value("Amount"), Status: "Paid", "Due Date": value("Due Date"), "Fee Type": value("Fee Type") },
     context
   );
   return true;

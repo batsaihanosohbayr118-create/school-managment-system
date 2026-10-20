@@ -57,6 +57,8 @@ export type PaymentEntry = {
   amount: number | null;
   status: string;
   dueDate: string;
+  /** "app" is the app usage fee — the only kind that locks the mobile app. */
+  kind: "app" | "tuition";
 };
 
 export type AnnouncementEntry = {
