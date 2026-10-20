@@ -40,7 +40,7 @@ const statusStyles = {
  */
 export function PaymentsView({ locked = false }: { locked?: boolean }) {
   const { data, error, loading, refetch, isOffline } = useApiData('payments', api.payments);
-  const { refresh: refreshLock } = usePaymentLock();
+  const { refresh: refreshLock, skip: skipLock } = usePaymentLock();
   const { signOut } = useAuth();
   const { t } = useLanguage();
   const isDark = useColorScheme() === 'dark';
@@ -91,7 +91,8 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
         style={styles.list}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.content, { paddingTop: isIOS ? 12 : headerHeight + 12 }]}
-        data={locked ? (data?.payments ?? []).filter(isOutstandingAppFee) : (data?.payments ?? [])}
+        // The app fee belongs to the lock screen; the payments tab is tuition only.
+        data={(data?.payments ?? []).filter(locked ? isOutstandingAppFee : (payment) => payment.kind !== 'app')}
         keyExtractor={(payment) => payment.id}
         refreshControl={
           <RefreshControl
@@ -120,10 +121,17 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
             <Text style={[styles.promoTitle, { color: palette.text }]}>{t.qpay.promoTitle}</Text>
             <Text style={[styles.promoSubtitle, { color: palette.meta }]}>{t.qpay.promoSubtitle}</Text>
             {locked ? (
-              <Pressable onPress={() => signOut()} style={({ pressed }) => [styles.signOut, pressed && styles.buttonPressed]} accessibilityRole="button">
-                <Ionicons name="log-out-outline" size={18} color={palette.meta} />
-                <Text style={[styles.signOutText, { color: palette.meta }]}>{t.common.logout}</Text>
-              </Pressable>
+              <RNView style={styles.lockActions}>
+                <Pressable onPress={() => signOut()} style={({ pressed }) => [styles.signOut, pressed && styles.buttonPressed]} accessibilityRole="button">
+                  <Ionicons name="log-out-outline" size={18} color={palette.meta} />
+                  <Text style={[styles.signOutText, { color: palette.meta }]}>{t.common.logout}</Text>
+                </Pressable>
+                {/* TEMPORARY: remove once the app fee goes live. */}
+                <Pressable onPress={skipLock} style={({ pressed }) => [styles.signOut, pressed && styles.buttonPressed]} accessibilityRole="button">
+                  <Text style={[styles.signOutText, { color: palette.meta }]}>{t.qpay.skip}</Text>
+                  <Ionicons name="arrow-forward" size={18} color={palette.meta} />
+                </Pressable>
+              </RNView>
             ) : null}
           </RNView>
         }
@@ -155,17 +163,43 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
   );
 }
 
+/** Same in both themes: the copy is white, and the card is the screen's one bold surface. */
+const NOTICE_GRADIENT = ['#3b82f6', '#4f46e5', '#7c3aed'] as const;
+
 function LockNotice({ palette }: { palette: Palette }) {
   const { t } = useLanguage();
   return (
-    <RNView style={[styles.notice, { backgroundColor: palette.iconBg, borderColor: palette.cardBorder }]}>
-      <RNView style={[styles.noticeIcon, { backgroundColor: palette.icon }]}>
-        <Ionicons name="lock-closed" size={18} color="#fff" />
-      </RNView>
-      <RNView style={styles.noticeCopy}>
-        <Text style={[styles.noticeTitle, { color: palette.text }]}>{t.qpay.lockHeading}</Text>
-        <Text style={[styles.noticeBody, { color: palette.meta }]}>{t.qpay.lockBody}</Text>
-      </RNView>
+    <RNView style={[styles.noticeShadow, { shadowColor: palette.glow }]}>
+      <LinearGradient colors={NOTICE_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.notice}>
+        <RNView pointerEvents="none" style={[styles.noticeOrb, styles.noticeOrbTop]} />
+        <RNView pointerEvents="none" style={[styles.noticeOrb, styles.noticeOrbBottom]} />
+
+        <RNView style={styles.noticeHeader}>
+          <RNView style={styles.noticeIconRing}>
+            <RNView style={styles.noticeIcon}>
+              <Ionicons name="lock-closed" size={22} color="#4f46e5" />
+            </RNView>
+          </RNView>
+          <RNView style={styles.noticeEyebrow}>
+            <Ionicons name="phone-portrait-outline" size={13} color="#fff" />
+            <Text style={styles.noticeEyebrowText}>{t.qpay.lockEyebrow}</Text>
+          </RNView>
+        </RNView>
+
+        <Text style={styles.noticeTitle}>{t.qpay.lockHeading}</Text>
+        <Text style={styles.noticeBody}>{t.qpay.lockBody}</Text>
+
+        <RNView style={styles.noticePerks}>
+          <RNView style={styles.noticePerk}>
+            <Ionicons name="flash" size={14} color="#fde68a" />
+            <Text style={styles.noticePerkText}>{t.qpay.lockPerkInstant}</Text>
+          </RNView>
+          <RNView style={styles.noticePerk}>
+            <Ionicons name="shield-checkmark" size={14} color="#a7f3d0" />
+            <Text style={styles.noticePerkText}>{t.qpay.lockPerkSecure}</Text>
+          </RNView>
+        </RNView>
+      </LinearGradient>
     </RNView>
   );
 }
@@ -182,7 +216,7 @@ function PaymentCard({ payment, palette }: { payment: PaymentEntry; palette: Pal
         colors={palette.card}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.card, { borderColor: palette.cardBorder }]}
+        style={styles.card}
       >
         <RNView style={styles.cardHeader}>
           <RNView style={styles.amountRow}>
@@ -269,36 +303,112 @@ const styles = StyleSheet.create({
   list: {
     flex: 1
   },
+  noticeShadow: {
+    borderRadius: 26,
+    marginBottom: 20,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 22,
+    elevation: 8
+  },
   notice: {
+    borderRadius: 26,
+    padding: 20,
+    gap: 8,
+    overflow: 'hidden'
+  },
+  noticeOrb: {
+    position: 'absolute',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)'
+  },
+  noticeOrbTop: {
+    width: 180,
+    height: 180,
+    top: -80,
+    right: -50
+  },
+  noticeOrbBottom: {
+    width: 120,
+    height: 120,
+    bottom: -60,
+    left: -30
+  },
+  noticeHeader: {
     flexDirection: 'row',
-    gap: 12,
-    padding: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-    marginBottom: 16
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6
+  },
+  noticeIconRing: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.22)'
   },
   noticeIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    backgroundColor: '#fff'
   },
-  noticeCopy: {
-    flex: 1,
-    gap: 3
+  noticeEyebrow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.2)'
+  },
+  noticeEyebrowText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700'
   },
   noticeTitle: {
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 21,
+    lineHeight: 27,
     fontWeight: '800'
   },
   noticeBody: {
-    fontSize: 13.5,
-    lineHeight: 19,
+    color: 'rgba(255,255,255,0.86)',
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '500'
   },
+  noticePerks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6
+  },
+  noticePerk: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15,10,60,0.25)'
+  },
+  noticePerkText: {
+    color: '#fff',
+    fontSize: 12.5,
+    fontWeight: '700'
+  },
+  lockActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 18
+  },
   signOut: {
-    marginTop: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -348,7 +458,6 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 26,
-    borderWidth: 1,
     padding: 18,
     gap: 16,
     overflow: 'hidden'

@@ -8,6 +8,7 @@ import { PaymentSuccess } from '@/components/PaymentSuccess';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { useLanguage } from '@/lib/language-context';
+import { usePaymentLock } from '@/lib/payment-lock';
 import { ApiError } from '@shared/api-error';
 import type { QpayInvoiceResponse } from '@shared/api-types';
 import { groupThousands } from '@shared/money';
@@ -18,6 +19,7 @@ const POLL_MS = 5000;
 export default function QpayScreen() {
   const router = useRouter();
   const { t } = useLanguage();
+  const { refresh: refreshLock } = usePaymentLock();
   const { paymentId, amountLabel } = useLocalSearchParams<{ paymentId: string; amountLabel?: string }>();
   const tint = useThemeColor({}, 'tint');
   const mutedColor = useThemeColor({}, 'muted');
@@ -61,8 +63,11 @@ export default function QpayScreen() {
           invoiceId: invoice.invoiceId,
           checkToken: invoice.checkToken
         });
-        if (result.paid) setPaid(true);
-        else if (manual) setNotice(t.qpay.notPaidYet);
+        if (result.paid) {
+          setPaid(true);
+          // Unlock now, so the gate lets the user in however they leave this screen.
+          refreshLock();
+        } else if (manual) setNotice(t.qpay.notPaidYet);
       } catch {
         if (manual) setNotice(t.qpay.checkFailed);
       } finally {
@@ -70,7 +75,7 @@ export default function QpayScreen() {
         if (manual) setChecking(false);
       }
     },
-    [invoice, paymentId, t.qpay.notPaidYet, t.qpay.checkFailed]
+    [invoice, paymentId, t.qpay.notPaidYet, t.qpay.checkFailed, refreshLock]
   );
 
   // Coming back from the bank app is the moment the payment is most likely done.
