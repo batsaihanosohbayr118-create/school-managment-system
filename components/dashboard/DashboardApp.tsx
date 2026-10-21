@@ -309,7 +309,7 @@ function statusOptionsFor(resource: NavModule, field: string) {
   if ((resource === "teachers" || resource === "grades" || resource === "timetable" || resource === "attendance" || resource === "assignments" || resource === "materials") && field === "Subject") return subjectOptions;
   if (resource === "students" && field === "Payment") return ["Unpaid", "Partial", "Paid"];
   if (resource === "payments" && field === "Status") return ["Unpaid", "Partial", "Paid"];
-  if (resource === "payments" && field === "Fee Type") return ["Tuition", "App fee"];
+  if (resource === "payments" && field === "Fee Type") return ["Tuition", "App fee", "Lunch fee"];
   if (resource === "attendance" && field === "Status") return ["Present", "Late", "Absent"];
   if (resource === "wellbeing" && field === "Category") return ["General", "Mood", "Stress", "Sleep", "Friendship", "Family", "Focus"];
   return null;

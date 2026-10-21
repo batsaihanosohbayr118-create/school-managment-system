@@ -117,6 +117,7 @@ const valueTranslations: Record<string, string> = {
   Unpaid: "Төлөөгүй",
   Tuition: "Сургалтын төлбөр",
   "App fee": "Апп ашиглалтын төлбөр",
+  "Lunch fee": "Өдрийн цайны төлбөр",
   "Word, PowerPoint, PDF, and other prepared lesson materials": "Word, PowerPoint, PDF болон бусад бэлдсэн хичээлийн материалууд",
   "Word, PowerPoint, PDF, video, and other prepared lesson materials": "Word, PowerPoint, PDF, видео болон бусад бэлдсэн хичээлийн материалууд"
 };
@@ -353,7 +354,6 @@ export const translations = {
       mongolianLanguage: "Mongolian",
       todaysClasses: "Today's classes",
       todaysSchedule: "Today's schedule",
-      latestGrades: "Latest grades",
       noGradesYet: "No grades yet.",
       viewPayments: "View payments",
       goodMorning: "Good morning",
@@ -586,6 +586,7 @@ export const translations = {
       lockEyebrow: "Monthly fee",
       lockPerkInstant: "Unlocks instantly",
       lockPerkSecure: "Secure payment",
+      skip: "Skip",
       paidTitle: "Payment successful!",
       paidSubtitle: "Thank you — your payment has been received and recorded.",
       amountPaid: "Amount paid",
@@ -606,6 +607,24 @@ export const translations = {
       paid: "Payment received. Thank you!",
       done: "Done",
       retry: "Try again"
+    },
+    lunch: {
+      homeLink: "Lunch fee",
+      title: "Lunch fee",
+      unit: "per school day",
+      monthTitle: (year: number, month: number) =>
+        `${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][month]} ${year}`,
+      weekdays: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
+      previousMonth: "Previous month",
+      nextMonth: "Next month",
+      selectMonth: "Select all school days",
+      unselectMonth: "Unselect this month",
+      clear: "Clear",
+      totalLabel: "Total",
+      selectedDays: (days: number) => `${days} ${days === 1 ? "day" : "days"}`,
+      selectToPay: "Select at least one day to pay.",
+      tooManyDays: (max: number) => `You can pay for at most ${max} days at a time.`,
+      note: "Tap the days your child will have lunch. Weekends cannot be selected."
     }
   },
   mn: {
@@ -839,7 +858,6 @@ export const translations = {
       mongolianLanguage: "Монгол хэл",
       todaysClasses: "Өнөөдрийн хичээлүүд",
       todaysSchedule: "Өнөөдрийн хуваарь",
-      latestGrades: "Сүүлийн дүнгүүд",
       noGradesYet: "Одоогоор дүн алга байна.",
       viewPayments: "Төлбөр харах",
       goodMorning: "Өглөөний мэнд",
@@ -1070,6 +1088,7 @@ export const translations = {
       lockEyebrow: "Сар бүрийн төлбөр",
       lockPerkInstant: "Шууд нээгдэнэ",
       lockPerkSecure: "Аюулгүй төлбөр",
+      skip: "Алгасах",
       paidTitle: "Төлбөр амжилттай!",
       paidSubtitle: "Баярлалаа — таны төлбөр хүлээн авагдаж, бүртгэгдлээ.",
       amountPaid: "Төлсөн дүн",
@@ -1090,6 +1109,23 @@ export const translations = {
       paid: "Төлбөр амжилттай төлөгдлөө. Баярлалаа!",
       done: "Болсон",
       retry: "Дахин оролдох"
+    },
+    lunch: {
+      homeLink: "Өдрийн цайны төлбөр",
+      title: "Өдрийн цайны төлбөр",
+      unit: "хичээлийн нэг өдөрт",
+      monthTitle: (year: number, month: number) => `${year} оны ${month + 1}-р сар`,
+      weekdays: ["Да", "Мя", "Лх", "Пү", "Ба", "Бя", "Ня"],
+      previousMonth: "Өмнөх сар",
+      nextMonth: "Дараагийн сар",
+      selectMonth: "Бүх хичээлийн өдрийг сонгох",
+      unselectMonth: "Энэ сарын сонголтыг цуцлах",
+      clear: "Цэвэрлэх",
+      totalLabel: "Нийт дүн",
+      selectedDays: (days: number) => `${days} өдөр`,
+      selectToPay: "Төлөхийн тулд дор хаяж нэг өдөр сонгоно уу.",
+      tooManyDays: (max: number) => `Нэг удаад хамгийн ихдээ ${max} өдрийн төлбөр төлөх боломжтой.`,
+      note: "Хүүхэд тань өдрийн хоол идэх өдрүүдийг дарж сонгоно уу. Амралтын өдрийг сонгох боломжгүй."
     }
   }
 };

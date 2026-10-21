@@ -138,6 +138,15 @@ describe("toPaymentEntries", () => {
     expect(second.kind).toBe("tuition");
   });
 
+  it("marks a Lunch fee row as kind lunch", () => {
+    const [entry] = toPaymentEntries({
+      columns: payments.columns,
+      ids: ["LF-1"],
+      rows: [["Bat", "15,000₮", "Unpaid", "2026-10-21 – 2026-10-23", "Lunch fee"]]
+    });
+    expect(entry.kind).toBe("lunch");
+  });
+
   it("resolves the two-word Due Date column", () => {
     expect(() => toPaymentEntries(payments)).not.toThrow();
   });

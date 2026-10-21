@@ -70,6 +70,7 @@ export function toPaymentEntries(table: ResourceTable): PaymentEntry[] {
 
   return table.rows.map((row, index) => {
     const amountLabel = row[amount] ?? "";
+    const type = (row[feeType] ?? "").trim();
 
     return {
       id: table.ids[index] ?? "",
@@ -78,7 +79,7 @@ export function toPaymentEntries(table: ResourceTable): PaymentEntry[] {
       amount: parseMoney(amountLabel),
       status: row[status] ?? "",
       dueDate: row[dueDate] ?? "",
-      kind: /^app\b/i.test((row[feeType] ?? "").trim()) ? "app" : "tuition"
+      kind: /^app\b/i.test(type) ? "app" : /^lunch\b/i.test(type) ? "lunch" : "tuition"
     };
   });
 }

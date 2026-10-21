@@ -166,6 +166,7 @@ function RootLayoutNav() {
         <Stack.Screen name="grade-entry" options={{ presentation: 'modal' }} />
         <Stack.Screen name="timetable-entry" options={{ presentation: 'modal' }} />
         <Stack.Screen name="payments" options={{ title: t.nav.payments.label }} />
+        <Stack.Screen name="lunch" options={{ title: t.lunch.title }} />
         <Stack.Screen name="payment-required" options={{ headerBackVisible: false, gestureEnabled: false }} />
         <Stack.Screen name="qpay" options={{ presentation: 'modal', title: t.qpay.title }} />
         <Stack.Screen name="subject-content" />

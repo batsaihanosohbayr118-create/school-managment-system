@@ -10,6 +10,7 @@ import type {
   PlacementResponse,
   PlacementResultsResponse,
   QpayCheckResponse,
+  LunchPaymentResponse,
   QpayInvoiceResponse,
   SubjectContent,
   SubjectsResponse,
@@ -98,6 +99,8 @@ export const api = {
   attendance: () => request<AttendanceResponse>("/api/mobile/attendance"),
   announcements: () => request<AnnouncementsResponse>("/api/mobile/announcements"),
   payments: () => request<PaymentsResponse>("/api/mobile/payments"),
+  createLunchPayment: (dates: string[]) =>
+    request<LunchPaymentResponse>("/api/mobile/payments/lunch", { method: "POST", body: JSON.stringify({ dates }) }),
   createQpayInvoice: (paymentId: string) =>
     request<QpayInvoiceResponse>("/api/mobile/payments/qpay", { method: "POST", body: JSON.stringify({ paymentId }) }),
   checkQpayPayment: (body: { paymentId: string; invoiceId: string; checkToken: string }) =>

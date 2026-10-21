@@ -40,7 +40,7 @@ const statusStyles = {
  */
 export function PaymentsView({ locked = false }: { locked?: boolean }) {
   const { data, error, loading, refetch, isOffline } = useApiData('payments', api.payments);
-  const { refresh: refreshLock } = usePaymentLock();
+  const { refresh: refreshLock, skip: skipLock } = usePaymentLock();
   const { signOut } = useAuth();
   const { t } = useLanguage();
   const isDark = useColorScheme() === 'dark';
@@ -91,8 +91,11 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
         style={styles.list}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.content, { paddingTop: isIOS ? 12 : headerHeight + 12 }]}
-        // The app fee belongs to the lock screen; the payments tab is tuition only.
-        data={(data?.payments ?? []).filter(locked ? isOutstandingAppFee : (payment) => payment.kind !== 'app')}
+        // The app fee belongs to the lock screen. An unpaid lunch fee is an
+        // abandoned checkout from the lunch screen, so only paid ones are listed.
+        data={(data?.payments ?? []).filter(
+          locked ? isOutstandingAppFee : (payment) => payment.kind === 'tuition' || (payment.kind === 'lunch' && payment.status.trim().toLowerCase() === 'paid')
+        )}
         keyExtractor={(payment) => payment.id}
         refreshControl={
           <RefreshControl
@@ -121,10 +124,17 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
             <Text style={[styles.promoTitle, { color: palette.text }]}>{t.qpay.promoTitle}</Text>
             <Text style={[styles.promoSubtitle, { color: palette.meta }]}>{t.qpay.promoSubtitle}</Text>
             {locked ? (
-              <Pressable onPress={() => signOut()} style={({ pressed }) => [styles.signOut, pressed && styles.buttonPressed]} accessibilityRole="button">
-                <Ionicons name="log-out-outline" size={18} color={palette.meta} />
-                <Text style={[styles.signOutText, { color: palette.meta }]}>{t.common.logout}</Text>
-              </Pressable>
+              <RNView style={styles.lockActions}>
+                <Pressable onPress={() => signOut()} style={({ pressed }) => [styles.signOut, pressed && styles.buttonPressed]} accessibilityRole="button">
+                  <Ionicons name="log-out-outline" size={18} color={palette.meta} />
+                  <Text style={[styles.signOutText, { color: palette.meta }]}>{t.common.logout}</Text>
+                </Pressable>
+                {/* TEMPORARY: remove once the app fee goes live. */}
+                <Pressable onPress={skipLock} style={({ pressed }) => [styles.signOut, pressed && styles.buttonPressed]} accessibilityRole="button">
+                  <Text style={[styles.signOutText, { color: palette.meta }]}>{t.qpay.skip}</Text>
+                  <Ionicons name="arrow-forward" size={18} color={palette.meta} />
+                </Pressable>
+              </RNView>
             ) : null}
           </RNView>
         }
@@ -237,7 +247,7 @@ function PaymentCard({ payment, palette }: { payment: PaymentEntry; palette: Pal
           <RNView style={styles.metaGroup}>
             <Ionicons name="pricetag-outline" size={16} color={palette.meta} />
             <Text style={[styles.date, { color: palette.meta }]}>
-              {translateValue(payment.kind === 'app' ? 'App fee' : 'Tuition', language)}
+              {translateValue(payment.kind === 'app' ? 'App fee' : payment.kind === 'lunch' ? 'Lunch fee' : 'Tuition', language)}
             </Text>
           </RNView>
           <RNView style={styles.metaGroup}>
@@ -395,8 +405,13 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '700'
   },
+  lockActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 18
+  },
   signOut: {
-    marginTop: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

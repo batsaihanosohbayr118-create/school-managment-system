@@ -16,7 +16,7 @@ import { useLanguage } from '@/lib/language-context';
 import { useApiData } from '@/lib/use-api';
 import { normalizeDayName, translateValue } from '@shared/i18n-tables';
 import { computeAttendanceStats } from '@shared/attendance-stats';
-import type { GradeEntry, TimetableSlot } from '@shared/api-types';
+import type { TimetableSlot } from '@shared/api-types';
 import { roleLabel } from '@shared/roles';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -53,14 +53,12 @@ export default function HomeScreen() {
   }, [sunPulse, sunRotation]);
 
   const timetable = useApiData('timetable', api.timetable);
-  const grades = useApiData('grades', api.grades);
   const announcements = useApiData('announcements', api.announcements);
   const attendance = useApiData('attendance', api.attendance);
 
   useFocusEffect(
     useCallback(() => {
       timetable.refetch();
-      grades.refetch();
       announcements.refetch();
       attendance.refetch();
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -70,9 +68,6 @@ export default function HomeScreen() {
   const todaysSlots = (timetable.data?.slots ?? [])
     .filter((slot) => normalizeDayName(slot.day) === today)
     .sort((a, b) => (a.startsAt ?? '').localeCompare(b.startsAt ?? ''));
-
-  // The server already returns newest-first (created_at desc); take the top 3.
-  const latestGrades = (grades.data?.grades ?? []).slice(0, 3);
 
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -88,7 +83,7 @@ export default function HomeScreen() {
   const name = session?.name || session?.email || '';
   const initial = name.trim().charAt(0).toUpperCase() || '?';
 
-  if (timetable.loading || grades.loading) {
+  if (timetable.loading) {
     return (
       <ScrollView style={styles.container}>
         <SkeletonHome />
@@ -98,7 +93,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {(timetable.isOffline || grades.isOffline) ? <OfflineBanner /> : null}
+      {timetable.isOffline ? <OfflineBanner /> : null}
 
       <View style={[styles.greetingPanelWrap, { shadowColor: card.shadow }]}>
         <View style={[styles.greetingPanel, { borderColor: card.border, backgroundColor: card.base }]}>
@@ -298,19 +293,26 @@ export default function HomeScreen() {
         </Pressable>
       </Link>
 
+      {session?.role === 'parent' && (
+        <Link href="/lunch" asChild>
+          <Pressable style={StyleSheet.flatten([styles.paymentsLink, { backgroundColor: '#ea580c' }])}>
+            {({ pressed }) => (
+              <View style={[styles.paymentsLinkInner, pressed && styles.paymentsLinkPressed]}>
+                <View style={[styles.paymentsLinkCopy, styles.shrink]}>
+                  <View style={[styles.paymentsLinkIcon, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
+                    <Ionicons name="restaurant-outline" size={17} color="#fff" />
+                  </View>
+                  <Text style={[styles.paymentsLinkText, styles.shrink, { color: '#fff' }]}>{t.lunch.homeLink}</Text>
+                </View>
+                <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
+              </View>
+            )}
+          </Pressable>
+        </Link>
+      )}
+
       {!isTeacher && (
         <>
-          <SectionHeader icon="bar-chart-outline" label={t.common.latestGrades} />
-          {grades.loading ? (
-            <Text style={{ color: mutedColor }}>{t.common.loading}</Text>
-          ) : grades.error && !grades.isOffline ? (
-            <Text style={{ color: dangerColor }}>{grades.error.message}</Text>
-          ) : latestGrades.length === 0 ? (
-            <Text style={{ color: mutedColor }}>{t.common.noGradesYet}</Text>
-          ) : (
-            latestGrades.map((grade) => <GradeRow key={grade.id} grade={grade} />)
-          )}
-
           <Link href="/payments" asChild>
             {/* Link's web `asChild` forwards this style straight onto the underlying
                 <a> tag, bypassing react-native-web's array flattening — an array
@@ -442,22 +444,6 @@ function getSlotStatus(slot: TimetableSlot): 'completed' | 'current' | 'upcoming
   if (currentMinutes >= end) return 'completed';
   if (currentMinutes >= start) return 'current';
   return 'upcoming';
-}
-
-function GradeRow({ grade }: { grade: GradeEntry }) {
-  const mutedColor = useThemeColor({}, 'muted');
-  const tint = useThemeColor({}, 'tint');
-  return (
-    <Card style={styles.card}>
-      <View style={styles.rowHeader}>
-        <Text style={styles.rowTitle}>{grade.subject}</Text>
-        <Text style={[styles.score, { color: tint }]}>{grade.scoreLabel}</Text>
-      </View>
-      <Text style={[styles.rowMeta, { color: mutedColor }]}>
-        {grade.student} · {grade.semester}
-      </Text>
-    </Card>
-  );
 }
 
 const styles = StyleSheet.create({
@@ -664,11 +650,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5
   },
-  card: {
-    gap: 5,
-    marginBottom: 9,
-    borderRadius: 15
-  },
   scheduleLink: {
     borderRadius: 18
   },
@@ -757,21 +738,12 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     textAlign: 'center'
   },
-  rowHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: 'transparent'
-  },
   rowTitle: {
     fontSize: 16,
     fontWeight: '700'
   },
   rowMeta: {
     fontSize: 14
-  },
-  score: {
-    fontSize: 18,
-    fontWeight: '800'
   },
   paymentsLink: {
     marginTop: 20,

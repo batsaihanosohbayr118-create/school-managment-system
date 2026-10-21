@@ -58,7 +58,14 @@ export type PaymentEntry = {
   status: string;
   dueDate: string;
   /** "app" is the app usage fee — the only kind that locks the mobile app. */
-  kind: "app" | "tuition";
+  kind: "app" | "lunch" | "tuition";
+};
+
+/** A lunch fee record issued for the days a parent picked, ready for QPay. */
+export type LunchPaymentResponse = {
+  paymentId: string;
+  amountLabel: string;
+  days: number;
 };
 
 export type AnnouncementEntry = {

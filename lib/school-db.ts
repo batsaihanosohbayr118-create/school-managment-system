@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from "pg";
+import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -7,8 +8,11 @@ import type { NavModule, Role } from "@/lib/types";
 import { defaultStudentSubjects, defaultStudentSubjectsValue, subjectCatalog } from "@/lib/subjects";
 import { AccountConflictError, allPushTokens, createAccount, pushTokensForRole, setAccountPassword, syncAccountName } from "@/lib/auth-db";
 import { sendPushNotifications } from "@/lib/mobile/push";
+import { toPaymentEntries } from "@/lib/mobile/projections";
 import { parseMoney } from "@/lib/mobile/table";
 import { placementBank } from "@/lib/placement-bank";
+import { lunchAmount, normalizeLunchDates } from "@shared/lunch";
+import { groupThousands } from "@shared/money";
 import { PLACEMENT_SUBJECT, isPlacementSubject, normalizeAnswerLetter, normalizeCefrLevel, scorePlacement } from "@shared/placement";
 import type { SchoolSession } from "./school-session";
 
@@ -735,21 +739,23 @@ function filterByColumnValues(table: ResourceTable, columnName: string, allowedV
  * Resolves the display name of the student a student/parent session is
  * scoped to — the student themself, or the parent's linked child.
  */
-async function ownStudentFullName(role: "student" | "parent", normalizedEmail: string): Promise<string | null> {
-  if (role === "student") {
-    const students = await fetchRawTable("students");
-    const student = students.find((row) => normalizedToken((row as DbRow).email) === normalizedEmail);
-    return student ? normalizedToken((student as DbRow).full_name) : null;
+/** The student's own row, or a parent's child's row. */
+async function ownStudentRow(role: "student" | "parent", normalizedEmail: string): Promise<DbRow | null> {
+  let studentEmail = normalizedEmail;
+  if (role === "parent") {
+    const parents = await fetchRawTable("parents");
+    const parent = parents.find((row) => normalizedToken((row as DbRow).email) === normalizedEmail);
+    studentEmail = normalizedToken((parent as DbRow | undefined)?.student_email);
+    if (!studentEmail) return null;
   }
 
-  const parents = await fetchRawTable("parents");
-  const parent = parents.find((row) => normalizedToken((row as DbRow).email) === normalizedEmail);
-  const studentEmail = normalizedToken((parent as DbRow | undefined)?.student_email);
-  if (!studentEmail) return null;
-
   const students = await fetchRawTable("students");
-  const student = students.find((row) => normalizedToken((row as DbRow).email) === studentEmail);
-  return student ? normalizedToken((student as DbRow).full_name) : null;
+  return (students.find((row) => normalizedToken((row as DbRow).email) === studentEmail) as DbRow | undefined) ?? null;
+}
+
+async function ownStudentFullName(role: "student" | "parent", normalizedEmail: string): Promise<string | null> {
+  const student = await ownStudentRow(role, normalizedEmail);
+  return student ? normalizedToken(student.full_name) : null;
 }
 
 async function filterResourceTable(
@@ -1832,6 +1838,58 @@ export async function settleQpayPayment(id: string, paidAmount: number): Promise
     context
   );
   return true;
+}
+
+const LUNCH_FEE_TYPE = "Lunch fee";
+
+/**
+ * Issues the lunch fee for the days a parent picked, so it can be paid with
+ * QPay like any other payment record. The amount is recomputed here from the
+ * dates; the client never sends one.
+ *
+ * The id hashes the child and the dates, so paying again for the same
+ * selection (after a cancelled or failed QPay attempt) reuses the record
+ * instead of piling up duplicates.
+ */
+export async function requestLunchPayment(dates: unknown, context: SchoolRequestContext) {
+  if (context.session.role !== "parent") {
+    throw new Error("Only parents have permission to pay the lunch fee.");
+  }
+
+  const days = normalizeLunchDates(dates);
+  const student = await ownStudentRow("parent", normalizedToken(context.session.email));
+  const studentName = stringValue(student?.full_name);
+  if (!student || !studentName) {
+    throw new Error("A linked student record is required to pay the lunch fee.");
+  }
+
+  const id = `LF-${createHash("sha256").update(`${stringValue(student.id)}|${days.join(",")}`).digest("hex").slice(0, 12)}`;
+  const amountLabel = `${groupThousands(String(lunchAmount(days.length)))}₮`;
+  const period = days.length === 1 ? days[0] : `${days[0]} – ${days[days.length - 1]}`;
+
+  try {
+    await ensureSchoolDatabase();
+    await getPool().query(
+      `INSERT INTO payment_records (id, student, amount, status, due_date, fee_type)
+       VALUES ($1, $2, $3, 'Unpaid', $4, $5)
+       ON CONFLICT (id) DO NOTHING`,
+      [id, studentName, amountLabel, period, LUNCH_FEE_TYPE]
+    );
+  } catch (error) {
+    logDatabaseFallback(error);
+    const store = await readLocalStore();
+    if (!store.payments.some((row) => row.id === id)) {
+      store.payments = [{ id, values: [studentName, amountLabel, "Unpaid", period, LUNCH_FEE_TYPE], createdAt: new Date().toISOString() }, ...store.payments];
+      await writeLocalStore(store);
+    }
+  }
+
+  // Read back through the role filter, as the QPay route will.
+  const payment = toPaymentEntries(await listResource("payments", context)).find((entry) => entry.id === id);
+  if (!payment) throw new Error("You are not allowed to pay this record.");
+  if (payment.status.trim().toLowerCase() === "paid") throw new Error("Invalid payment: these days are already paid.");
+
+  return { paymentId: id, amountLabel: payment.amountLabel, days: days.length };
 }
 
 export async function submitPlacementTest(answers: Record<string, string>, context: SchoolRequestContext) {
