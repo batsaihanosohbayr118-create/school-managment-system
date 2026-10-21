@@ -611,7 +611,8 @@ export const translations = {
       checkFailed: "Could not check the payment. Try again.",
       paid: "Payment received. Thank you!",
       done: "Done",
-      retry: "Try again"
+      retry: "Try again",
+      emptyHint: "You're all set. New bills from the school will show up here."
     },
     lunch: {
       homeLink: "Lunch fee",
@@ -1182,7 +1183,8 @@ export const translations = {
       checkFailed: "Төлбөр шалгаж чадсангүй. Дахин оролдоно уу.",
       paid: "Төлбөр амжилттай төлөгдлөө. Баярлалаа!",
       done: "Болсон",
-      retry: "Дахин оролдох"
+      retry: "Дахин оролдох",
+      emptyHint: "Төлөх зүйл алга. Сургуулиас шинэ төлбөр нэмэгдвэл энд харагдана."
     },
     lunch: {
       homeLink: "Өдрийн цайны төлбөр",

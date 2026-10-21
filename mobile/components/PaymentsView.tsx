@@ -8,7 +8,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { statusTone } from '@/components/Badge';
 import { GradientHeaderButton, gradientHeaderItem } from '@/components/GradientHeaderButton';
-import { EmptyState } from '@/components/EmptyState';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { SkeletonList } from '@/components/Skeleton';
 import { Text, View } from '@/components/Themed';
@@ -113,7 +112,7 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
             {locked ? <LockNotice palette={palette} /> : null}
           </>
         }
-        ListEmptyComponent={<EmptyState icon="card-outline" label={t.common.noPaymentsYet} />}
+        ListEmptyComponent={<EmptyPayments palette={palette} />}
         ListFooterComponent={
           <RNView style={styles.promo}>
             <Image
@@ -164,6 +163,30 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
       <RNView pointerEvents="none" style={[styles.orb, styles.orbTop, { backgroundColor: palette.orbA }]} />
       <RNView pointerEvents="none" style={[styles.orb, styles.orbBottom, { backgroundColor: palette.orbB }]} />
       {body}
+    </RNView>
+  );
+}
+
+/**
+ * No payments: the same glass card as a payment, so the screen keeps its look
+ * instead of the app-wide EmptyState's plain themed box.
+ */
+function EmptyPayments({ palette }: { palette: Palette }) {
+  const { t } = useLanguage();
+  return (
+    <RNView style={[styles.cardShadow, { shadowColor: palette.glow }]}>
+      <LinearGradient
+        colors={palette.card}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.card, styles.emptyCard, { borderColor: palette.cardBorder }]}
+      >
+        <RNView style={[styles.emptyIcon, { backgroundColor: palette.iconBg, borderColor: palette.iconBorder }]}>
+          <Ionicons name="checkmark-done" size={28} color={palette.icon} />
+        </RNView>
+        <Text style={[styles.emptyTitle, { color: palette.text }]}>{t.common.noPaymentsYet}</Text>
+        <Text style={[styles.emptyBody, { color: palette.meta }]}>{t.qpay.emptyHint}</Text>
+      </LinearGradient>
     </RNView>
   );
 }
@@ -542,6 +565,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     flexShrink: 1
+  },
+  emptyCard: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 28,
+    borderWidth: 1
+  },
+  emptyIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    textAlign: 'center'
+  },
+  emptyBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center'
   },
   iconCircle: {
     width: 52,
