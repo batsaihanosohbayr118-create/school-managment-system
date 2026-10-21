@@ -85,7 +85,7 @@ function useAuthGate() {
 
     const currentTop = segments[0] as string | undefined;
 
-    if (!session && currentTop !== 'login') {
+    if (!session && currentTop !== 'login' && currentTop !== 'register') {
       router.replace('/login');
       return;
     }
@@ -107,7 +107,7 @@ function useAuthGate() {
       }
     }
 
-    if (session && session.role !== 'admin' && (currentTop === 'login' || currentTop === 'admin-web-only')) {
+    if (session && session.role !== 'admin' && (currentTop === 'login' || currentTop === 'register' || currentTop === 'admin-web-only')) {
       router.replace('/(tabs)');
     }
   }, [session, loading, lockState, segments, router]);
@@ -160,6 +160,7 @@ function RootLayoutNav() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="register" options={{ headerShown: false }} />
         <Stack.Screen name="admin-web-only" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
         <Stack.Screen name="attendance-entry" options={{ presentation: 'modal' }} />

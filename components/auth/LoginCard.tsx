@@ -4,11 +4,13 @@ import { motion } from "framer-motion";
 import { useSiteReady } from "@/lib/site-ready";
 import { SecureBadge } from "./SecureBadge";
 import { LoginForm } from "./LoginForm";
+import { RegisterForm } from "./RegisterForm";
+import { translations } from "@shared/i18n-tables";
 
 const hidden = { opacity: 0, y: 24, scale: 0.98, filter: "blur(8px)" };
 
 /** Right-side dark glass card containing the secure badge, heading and form. */
-export function LoginCard() {
+export function LoginCard({ mode = "login" }: { mode?: "login" | "register" }) {
   const ready = useSiteReady();
 
   return (
@@ -24,10 +26,19 @@ export function LoginCard() {
       <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-7 shadow-[0_30px_80px_rgba(2,6,23,0.6)] backdrop-blur-2xl sm:p-9">
         <SecureBadge />
 
-        <h2 className="mt-6 text-[1.9rem] font-black tracking-tight text-white">Тавтай морил </h2>
-        <p className="mt-2 text-[15px] text-slate-400">Nova Mind Academy-д нэвтэрнэ үү.</p>
-
-        <LoginForm />
+        {mode === "register" ? (
+          <>
+            <h2 className="mt-6 text-[1.9rem] font-black tracking-tight text-white">{translations.mn.register.title}</h2>
+            <p className="mt-2 text-[15px] text-slate-400">{translations.mn.register.subtitle}</p>
+            <RegisterForm />
+          </>
+        ) : (
+          <>
+            <h2 className="mt-6 text-[1.9rem] font-black tracking-tight text-white">Тавтай морил </h2>
+            <p className="mt-2 text-[15px] text-slate-400">Nova Mind Academy-д нэвтэрнэ үү.</p>
+            <LoginForm />
+          </>
+        )}
       </div>
     </motion.div>
   );

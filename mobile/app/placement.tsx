@@ -107,7 +107,7 @@ function StudentView({ data, refetch, isOffline }: { data: PlacementResponse; re
 
   if (result) {
     return (
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         {isOffline ? <OfflineBanner /> : null}
         <LevelResultCard result={result} heading={t.placement.yourLevel} footnote={t.placement.retakeHint} />
       </ScrollView>
@@ -131,7 +131,7 @@ function StudentView({ data, refetch, isOffline }: { data: PlacementResponse; re
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
       {isOffline ? <OfflineBanner /> : null}
       <Card style={styles.introCard}>
         <View style={[styles.introIcon, { backgroundColor: tint }]}>
@@ -191,7 +191,7 @@ function TestRunner({ questions, onFinished }: { questions: PlacementQuestion[];
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
       <View style={styles.progressHeader}>
         <Text style={[styles.progressLabel, { color: mutedColor }]}>
           {t.placement.questionOf} {index + 1} / {questions.length}
@@ -265,7 +265,7 @@ function ParentView({ data, isOffline }: { data: PlacementResponse; isOffline: b
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
       {isOffline ? <OfflineBanner /> : null}
       <LevelResultCard result={result} heading={`${result.student} · ${t.placement.childLevel}`} />
     </ScrollView>

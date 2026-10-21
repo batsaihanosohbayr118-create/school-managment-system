@@ -33,6 +33,8 @@ type ManagedUser = {
   role: Role;
   subject: string;
   studentEmail: string;
+  /** False for a self-registered teacher waiting on an admin. */
+  approved: boolean;
   createdAt: string;
 };
 
@@ -277,6 +279,9 @@ export default function AdminUsersPage() {
 
   const provisioningDisabled = Boolean(notice);
 
+  /** Self-registered teachers who cannot sign in until approved here. */
+  const pending = useMemo(() => users.filter((user) => !user.approved), [users]);
+
   // --- Mutations (all go through the Neon-backed admin API) ---
 
   async function apiWrite(method: "POST" | "PATCH" | "DELETE", body?: Record<string, unknown>, search = "") {
@@ -299,6 +304,16 @@ export default function AdminUsersPage() {
 
   async function handleReset(id: string, password: string) {
     await apiWrite("PATCH", { id, password });
+  }
+
+  async function handleApprove(user: ManagedUser) {
+    try {
+      await apiWrite("PATCH", { id: user.id, approve: true });
+      setToast(`${user.name || user.email} approved`);
+      await loadUsers();
+    } catch (approveError) {
+      setError(approveError instanceof Error ? approveError.message : "Approval failed.");
+    }
   }
 
   async function handleDelete(id: string) {
@@ -337,6 +352,39 @@ export default function AdminUsersPage() {
           <ShieldAlert size={18} />
           <p>{notice}</p>
         </div>
+      ) : null}
+
+      {pending.length > 0 ? (
+        <section className="um-pending" aria-label="Teachers awaiting approval">
+          <header>
+            <ShieldAlert size={18} />
+            <div>
+              <strong>Teachers awaiting approval ({pending.length})</strong>
+              <p>They signed themselves up and cannot sign in until approved. Approving gives them their subject&apos;s grades and attendance.</p>
+            </div>
+          </header>
+          <ul>
+            {pending.map((user) => (
+              <li key={user.id}>
+                <div className="um-pending-who">
+                  <strong>{user.name || "—"}</strong>
+                  <span>{user.email}</span>
+                </div>
+                <Badge tone="blue">{user.subject || "No subject"}</Badge>
+                <div className="um-pending-actions">
+                  <Button type="button" onClick={() => void handleApprove(user)}>
+                    <Check size={16} />
+                    Approve
+                  </Button>
+                  <button type="button" className="um-pending-reject" onClick={() => setModal({ kind: "delete", user })}>
+                    <X size={16} />
+                    Reject
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       <section className="um-toolbar">
@@ -402,7 +450,10 @@ export default function AdminUsersPage() {
                     <td data-label="Name">{user.name || "—"}</td>
                     <td data-label="Username">{user.username || "—"}</td>
                     <td data-label="Email">{user.email}</td>
-                    <td data-label="Role"><Badge tone={roleTone[user.role]}>{roleLabels[user.role]}</Badge></td>
+                    <td data-label="Role">
+                      <Badge tone={roleTone[user.role]}>{roleLabels[user.role]}</Badge>
+                      {!user.approved ? <Badge tone="amber">Pending</Badge> : null}
+                    </td>
                     <td data-label="Actions">
                       <div className="um-row-actions">
                         <button title="Edit" onClick={() => setModal({ kind: "edit", user })} type="button">
@@ -438,7 +489,10 @@ export default function AdminUsersPage() {
                   </div>
                   <div className="um-card-row">
                     <span>Role</span>
-                    <Badge tone={roleTone[user.role]}>{roleLabels[user.role]}</Badge>
+                    <span>
+                      <Badge tone={roleTone[user.role]}>{roleLabels[user.role]}</Badge>
+                      {!user.approved ? <Badge tone="amber">Pending</Badge> : null}
+                    </span>
                   </div>
                   <div className="um-row-actions">
                     <button title="Edit" onClick={() => setModal({ kind: "edit", user })} type="button">
@@ -793,6 +847,10 @@ function mapApiError(code: string | undefined) {
       return "This is the only admin account — promote someone else first.";
     case "cannot-delete-self":
       return "You cannot delete the account you are signed in with.";
+    case "subject-taken":
+      return "That subject already has a teacher — reject this request, or free the subject first.";
+    case "subject-not-found":
+      return "The subject this teacher asked for no longer exists.";
     default:
       return code ?? "Something went wrong.";
   }

@@ -10,6 +10,8 @@
  * lucide-react, a web-only dependency shared/ must not carry — so keep the
  * two lists in sync by hand if a role or module is ever added or renamed.
  */
+import type { RegistrationErrorCode } from "./registration";
+
 export type Language = "en" | "mn";
 
 export type Role = "admin" | "teacher" | "student" | "parent";
@@ -329,6 +331,9 @@ export const translations = {
       searchSubjects: "Search subjects...",
       noSubjectsMatchSearch: "No subjects match your search.",
       searchTimetable: "Search timetable...",
+      dayOffTitle: (day: string) => `No classes on ${day}`,
+      dayOffBody: "A free day — rest up and recharge.",
+      dayOffNext: (day: string, count: number) => `${day}: ${count} ${count === 1 ? "class" : "classes"}`,
       noTimetableMatchSearch: "No timetable slots match your search.",
       searchGrades: "Search grades...",
       noGradesMatchSearch: "No grades match your search.",
@@ -610,6 +615,7 @@ export const translations = {
     },
     lunch: {
       homeLink: "Lunch fee",
+      paymentsLinkSubtitle: (price: string) => `${price} per day · pick days and pay with QPay`,
       title: "Lunch fee",
       unit: "per school day",
       monthTitle: (year: number, month: number) =>
@@ -625,6 +631,71 @@ export const translations = {
       selectToPay: "Select at least one day to pay.",
       tooManyDays: (max: number) => `You can pay for at most ${max} days at a time.`,
       note: "Tap the days your child will have lunch. Weekends cannot be selected."
+    },
+    register: {
+      title: "Create an account",
+      subtitle: "Pick who you are, then fill in your details.",
+      roles: { student: "Student", parent: "Parent", teacher: "Teacher" },
+      roleHints: {
+        student: "See your grades, timetable and payments.",
+        parent: "Follow your child's grades and attendance.",
+        teacher: "Grade and take attendance — after an admin approves you."
+      },
+      fields: {
+        name: "Full name",
+        email: "Email",
+        phone: "Phone (optional)",
+        password: "Password",
+        childEmail: "Your child's email",
+        childPassword: "Your child's password",
+        subject: "Subject you teach",
+        subjects: "Your subjects"
+      },
+      passwordHint: (min: number) => `At least ${min} characters.`,
+      subjectsHint: "Pick none to get the school's standard subjects.",
+      subjectTaken: "has a teacher",
+      parentNote: "Your child's sign-in proves you are their parent. It is only checked, never stored with your account.",
+      teacherNote: "An admin approves new teachers. You can sign in once approved.",
+      submit: "Create account",
+      haveAccount: "Already have an account?",
+      signIn: "Sign in",
+      noAccount: "No account yet?",
+      createAccount: "Create one",
+      pendingTitle: "Request received",
+      pendingBody: "An admin will review your teacher account. Sign in once it is approved.",
+      backToLogin: "Back to sign in",
+      pendingLogin: "Your teacher account is waiting for admin approval.",
+      loadFailed: "Could not load subjects. Check your connection.",
+      errors: {
+        "invalid-role": "Choose who you are.",
+        "name-required": "Enter your full name.",
+        "invalid-email": "Enter a valid email address.",
+        "weak-password": "The password is too short.",
+        "email-taken": "An account with this email already exists.",
+        "subject-required": "Choose the subject you teach.",
+        "subject-not-found": "That subject does not exist.",
+        "subject-taken": "That subject already has a teacher.",
+        "child-credentials-invalid": "Your child's email or password is incorrect.",
+        "child-has-parent": "This student already has a parent account."
+      } satisfies Record<RegistrationErrorCode, string>,
+      failed: "Registration failed. Please try again."
+    },
+    gradesView: {
+      schoolYear: (start: number) => `${start}–${start + 1} school year`,
+      wholeYear: "Year total",
+      gpa: "Grade point average (GPA)",
+      fromPrevious: "From last semester",
+      overallAverage: "Overall average",
+      noGradesHint: "Shows up once teachers enter grades.",
+      subjectGrades: "Subject grades",
+      teacher: (name: string) => `Teacher: ${name}`,
+      trendTitle: "Progress",
+      trendSubtitle: (count: number) => `GPA over the last ${count} semesters`,
+      cheers: {
+        great: { title: "Great job!", body: "Excellent results this semester." },
+        good: { title: "Good work", body: "Steady results — keep it up." },
+        focus: { title: "Keep going", body: "Some subjects need more attention. A word with the teacher can help." }
+      }
     }
   },
   mn: {
@@ -833,6 +904,9 @@ export const translations = {
       searchSubjects: "Хичээл хайх...",
       noSubjectsMatchSearch: "Хайлтад тохирох хичээл олдсонгүй.",
       searchTimetable: "Хуваарь хайх...",
+      dayOffTitle: (day: string) => `${day} гарагт хичээл алга`,
+      dayOffBody: "Чөлөөтэй өдөр — сайхан амарч, хүчээ цуглуулаарай.",
+      dayOffNext: (day: string, count: number) => `${day}: ${count} хичээл`,
       noTimetableMatchSearch: "Хайлтад тохирох хуваарь олдсонгүй.",
       searchGrades: "Дүн хайх...",
       noGradesMatchSearch: "Хайлтад тохирох дүн олдсонгүй.",
@@ -1112,6 +1186,7 @@ export const translations = {
     },
     lunch: {
       homeLink: "Өдрийн цайны төлбөр",
+      paymentsLinkSubtitle: (price: string) => `Өдөрт ${price} · өдрөө сонгоод QPay-ээр төлнө`,
       title: "Өдрийн цайны төлбөр",
       unit: "хичээлийн нэг өдөрт",
       monthTitle: (year: number, month: number) => `${year} оны ${month + 1}-р сар`,
@@ -1126,6 +1201,71 @@ export const translations = {
       selectToPay: "Төлөхийн тулд дор хаяж нэг өдөр сонгоно уу.",
       tooManyDays: (max: number) => `Нэг удаад хамгийн ихдээ ${max} өдрийн төлбөр төлөх боломжтой.`,
       note: "Хүүхэд тань өдрийн хоол идэх өдрүүдийг дарж сонгоно уу. Амралтын өдрийг сонгох боломжгүй."
+    },
+    register: {
+      title: "Бүртгүүлэх",
+      subtitle: "Та хэн болохоо сонгоод мэдээллээ бөглөнө үү.",
+      roles: { student: "Сурагч", parent: "Эцэг эх", teacher: "Багш" },
+      roleHints: {
+        student: "Дүн, хуваарь, төлбөрөө харна.",
+        parent: "Хүүхдийнхээ дүн, ирцийг хянана.",
+        teacher: "Админ баталсны дараа дүн, ирц бүртгэнэ."
+      },
+      fields: {
+        name: "Овог нэр",
+        email: "Имэйл",
+        phone: "Утас (заавал биш)",
+        password: "Нууц үг",
+        childEmail: "Хүүхдийн имэйл",
+        childPassword: "Хүүхдийн нууц үг",
+        subject: "Заадаг хичээл",
+        subjects: "Үзэх хичээлүүд"
+      },
+      passwordHint: (min: number) => `Дор хаяж ${min} тэмдэгт.`,
+      subjectsHint: "Сонгохгүй бол сургуулийн үндсэн хичээлүүд оноогдоно.",
+      subjectTaken: "багштай",
+      parentNote: "Хүүхдийн нэвтрэх мэдээлэл нь таныг эцэг эх нь гэдгийг баталгаажуулна. Зөвхөн шалгахад ашиглагдана, хадгалагдахгүй.",
+      teacherNote: "Шинэ багшийг админ баталдаг. Батлагдсаны дараа нэвтэрнэ.",
+      submit: "Бүртгүүлэх",
+      haveAccount: "Бүртгэлтэй юу?",
+      signIn: "Нэвтрэх",
+      noAccount: "Бүртгэл байхгүй юу?",
+      createAccount: "Бүртгүүлэх",
+      pendingTitle: "Хүсэлт хүлээн авлаа",
+      pendingBody: "Админ таны багшийн бүртгэлийг шалгана. Батлагдсаны дараа нэвтэрнэ үү.",
+      backToLogin: "Нэвтрэх хуудас руу",
+      pendingLogin: "Таны багшийн бүртгэл админы баталгаажуулалт хүлээж байна.",
+      loadFailed: "Хичээлүүдийг ачаалж чадсангүй. Холболтоо шалгана уу.",
+      errors: {
+        "invalid-role": "Та хэн болохоо сонгоно уу.",
+        "name-required": "Овог нэрээ оруулна уу.",
+        "invalid-email": "Зөв имэйл хаяг оруулна уу.",
+        "weak-password": "Нууц үг хэт богино байна.",
+        "email-taken": "Энэ имэйлээр бүртгэл үүссэн байна.",
+        "subject-required": "Заадаг хичээлээ сонгоно уу.",
+        "subject-not-found": "Ийм хичээл олдсонгүй.",
+        "subject-taken": "Энэ хичээл багштай байна.",
+        "child-credentials-invalid": "Хүүхдийн имэйл эсвэл нууц үг буруу байна.",
+        "child-has-parent": "Энэ сурагч эцэг эхийн бүртгэлтэй байна."
+      } satisfies Record<RegistrationErrorCode, string>,
+      failed: "Бүртгэл амжилтгүй боллоо. Дахин оролдоно уу."
+    },
+    gradesView: {
+      schoolYear: (start: number) => `${start}–${start + 1} оны хичээлийн жил`,
+      wholeYear: "Жилийн дүн",
+      gpa: "Нийт голч дүн (GPA)",
+      fromPrevious: "Өмнөх улирлаас",
+      overallAverage: "Нийт дундаж",
+      noGradesHint: "Багш дүн оруулмагц энд харагдана.",
+      subjectGrades: "Хичээлийн дүн",
+      teacher: (name: string) => `Багш: ${name}`,
+      trendTitle: "Сурлагын ахиц",
+      trendSubtitle: (count: number) => `Сүүлийн ${count} улирлын голч дүн`,
+      cheers: {
+        great: { title: "Сайхан байна!", body: "Энэ улиралд маш сайн амжилт үзүүллээ." },
+        good: { title: "Сайн байна", body: "Тогтвортой сурч байна — ингээд үргэлжлүүлээрэй." },
+        focus: { title: "Хичээгээрэй", body: "Зарим хичээлд илүү анхаарах хэрэгтэй. Багштайгаа зөвлөлдөөрэй." }
+      }
     }
   }
 };
@@ -1137,7 +1277,7 @@ export function translateColumn(column: string, language: Language) {
   return columns[column] ?? column;
 }
 
-const WEEKDAYS_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
+export const WEEKDAYS_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
 
 /**
  * The "Day" field on timetable entries is free text, entered in whichever

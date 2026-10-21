@@ -137,7 +137,7 @@ export default function SubjectContentScreen() {
     : undefined;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView showsVerticalScrollIndicator={false} style={styles.container} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: name || t.nav.subjects.label }} />
 
       {loading ? (

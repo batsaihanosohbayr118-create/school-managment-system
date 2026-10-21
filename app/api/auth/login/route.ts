@@ -40,6 +40,13 @@ export async function POST(request: Request) {
       return withCors(NextResponse.json({ message: "invalid-credentials" }, { status: 401 }), request, METHODS);
     }
 
+    // A self-registered teacher waits for an admin. Refusing the token here is
+    // the whole gate: without one, no API route will serve them anything.
+    // Only reached with the right password, so it reveals nothing to a guesser.
+    if (!account.approved) {
+      return withCors(NextResponse.json({ message: "pending-approval" }, { status: 403 }), request, METHODS);
+    }
+
     const token = issueToken({
       sub: account.id,
       email: account.email,

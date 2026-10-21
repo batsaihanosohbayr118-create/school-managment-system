@@ -122,7 +122,7 @@ export default function SettingsScreen() {
   const divider = <View style={[styles.divider, { backgroundColor: borderColor }]} />;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView showsVerticalScrollIndicator={false} style={styles.container} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: t.nav.settings.label }} />
 
       {session ? (

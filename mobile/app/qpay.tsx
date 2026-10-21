@@ -134,7 +134,7 @@ export default function QpayScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView showsVerticalScrollIndicator={false} style={styles.container} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: t.qpay.title }} />
       <Text style={styles.amount}>{amountLabel || `${groupThousands(String(invoice.amount))}₮`}</Text>
 

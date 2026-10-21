@@ -11,6 +11,7 @@ import {
   updateAccount
 } from "@/lib/auth-db";
 import { verifyToken, type TokenPayload } from "@/lib/auth-token";
+import { approveTeacher, RegistrationError } from "@/lib/school-db";
 import type { Role } from "@/lib/types";
 import { preflight, withCors } from "@/lib/cors";
 
@@ -152,10 +153,26 @@ export async function PATCH(request: Request) {
     role?: string;
     subject?: string;
     studentEmail?: string;
+    approve?: boolean;
   } | null;
 
   if (!body?.id) {
     return withCors(NextResponse.json({ message: "id is required." }, { status: 400 }), request, METHODS);
+  }
+
+  // Approving a self-registered teacher: creates their teacher record for the
+  // subject they asked for, then lets them sign in. Nothing else in the body applies.
+  if (body.approve === true) {
+    try {
+      const user = await approveTeacher(body.id, {
+        session: { role: "admin", email: guard.caller.email, name: guard.caller.name, avatarUrl: "", source: "neon" }
+      });
+      if (!user) return NextResponse.json({ message: "No pending teacher with that id." }, { status: 404 });
+      return NextResponse.json({ user });
+    } catch (error) {
+      if (error instanceof RegistrationError) return NextResponse.json({ message: error.code }, { status: 409 });
+      return fail(error);
+    }
   }
 
   // Demoting the last admin would leave nobody able to manage accounts.

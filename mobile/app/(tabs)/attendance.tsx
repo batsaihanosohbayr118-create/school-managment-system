@@ -73,7 +73,7 @@ export default function AttendanceScreen() {
   }
 
   return (
-    <FlatList
+    <FlatList showsVerticalScrollIndicator={false}
       style={styles.container}
       contentContainerStyle={styles.content}
       data={filteredEntries}

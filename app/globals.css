@@ -4955,6 +4955,88 @@ button {
   }
 }
 
+/* Self-registered teachers awaiting approval (app/admin/users). */
+.um-pending {
+  margin-bottom: 18px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  background: rgba(113, 63, 18, 0.18);
+}
+
+.um-pending header {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: #fcd34d;
+}
+
+.um-pending header strong {
+  display: block;
+  color: #fde68a;
+}
+
+.um-pending header p {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: #d6c89a;
+}
+
+.um-pending ul {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.um-pending li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #101c39;
+}
+
+.um-pending-who {
+  display: grid;
+  flex: 1;
+  min-width: 180px;
+}
+
+.um-pending-who strong {
+  color: #e8eefc;
+}
+
+.um-pending-who span {
+  font-size: 0.85rem;
+  color: #94a3c4;
+}
+
+.um-pending-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.um-pending-reject {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  background: transparent;
+  color: #fda4af;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.um-pending-reject:hover {
+  background: rgba(244, 63, 94, 0.12);
+}
+
 /* User-management surfaces — dark unconditionally (the base vars above already
    carry the dark palette; these are the per-component pieces). */
 .um-table thead th {

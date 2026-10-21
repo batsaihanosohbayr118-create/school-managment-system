@@ -61,7 +61,7 @@ export function PlacementTeacherView({
   }
 
   return (
-    <FlatList
+    <FlatList showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}
       data={data.results}
       keyExtractor={(result) => result.id}

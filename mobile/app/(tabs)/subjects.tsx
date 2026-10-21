@@ -87,7 +87,7 @@ export default function SubjectsScreen() {
           center; render the empty state outside it so it sits like every other tab's. */}
       {isReadOnlyViewer && filteredSubjects.length === 0 ? (
         // An empty vertical list, laid out exactly like the other tabs' empty states.
-        <FlatList
+        <FlatList showsVerticalScrollIndicator={false}
           style={styles.flex}
           contentContainerStyle={styles.content}
           data={[]}
@@ -96,7 +96,7 @@ export default function SubjectsScreen() {
           refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={tint} colors={[tint]} />}
         />
       ) : (
-        <FlatList
+        <FlatList showsVerticalScrollIndicator={false}
           style={styles.flex}
           contentContainerStyle={isReadOnlyViewer ? styles.contentHorizontal : styles.content}
           data={filteredSubjects}

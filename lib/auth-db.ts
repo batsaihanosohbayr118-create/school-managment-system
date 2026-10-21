@@ -21,6 +21,7 @@ const KEY_LENGTH = 64;
 declare global {
   var authPool: Pool | undefined;
   var authReady: Promise<void> | undefined;
+  var authSchemaVersion: number | undefined;
 }
 
 export type AccountRecord = {
@@ -35,6 +36,12 @@ export type AccountRecord = {
   subject: string;
   /** Parents only — the email of the student they are guardian for. */
   studentEmail: string;
+  /**
+   * False only for a self-registered teacher an admin has not approved yet.
+   * Such an account cannot sign in (see app/api/auth/login), so it never holds
+   * a token and cannot reach any data.
+   */
+  approved: boolean;
   createdAt: string;
 };
 
@@ -100,6 +107,8 @@ async function initialize() {
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS subject TEXT NOT NULL DEFAULT '';`);
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS student_email TEXT NOT NULL DEFAULT '';`);
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';`);
+  // Every account that existed before self-registration was admin-made, so approved.
+  await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT TRUE;`);
 
   // One row per device: an account signed in on a phone and a tablet gets
   // notified on both. Keyed by the token itself (not email) so re-registering
@@ -132,7 +141,20 @@ async function initialize() {
   }
 }
 
+/**
+ * Bump whenever initialize() gains a migration. The ready promise lives on
+ * globalThis so it survives hot reloads — without this, a dev server started
+ * before the migration keeps its old promise, never runs the new ALTER, and
+ * every query naming the new column fails until a restart.
+ */
+const SCHEMA_VERSION = 2;
+
 async function ensureReady() {
+  if (globalThis.authSchemaVersion !== SCHEMA_VERSION) {
+    globalThis.authReady = undefined;
+    globalThis.authSchemaVersion = SCHEMA_VERSION;
+  }
+
   if (!globalThis.authReady) {
     globalThis.authReady = initialize().catch((error) => {
       globalThis.authReady = undefined;
@@ -153,6 +175,7 @@ type Row = {
   phone: string;
   subject: string;
   student_email: string;
+  approved: boolean;
   created_at: Date | string;
 };
 
@@ -167,11 +190,12 @@ function mapRow(row: Row): AccountRecord {
     phone: row.phone ?? "",
     subject: row.subject ?? "",
     studentEmail: row.student_email ?? "",
+    approved: row.approved !== false,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at)
   };
 }
 
-const SELECT = `id, email, username, name, role, avatar_url, phone, subject, student_email, created_at`;
+const SELECT = `id, email, username, name, role, avatar_url, phone, subject, student_email, approved, created_at`;
 
 /**
  * A parent account may only be linked to a student that actually exists, so
@@ -233,6 +257,8 @@ export type CreateAccountInput = {
   phone?: string;
   subject?: string;
   studentEmail?: string;
+  /** Defaults to true; only self-registered teachers start unapproved. */
+  approved?: boolean;
 };
 
 export class AccountConflictError extends Error {
@@ -262,8 +288,8 @@ export async function createAccount(input: CreateAccountInput): Promise<AccountR
 
   try {
     const { rows } = await getPool().query<Row>(
-      `INSERT INTO app_users (id, email, username, name, role, password_hash, phone, subject, student_email)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO app_users (id, email, username, name, role, password_hash, phone, subject, student_email, approved)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING ${SELECT};`,
       [
         makeId(),
@@ -274,7 +300,8 @@ export async function createAccount(input: CreateAccountInput): Promise<AccountR
         passwordHash,
         input.phone?.trim() ?? "",
         input.role === "teacher" ? (input.subject?.trim() ?? "") : "",
-        input.role === "parent" ? (input.studentEmail?.trim() ?? "") : ""
+        input.role === "parent" ? (input.studentEmail?.trim() ?? "") : "",
+        input.approved ?? true
       ]
     );
     return mapRow(rows[0]);
@@ -384,6 +411,23 @@ export async function setAccountPassword(input: {
 
   await createAccount(input);
   return "created";
+}
+
+/** Whether any account already uses this email, case-insensitively. */
+export async function accountEmailTaken(email: string): Promise<boolean> {
+  await ensureReady();
+  const { rows } = await getPool().query<{ exists: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM app_users WHERE LOWER(email) = LOWER($1)) AS exists;`,
+    [email.trim()]
+  );
+  return rows[0]?.exists ?? false;
+}
+
+/** Lets a pending self-registered account sign in. */
+export async function approveAccount(id: string): Promise<AccountRecord | null> {
+  await ensureReady();
+  const { rows } = await getPool().query<Row>(`UPDATE app_users SET approved = TRUE WHERE id = $1 RETURNING ${SELECT};`, [id]);
+  return rows[0] ? mapRow(rows[0]) : null;
 }
 
 export async function deleteAccount(id: string): Promise<boolean> {

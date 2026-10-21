@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
+import { GradesOverview } from '@/components/GradesOverview';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { ProgressRing } from '@/components/ProgressRing';
 import { SearchBar } from '@/components/SearchBar';
@@ -70,8 +71,14 @@ export default function GradesScreen() {
     );
   }
 
+  // Students and parents see one child's grades as a report card; a teacher
+  // sees many students' rows, so keeps the searchable, deletable list below.
+  if (!isTeacher) {
+    return <GradesOverview grades={grades} loading={loading} refetch={refetch} isOffline={isOffline} />;
+  }
+
   return (
-    <FlatList
+    <FlatList showsVerticalScrollIndicator={false}
       style={styles.container}
       contentContainerStyle={styles.content}
       data={filteredGrades}

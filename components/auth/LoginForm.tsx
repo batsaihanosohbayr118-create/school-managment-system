@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
 import { authService } from "@/lib/auth-client";
 import { dashboardPathForRole, resolveActiveSession } from "@/lib/auth-flow";
+import { translations } from "@shared/i18n-tables";
 
 const REMEMBER_KEY = "nm_remember_email";
 
@@ -68,7 +69,9 @@ export function LoginForm() {
       setMessage(
         result.error === "invalid-credentials"
           ? "Имэйл эсвэл нууц үг буруу байна."
-          : "Нэвтрэхэд алдаа гарлаа. Дахин оролдоно уу."
+          : result.error === "pending-approval"
+            ? translations.mn.register.pendingLogin
+            : "Нэвтрэхэд алдаа гарлаа. Дахин оролдоно уу."
       );
       return;
     }
@@ -164,6 +167,12 @@ export function LoginForm() {
         </p>
       ) : null}
 
+      <p className="text-center text-[13px] text-slate-400">
+        {translations.mn.register.noAccount}{" "}
+        <Link href="/register" className="font-semibold text-sky-300 transition hover:text-sky-200">
+          {translations.mn.register.createAccount}
+        </Link>
+      </p>
     </form>
   );
 }

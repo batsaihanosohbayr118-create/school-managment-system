@@ -103,8 +103,8 @@ empty, check for that warning before debugging anything else.
 ### Auth is client-side; route protection is layered
 
 - `proxy.ts` (Next 16's successor to `middleware.ts` — the README's mention of `middleware.ts` is
-  stale) cannot see the session. It only normalizes `/admin` → `/admin/dashboard`, redirects the
-  removed `/register` → `/login`, and sets security headers.
+  stale) cannot see the session. It only normalizes `/admin` → `/admin/dashboard` and sets
+  security headers.
 - The **authoritative per-role guard** is the `useEffect` in
   `components/dashboard/DashboardApp.tsx` (~line 1065). Each `app/<role>/dashboard/page.tsx` is a
   5-line shell rendering `<DashboardApp lockedRole="..." />`; the guard bounces a user whose session
@@ -141,9 +141,13 @@ block in `initializeSchoolDatabase`, `resourceColumns`, `rowToArray`, and the ro
 - The web app is **not** a PWA any more (`next-pwa`, the manifest and the offline page were
   removed). `public/sw.js` is a hand-written kill switch that clears old caches and unregisters
   itself for browsers that installed the old service worker — do not delete it or add a new one.
-- Accounts are admin-provisioned only (`/admin/users` → `app/api/admin/users/route.ts`), which
-  requires the server-only `SUPABASE_SERVICE_ROLE_KEY` and returns 501 with a setup notice without
-  it. There is no public registration.
+- Accounts are made by an admin (`/admin/users`, or a record's Password field) **or by
+  self-registration** (`/register` on web, `mobile/app/register.tsx`, both calling
+  `app/api/auth/register` → `registerAccount()` in `lib/school-db.ts`). Students sign straight in;
+  a parent must give their child's email *and password*; a teacher's account starts with
+  `app_users.approved = false`, cannot sign in (`/api/auth/login` returns `pending-approval`), and
+  gets their teacher record only when an admin approves them on `/admin/users`. Rules shared by
+  all three are in `shared/registration.ts`. Admin can never be self-registered.
 
 ## Files that are not what they look like
 

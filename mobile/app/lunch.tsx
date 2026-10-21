@@ -1,15 +1,21 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '@/components/Card';
+import { GradientHeaderButton, gradientHeaderItem } from '@/components/GradientHeaderButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { api } from '@/lib/api';
 import { useLanguage } from '@/lib/language-context';
 import { ApiError } from '@shared/api-error';
 import { LUNCH_FEE_PER_DAY, MAX_LUNCH_DAYS } from '@shared/lunch';
+
+/** Matches the card image's blue; used by the back button and the picked days. */
+const LUNCH_GRADIENT: [string, string] = ['#3b82f6', '#1d4ed8'];
+const SELECTED_DAY = '#2563eb';
+
+const LUNCH_CARD_IMAGE = require('@/assets/images/lunch-card.png');
 
 function formatMoney(amount: number) {
   return `${amount.toLocaleString('en-US')}₮`;
@@ -39,6 +45,7 @@ export default function LunchScreen() {
   const [paying, setPaying] = useState(false);
   const mutedColor = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
+  const moneyColor = useThemeColor({}, 'success');
   const borderColor = useThemeColor({}, 'border');
   const today = new Date();
   const [visible, setVisible] = useState({ year: today.getFullYear(), month: today.getMonth() });
@@ -79,6 +86,10 @@ export default function LunchScreen() {
 
   const tooManyDays = selected.size > MAX_LUNCH_DAYS;
 
+  const backButton = (
+    <GradientHeaderButton icon="chevron-back" colors={LUNCH_GRADIENT} onPress={() => router.back()} accessibilityLabel={t.qpay.back} />
+  );
+
   /** The server issues the record and its amount; QPay then pays it like any other payment. */
   const pay = async () => {
     if (selected.size === 0 || tooManyDays || paying) return;
@@ -94,16 +105,24 @@ export default function LunchScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <LinearGradient colors={['#f59e0b', '#ea580c']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.8 }} style={styles.hero}>
-        <Ionicons name="restaurant" size={72} color="rgba(255,255,255,0.15)" style={styles.heroBgIcon} />
-        <View style={styles.heroIcon}>
-          <Ionicons name="restaurant-outline" size={22} color="#fff" />
+    <ScrollView showsVerticalScrollIndicator={false} style={styles.container} contentContainerStyle={styles.content}>
+      <Stack.Screen
+        options={{ headerBackVisible: false, headerLeft: () => backButton, unstable_headerLeftItems: gradientHeaderItem(backButton) }}
+      />
+      <View style={styles.heroShadow}>
+        <Image source={LUNCH_CARD_IMAGE} style={styles.hero} resizeMode="cover" accessibilityIgnoresInvertColors />
+      </View>
+
+      <View style={styles.price}>
+        <View style={styles.priceIcon}>
+          <Ionicons name="restaurant-outline" size={18} color="#fff" />
         </View>
-        <Text style={styles.heroLabel}>{t.lunch.title}</Text>
-        <Text style={styles.heroAmount}>{formatMoney(LUNCH_FEE_PER_DAY)}</Text>
-        <Text style={styles.heroUnit}>{t.lunch.unit}</Text>
-      </LinearGradient>
+        <View style={styles.priceCopy}>
+          <Text style={styles.priceLabel}>{t.lunch.title}</Text>
+          <Text style={[styles.priceUnit, { color: mutedColor }]}>{t.lunch.unit}</Text>
+        </View>
+        <Text style={[styles.priceAmount, { color: moneyColor }]}>{formatMoney(LUNCH_FEE_PER_DAY)}</Text>
+      </View>
 
       <Card style={styles.calendar}>
         <View style={styles.monthHeader}>
@@ -139,7 +158,7 @@ export default function LunchScreen() {
                     accessibilityState={{ selected: isSelected, disabled: weekend }}
                     style={({ pressed }) => [
                       styles.day,
-                      isSelected && { backgroundColor: '#ea580c' },
+                      isSelected && { backgroundColor: SELECTED_DAY },
                       !isSelected && isToday && { borderWidth: 1.5, borderColor: tint },
                       pressed && styles.dayPressed
                     ]}
@@ -179,7 +198,7 @@ export default function LunchScreen() {
             {t.lunch.selectedDays(selected.size)} × {formatMoney(LUNCH_FEE_PER_DAY)}
           </Text>
         </View>
-        <Text style={styles.totalAmount}>{formatMoney(selected.size * LUNCH_FEE_PER_DAY)}</Text>
+        <Text style={[styles.totalAmount, { color: moneyColor }]}>{formatMoney(selected.size * LUNCH_FEE_PER_DAY)}</Text>
       </Card>
 
       <Pressable
@@ -219,42 +238,57 @@ const styles = StyleSheet.create({
   content: {
     padding: 16
   },
+  // The wrapper owns the size: a require()d Image given a percentage width plus
+  // aspectRatio falls back to the PNG's own pixel size and overflows the screen.
+  heroShadow: {
+    width: '100%',
+    aspectRatio: 1000 / 563,
+    borderRadius: 22,
+    backgroundColor: 'transparent',
+    shadowColor: '#1d4ed8',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 6
+  },
+  // lunch-card.png is cropped to the card itself, so it fills the wrapper exactly.
   hero: {
-    borderRadius: 24,
-    padding: 20,
-    overflow: 'hidden',
-    marginBottom: 16
+    width: '100%',
+    height: '100%',
+    borderRadius: 22
   },
-  heroBgIcon: {
-    position: 'absolute',
-    right: 12,
-    bottom: 10,
-    transform: [{ rotate: '-8deg' }]
+  price: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 18,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+    backgroundColor: 'transparent'
   },
-  heroIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
+  priceIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-    backgroundColor: 'rgba(255,255,255,0.22)'
+    backgroundColor: '#2563eb'
   },
-  heroLabel: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
+  priceCopy: {
+    flex: 1,
+    gap: 2,
+    backgroundColor: 'transparent'
+  },
+  priceLabel: {
+    fontSize: 15,
     fontWeight: '700'
   },
-  heroAmount: {
-    color: '#fff',
-    fontSize: 34,
-    fontWeight: '800',
-    marginTop: 4
+  priceUnit: {
+    fontSize: 13
   },
-  heroUnit: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 13,
-    fontWeight: '600'
+  priceAmount: {
+    fontSize: 22,
+    fontWeight: '800'
   },
   calendar: {
     paddingHorizontal: 10,
@@ -342,8 +376,7 @@ const styles = StyleSheet.create({
   },
   totalAmount: {
     fontSize: 24,
-    fontWeight: '800',
-    color: '#ea580c'
+    fontWeight: '800'
   },
   payButton: {
     flexDirection: 'row',

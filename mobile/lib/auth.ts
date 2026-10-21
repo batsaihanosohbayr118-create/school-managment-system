@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import type { Role } from "@shared/roles";
 import { isRole } from "@shared/roles";
+import type { RegistrationInput, RegistrationOptions, RegistrationResponse } from "@shared/registration";
 
 /**
  * Browser-side counterpart to lib/auth-client.ts on the web — same
@@ -165,6 +166,37 @@ export const authService = {
     const { token } = (await response.json()) as { token: string };
     await setToken(token);
     return { error: null };
+  },
+
+  /** Students and parents come back signed in; a teacher comes back pending approval. */
+  async register(input: RegistrationInput): Promise<{ error: string | null; pending?: boolean }> {
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input)
+      });
+    } catch {
+      return { error: "No connection." };
+    }
+
+    if (!response.ok) return { error: await readMessage(response) };
+
+    const body = (await response.json()) as RegistrationResponse;
+    if (body.status === "pending-approval") return { error: null, pending: true };
+
+    await setToken(body.token);
+    return { error: null };
+  },
+
+  async registrationOptions(): Promise<RegistrationOptions | null> {
+    try {
+      const response = await fetch(`${baseUrl}/api/auth/register`);
+      return response.ok ? ((await response.json()) as RegistrationOptions) : null;
+    } catch {
+      return null;
+    }
   },
 
   async signOut() {

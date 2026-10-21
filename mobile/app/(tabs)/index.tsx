@@ -85,14 +85,14 @@ export default function HomeScreen() {
 
   if (timetable.loading) {
     return (
-      <ScrollView style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false} style={styles.container}>
         <SkeletonHome />
       </ScrollView>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView showsVerticalScrollIndicator={false} style={styles.container} contentContainerStyle={styles.content}>
       {timetable.isOffline ? <OfflineBanner /> : null}
 
       <View style={[styles.greetingPanelWrap, { shadowColor: card.shadow }]}>
@@ -220,7 +220,8 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <AttendanceCard stats={attendanceStats} language={language} isParent={session?.role === 'parent'} />
+      {/* Teachers' own attendance is not recorded, so "My attendance" would always be empty. */}
+      {!isTeacher ? <AttendanceCard stats={attendanceStats} language={language} isParent={session?.role === 'parent'} /> : null}
 
       <SectionHeader
         icon="calendar-outline"
@@ -292,24 +293,6 @@ export default function HomeScreen() {
           )}
         </Pressable>
       </Link>
-
-      {session?.role === 'parent' && (
-        <Link href="/lunch" asChild>
-          <Pressable style={StyleSheet.flatten([styles.paymentsLink, { backgroundColor: '#ea580c' }])}>
-            {({ pressed }) => (
-              <View style={[styles.paymentsLinkInner, pressed && styles.paymentsLinkPressed]}>
-                <View style={[styles.paymentsLinkCopy, styles.shrink]}>
-                  <View style={[styles.paymentsLinkIcon, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
-                    <Ionicons name="restaurant-outline" size={17} color="#fff" />
-                  </View>
-                  <Text style={[styles.paymentsLinkText, styles.shrink, { color: '#fff' }]}>{t.lunch.homeLink}</Text>
-                </View>
-                <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
-              </View>
-            )}
-          </Pressable>
-        </Link>
-      )}
 
       {!isTeacher && (
         <>

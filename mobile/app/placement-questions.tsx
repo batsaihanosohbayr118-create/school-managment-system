@@ -80,7 +80,7 @@ export default function PlacementQuestionsScreen() {
   return (
     <>
       {header}
-      <SectionList
+      <SectionList showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
         sections={sections}
         keyExtractor={(question) => question.id}

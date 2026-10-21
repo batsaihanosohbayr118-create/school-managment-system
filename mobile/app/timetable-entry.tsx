@@ -61,7 +61,7 @@ export default function TimetableEntryScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
     >
-      <ScrollView
+      <ScrollView showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets

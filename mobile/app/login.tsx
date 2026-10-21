@@ -11,6 +11,7 @@ import {
   type TextInputProps
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Link } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -49,7 +50,13 @@ export default function LoginScreen() {
     const { error: signInError } = await signIn(email.trim(), password);
     setSubmitting(false);
     if (signInError) {
-      setError(signInError === 'invalid-credentials' ? t.mobileForms.invalidCredentials : signInError);
+      setError(
+        signInError === 'invalid-credentials'
+          ? t.mobileForms.invalidCredentials
+          : signInError === 'pending-approval'
+            ? t.register.pendingLogin
+            : signInError
+      );
     }
     // On success, signIn() already updated `session`; the root layout's
     // redirect effect takes it from there.
@@ -67,7 +74,7 @@ export default function LoginScreen() {
           device's light/dark setting, same reasoning apps like this usually
           apply to their sign-in screen specifically. */}
       <StatusBar style="light" />
-      <ScrollView
+      <ScrollView showsVerticalScrollIndicator={false}
         style={styles.flex}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -165,6 +172,15 @@ export default function LoginScreen() {
               </>
             )}
           </Pressable>
+
+          <View style={styles.registerRow}>
+            <Text style={[styles.registerText, { color: placeholderColor }]}>{t.register.noAccount}</Text>
+            <Link href="/register" asChild>
+              <Pressable hitSlop={8} accessibilityRole="link">
+                <Text style={[styles.registerLink, { color: tint }]}>{t.register.createAccount}</Text>
+              </Pressable>
+            </Link>
+          </View>
         </View>
 
         <View style={styles.footerImageWrap} pointerEvents="none">
@@ -347,6 +363,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 16
+  },
+  registerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    backgroundColor: 'transparent'
+  },
+  registerText: {
+    fontSize: 14
+  },
+  registerLink: {
+    fontSize: 14,
+    fontWeight: '800'
   },
   // Flexible rather than a fixed 280: it takes whatever height is left under
   // the card, so the screen fits without scrolling. minHeight keeps the

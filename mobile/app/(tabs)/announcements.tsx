@@ -60,7 +60,7 @@ export default function AnnouncementsScreen() {
   }
 
   return (
-    <FlatList
+    <FlatList showsVerticalScrollIndicator={false}
       style={styles.container}
       contentContainerStyle={styles.content}
       data={filteredAnnouncements}

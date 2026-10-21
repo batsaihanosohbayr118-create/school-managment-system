@@ -2,6 +2,7 @@
 
 import type { Role } from "@/lib/types";
 import { isRole } from "@/lib/auth-flow";
+import type { RegistrationInput, RegistrationOptions, RegistrationResponse } from "@shared/registration";
 
 /**
  * Browser-side authentication against the app's own Neon-backed endpoints.
@@ -88,6 +89,31 @@ export const authService = {
     const { token, user } = (await response.json()) as { token: string; user: SessionUser };
     setToken(token);
     return { user };
+  },
+
+  /** Students and parents come back signed in; a teacher comes back pending approval. */
+  async register(input: RegistrationInput): Promise<{ user: SessionUser } | { pending: true } | { error: string }> {
+    const response = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input)
+    });
+
+    if (!response.ok) return { error: await readMessage(response) };
+
+    const body = (await response.json()) as RegistrationResponse;
+    if (body.status === "pending-approval") return { pending: true };
+
+    const user = readToken(body.token);
+    if (!user) return { error: "request-failed" };
+    setToken(body.token);
+    return { user };
+  },
+
+  async registrationOptions(): Promise<RegistrationOptions | null> {
+    const response = await fetch("/api/auth/register").catch(() => null);
+    if (!response?.ok) return null;
+    return (await response.json()) as RegistrationOptions;
   },
 
   getSession(): SessionUser | null {

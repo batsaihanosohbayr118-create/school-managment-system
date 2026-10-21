@@ -19,7 +19,8 @@ import { isOutstandingAppFee, usePaymentLock } from '@/lib/payment-lock';
 import { useAuth } from '@/lib/auth-context';
 import { useApiData } from '@/lib/use-api';
 import { translateValue } from '@shared/i18n-tables';
-import { formatAmountLabel } from '@shared/money';
+import { LUNCH_FEE_PER_DAY } from '@shared/lunch';
+import { formatAmountLabel, groupThousands } from '@shared/money';
 import type { PaymentEntry } from '@shared/api-types';
 import { type Palette, paymentPalettes as palettes } from '@/components/payment-palette';
 
@@ -41,7 +42,7 @@ const statusStyles = {
 export function PaymentsView({ locked = false }: { locked?: boolean }) {
   const { data, error, loading, refetch, isOffline } = useApiData('payments', api.payments);
   const { refresh: refreshLock, skip: skipLock } = usePaymentLock();
-  const { signOut } = useAuth();
+  const { session, signOut } = useAuth();
   const { t } = useLanguage();
   const isDark = useColorScheme() === 'dark';
   const palette = isDark ? palettes.dark : palettes.light;
@@ -87,7 +88,7 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
     );
   } else {
     body = (
-      <FlatList
+      <FlatList showsVerticalScrollIndicator={false}
         style={styles.list}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.content, { paddingTop: isIOS ? 12 : headerHeight + 12 }]}
@@ -136,6 +137,7 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
                 </Pressable>
               </RNView>
             ) : null}
+            {!locked && session?.role === 'parent' ? <LunchLink palette={palette} /> : null}
           </RNView>
         }
         renderItem={({ item }) => <PaymentCard payment={item} palette={palette} />}
@@ -163,6 +165,30 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
       <RNView pointerEvents="none" style={[styles.orb, styles.orbBottom, { backgroundColor: palette.orbB }]} />
       {body}
     </RNView>
+  );
+}
+
+/** Parents pick lunch days and pay for them on their own screen (app/lunch). */
+function LunchLink({ palette }: { palette: Palette }) {
+  const { t } = useLanguage();
+  const router = useRouter();
+  return (
+    <Pressable
+      onPress={() => router.push('/lunch')}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.lunchShadow, { shadowColor: palette.glow }, pressed && styles.buttonPressed]}
+    >
+      <LinearGradient colors={palette.button} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.lunchLink}>
+        <RNView style={styles.lunchIcon}>
+          <Ionicons name="restaurant-outline" size={20} color="#fff" />
+        </RNView>
+        <RNView style={styles.lunchCopy}>
+          <Text style={styles.lunchTitle}>{t.lunch.homeLink}</Text>
+          <Text style={styles.lunchSubtitle}>{t.lunch.paymentsLinkSubtitle(`${groupThousands(String(LUNCH_FEE_PER_DAY))}₮`)}</Text>
+        </RNView>
+        <Ionicons name="chevron-forward" size={22} color="#fff" />
+      </LinearGradient>
+    </Pressable>
   );
 }
 
@@ -421,6 +447,46 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 15,
     fontWeight: '700'
+  },
+  lunchShadow: {
+    // The footer centers its children; the link spans the full width below the promo.
+    alignSelf: 'stretch',
+    marginTop: 22,
+    borderRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 6
+  },
+  lunchLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 16
+  },
+  lunchIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.22)'
+  },
+  lunchCopy: {
+    flex: 1,
+    gap: 2
+  },
+  lunchTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800'
+  },
+  lunchSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    fontWeight: '500'
   },
   promo: {
     alignItems: 'center',

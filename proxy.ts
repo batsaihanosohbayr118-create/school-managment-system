@@ -12,8 +12,7 @@ import type { NextRequest } from "next/server";
  * (and the `/admin/*` page guards). This proxy complements that by:
  *
  *  1. Normalizing structural routes (e.g. `/admin` -> `/admin/dashboard`).
- *  2. Retiring the removed public registration route (`/register` -> `/login`).
- *  3. Applying baseline security headers to every response.
+ *  2. Applying baseline security headers to every response.
  *
  * To move enforcement fully server-side, switch to cookie-based Supabase SSR
  * (`@supabase/ssr`) and read the session from cookies here.
@@ -32,11 +31,6 @@ function withSecurityHeaders(response: NextResponse) {
 
 export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  // Public registration was removed — send any stale links to login.
-  if (pathname === "/register") {
-    return withSecurityHeaders(NextResponse.redirect(new URL("/login", request.url)));
-  }
 
   // A bare role root resolves to that role's dashboard.
   if (ROLE_ROOTS.has(pathname)) {
