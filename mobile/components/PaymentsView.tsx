@@ -40,7 +40,7 @@ const statusStyles = {
  */
 export function PaymentsView({ locked = false }: { locked?: boolean }) {
   const { data, error, loading, refetch, isOffline } = useApiData('payments', api.payments);
-  const { refresh: refreshLock, skip: skipLock } = usePaymentLock();
+  const { refresh: refreshLock } = usePaymentLock();
   const { session, signOut } = useAuth();
   const { t } = useLanguage();
   const isDark = useColorScheme() === 'dark';
@@ -128,11 +128,6 @@ export function PaymentsView({ locked = false }: { locked?: boolean }) {
                 <Pressable onPress={() => signOut()} style={({ pressed }) => [styles.signOut, pressed && styles.buttonPressed]} accessibilityRole="button">
                   <Ionicons name="log-out-outline" size={18} color={palette.meta} />
                   <Text style={[styles.signOutText, { color: palette.meta }]}>{t.common.logout}</Text>
-                </Pressable>
-                {/* TEMPORARY: remove once the app fee goes live. */}
-                <Pressable onPress={skipLock} style={({ pressed }) => [styles.signOut, pressed && styles.buttonPressed]} accessibilityRole="button">
-                  <Text style={[styles.signOutText, { color: palette.meta }]}>{t.qpay.skip}</Text>
-                  <Ionicons name="arrow-forward" size={18} color={palette.meta} />
                 </Pressable>
               </RNView>
             ) : null}

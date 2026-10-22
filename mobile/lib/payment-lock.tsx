@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
 import type { PaymentEntry } from '@shared/api-types';
@@ -26,8 +26,6 @@ type LockState = 'unknown' | 'locked' | 'unlocked';
 type PaymentLockValue = {
   state: LockState;
   refresh: () => Promise<void>;
-  /** TEMPORARY: lets a locked user past the gate until the app restarts or they sign in again. */
-  skip: () => void;
 };
 
 const PaymentLockContext = createContext<PaymentLockValue | null>(null);
@@ -45,10 +43,9 @@ export function PaymentLockProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const isLockable = session ? LOCKED_ROLES.includes(session.role) : false;
   const [state, setState] = useState<LockState>('unknown');
-  const skipped = useRef(false);
 
   const refresh = useCallback(async () => {
-    if (!isLockable || skipped.current) {
+    if (!isLockable) {
       setState('unlocked');
       return;
     }
@@ -60,13 +57,7 @@ export function PaymentLockProvider({ children }: { children: ReactNode }) {
     }
   }, [isLockable]);
 
-  const skip = useCallback(() => {
-    skipped.current = true;
-    setState('unlocked');
-  }, []);
-
   useEffect(() => {
-    skipped.current = false;
     setState(isLockable ? 'unknown' : 'unlocked');
     refresh();
   }, [isLockable, session?.email, refresh]);
@@ -81,7 +72,7 @@ export function PaymentLockProvider({ children }: { children: ReactNode }) {
     return () => subscription.remove();
   }, [isLockable, refresh]);
 
-  return <PaymentLockContext.Provider value={{ state, refresh, skip }}>{children}</PaymentLockContext.Provider>;
+  return <PaymentLockContext.Provider value={{ state, refresh }}>{children}</PaymentLockContext.Provider>;
 }
 
 export function usePaymentLock(): PaymentLockValue {
