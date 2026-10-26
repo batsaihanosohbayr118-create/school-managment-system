@@ -551,11 +551,36 @@ button {
     transform 160ms ease;
 }
 
-.ec-sidebar nav button:hover,
-.ec-sidebar nav button.active {
+.ec-sidebar nav button:hover {
   color: var(--ink);
   background: rgba(79, 70, 229, 0.11);
   transform: translateX(2px);
+}
+
+.ec-sidebar nav button.active {
+  position: relative;
+  color: #fff;
+  font-weight: 700;
+  /* The same indigo-to-sky gradient as the page hero beside it. */
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.95), rgba(14, 165, 233, 0.88));
+  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
+  transform: translateX(2px);
+}
+
+.ec-sidebar nav button.active::before {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  content: "";
+  background: #7dd3fc;
+  border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 10px rgba(125, 211, 252, 0.9);
+}
+
+.ec-sidebar nav button.active svg {
+  color: #fff;
 }
 
 .ec-main {
@@ -931,6 +956,18 @@ button {
   border-radius: 15px;
 }
 
+.notification-toggle:not(.active),
+.logout-toggle {
+  background: transparent;
+  border-color: transparent;
+  transition: background 0.15s ease;
+}
+
+.notification-toggle:not(.active):hover,
+.logout-toggle:hover {
+  background: var(--panel-strong);
+}
+
 .ec-icon-button.active {
   color: #fff;
   background: linear-gradient(135deg, var(--primary), #2563eb);
@@ -1084,46 +1121,184 @@ button {
 }
 
 .metric-card {
+  --tone: 59, 130, 246;
+  --tone-strong: #2563eb;
   position: relative;
+  display: grid;
+  gap: 6px;
+  min-height: 140px;
   overflow: hidden;
-  padding: 18px;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, rgba(var(--tone), 0.24), rgba(var(--tone), 0.06) 70%);
+  border: 1px solid rgba(var(--tone), 0.45);
+  border-radius: 18px;
 }
 
-.metric-card::after {
-  position: absolute;
-  right: -34px;
-  bottom: -34px;
-  width: 110px;
-  height: 110px;
-  content: "";
-  background: radial-gradient(circle, rgba(79, 70, 229, 0.22), transparent 68%);
-  pointer-events: none;
+.metric-card.blue {
+  --tone: 59, 130, 246;
+  --tone-strong: #2563eb;
+}
+
+.metric-card.violet {
+  --tone: 139, 92, 246;
+  --tone-strong: #7c3aed;
+}
+
+.metric-card.green {
+  --tone: 16, 185, 129;
+  --tone-strong: #059669;
+}
+
+.metric-card.amber {
+  --tone: 245, 158, 11;
+  --tone-strong: #d97706;
+}
+
+.metric-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.metric-card-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  color: #fff;
+  background: var(--tone-strong);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(var(--tone), 0.35);
 }
 
 .metric-card p {
-  margin: 0 0 12px;
-  color: var(--muted);
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
 }
 
 .metric-card strong {
   position: relative;
   display: block;
   color: var(--ink);
-  font-size: 30px;
-  font-weight: 900;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
 }
 
-.metric-card span {
+.metric-card-helper {
   position: relative;
-  color: var(--accent);
+  color: rgb(var(--tone));
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
+}
+
+.metric-card.blue .metric-card-helper,
+.metric-card.violet .metric-card-helper {
+  color: #34d399;
+}
+
+.metric-card-wave {
+  position: absolute;
+  right: 16px;
+  bottom: 18px;
+  width: 96px;
+  height: 44px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.metric-card-wave-line {
+  fill: none;
+  stroke: rgb(var(--tone));
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(var(--tone), 0.7));
+}
+
+.metric-card-wave-fill {
+  fill: rgba(var(--tone), 0.14);
+}
+
+.metric-card-wave circle {
+  fill: #fff;
+  stroke: rgb(var(--tone));
+  stroke-width: 1.5;
 }
 
 .educore-shell.dark .metric-card strong {
   color: #f8fafc;
-  text-shadow: 0 0 24px rgba(79, 70, 229, 0.22);
+}
+
+/* Hover: the tile lifts and glows in its own colour, the wave redraws. */
+.metric-card {
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.metric-card-icon {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.metric-card-wave-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+.metric-card-wave circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.25s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(var(--tone), 0.8);
+  box-shadow: 0 14px 34px rgba(var(--tone), 0.28), inset 0 0 0 1px rgba(var(--tone), 0.15);
+}
+
+.metric-card:hover .metric-card-icon {
+  transform: scale(1.1) rotate(-6deg);
+}
+
+.metric-card:hover .metric-card-wave-line {
+  animation: metric-wave-draw 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.metric-card:hover .metric-card-wave circle {
+  transform: scale(1.5);
+}
+
+@keyframes metric-wave-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric-card,
+  .metric-card-icon,
+  .metric-card-wave circle {
+    transition: none;
+  }
+
+  .metric-card:hover {
+    transform: none;
+  }
+
+  .metric-card:hover .metric-card-icon,
+  .metric-card:hover .metric-card-wave circle {
+    transform: none;
+  }
+
+  .metric-card:hover .metric-card-wave-line {
+    animation: none;
+  }
 }
 
 .recharts-tooltip-wrapper {
@@ -1144,7 +1319,7 @@ button {
 
 .analytics-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 0.8fr);
+  grid-template-columns: minmax(0, 1.5fr) minmax(380px, 1fr);
   gap: 14px;
   margin-bottom: 14px;
 }
@@ -1174,6 +1349,349 @@ button {
 
 .chart-box {
   height: 292px;
+}
+
+.revenue-empty {
+  position: relative;
+  display: grid;
+  height: 100%;
+  min-height: 240px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 18px;
+  background: radial-gradient(ellipse at 50% 35%, rgba(99, 102, 241, 0.16), transparent 65%);
+}
+
+.revenue-empty-ghost {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.revenue-empty-ghost line {
+  stroke: var(--line);
+  stroke-dasharray: 3 5;
+  vector-effect: non-scaling-stroke;
+}
+
+.revenue-empty-area {
+  fill: url(#revenue-empty-fill);
+}
+
+.revenue-empty-curve {
+  fill: none;
+  stroke: rgba(129, 140, 248, 0.35);
+  stroke-dasharray: 6 6;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.revenue-empty-body {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  max-width: 420px;
+  padding: 18px 36px;
+  text-align: center;
+  /* Keeps the placeholder curve from running through the text. */
+  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.92) 45%, rgba(15, 23, 42, 0) 72%);
+}
+
+.revenue-empty-icon {
+  display: grid;
+  width: 60px;
+  height: 60px;
+  margin-bottom: 6px;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 18px;
+  box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.12), 0 12px 32px rgba(99, 102, 241, 0.45);
+}
+
+.revenue-empty-body strong {
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.revenue-empty-body p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.revenue-empty-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 9px 16px;
+  color: #e0e7ff;
+  font-weight: 700;
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.revenue-empty-action:hover {
+  background: rgba(99, 102, 241, 0.32);
+  transform: translateY(-1px);
+}
+
+.attendance-card-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.attendance-card-title > span {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  color: #c4b5fd;
+  background: linear-gradient(135deg, #4c1d95, #3730a3);
+  border-radius: 12px;
+}
+
+.attendance-mix {
+  display: grid;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+.chart-box:has(> .attendance-mix) {
+  height: auto;
+}
+
+.attendance-mix-body {
+  display: grid;
+  grid-template-columns: minmax(110px, 170px) minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+}
+
+.attendance-mix-ring {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.attendance-mix-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+
+.attendance-mix-ring circle {
+  fill: none;
+  transition: stroke-dasharray 0.9s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.15s ease;
+}
+
+.attendance-mix-track {
+  stroke: var(--line);
+}
+
+.attendance-mix-ring circle.dimmed {
+  opacity: 0.25;
+}
+
+.attendance-mix-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.attendance-mix-center strong {
+  color: var(--ink);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.attendance-mix-center span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.attendance-mix-legend {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attendance-mix-legend li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) 28px 42px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 6px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 14px;
+  transition: background 0.15s ease;
+}
+
+.attendance-mix-legend li:last-child {
+  border-bottom: 0;
+}
+
+.attendance-mix-legend li.active {
+  background: var(--line);
+}
+
+.attendance-mix-legend li > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attendance-mix-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.attendance-mix-legend strong {
+  font-size: 16px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.attendance-mix-legend em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.attendance-mix-verdict {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  color: var(--ink);
+  text-align: left;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.22), rgba(56, 189, 248, 0.12));
+  border: 0;
+  border-radius: 14px;
+}
+
+button.attendance-mix-verdict {
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+button.attendance-mix-verdict:hover {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.32), rgba(56, 189, 248, 0.18));
+  transform: translateY(-1px);
+}
+
+button.attendance-mix-verdict > svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.attendance-mix-verdict-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.attendance-mix-verdict.good .attendance-mix-verdict-icon {
+  color: #facc15;
+  background: rgba(234, 179, 8, 0.28);
+}
+
+.attendance-mix-verdict.fair .attendance-mix-verdict-icon {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.18);
+}
+
+.attendance-mix-verdict.low .attendance-mix-verdict-icon {
+  color: #fb7185;
+  background: rgba(251, 113, 133, 0.18);
+}
+
+.attendance-mix-verdict-text {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 3px;
+  min-width: 0;
+}
+
+.attendance-mix-verdict-text strong {
+  font-size: 15px;
+}
+
+.attendance-mix-verdict-text small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Stack the ring over the legend when the card itself is narrow. */
+/* A narrower card keeps the legend beside the ring, just tighter. */
+@container (max-width: 460px) {
+  .attendance-mix-body {
+    grid-template-columns: minmax(100px, 130px) minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .attendance-mix-center strong {
+    font-size: 24px;
+  }
+
+  .attendance-mix-center span {
+    font-size: 12px;
+  }
+
+  .attendance-mix-legend li {
+    grid-template-columns: 8px minmax(0, 1fr) auto 36px;
+    gap: 8px;
+    padding: 9px 2px;
+    font-size: 13px;
+  }
+
+  .attendance-mix-legend i {
+    width: 8px;
+    height: 8px;
+  }
+}
+
+@container (max-width: 340px) {
+  .attendance-mix-body {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 18px;
+  }
+
+  .attendance-mix-ring {
+    width: 160px;
+  }
+
+  .attendance-mix-legend {
+    width: 100%;
+  }
 }
 
 .ec-badge {
@@ -1247,6 +1765,29 @@ button {
 .table-actions {
   display: flex;
   gap: 10px;
+}
+
+.table-filter {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.table-filter > svg {
+  position: absolute;
+  left: 13px;
+  color: var(--muted);
+  pointer-events: none;
+  transition: color 150ms ease;
+}
+
+.table-filter .ec-input {
+  width: 100%;
+  padding-left: 38px;
+}
+
+.table-filter:focus-within > svg {
+  color: var(--ink);
 }
 
 .ec-table {
@@ -1489,7 +2030,7 @@ button {
 }
 
 .subject-content-stats {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .subject-content-stats span,
@@ -1680,6 +2221,33 @@ button {
 
 .subject-videos-grid {
   grid-template-columns: 1fr;
+}
+
+/* With no video card beside it, the lessons card would leave the second column empty. */
+.subject-content-grid > :only-child {
+  grid-column: 1 / -1;
+}
+
+/* Each lesson is a row: title and topic on the left, its actions on the right. */
+@media (min-width: 761px) {
+  .subject-lesson-carousel article {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 20px;
+    padding: 14px 18px;
+  }
+
+  .subject-lesson-carousel article > * {
+    grid-column: 1;
+  }
+
+  .subject-lesson-carousel article > .subject-file-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    flex-wrap: nowrap;
+    margin: 0;
+  }
 }
 
 .subject-video-list {
@@ -3043,8 +3611,12 @@ button {
     width: 100%;
   }
 
+  .table-actions .table-filter {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
   .table-actions .ec-input {
-    width: auto;
     min-width: 0;
   }
 
@@ -3165,6 +3737,7 @@ button {
     gap: 8px;
   }
 
+  .table-actions .table-filter,
   .table-actions .ec-input {
     flex: 1 1 auto;
   }
@@ -3732,8 +4305,17 @@ button {
     padding: 14px;
   }
 
+  .metric-card-head {
+    gap: 10px;
+  }
+
+  .metric-card-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
   .metric-card p {
-    margin-bottom: 9px;
     font-size: 13px;
     line-height: 1.25;
   }
@@ -3742,8 +4324,15 @@ button {
     font-size: 25px;
   }
 
-  .metric-card span {
+  .metric-card-helper {
     font-size: 12px;
+  }
+
+  .metric-card-wave {
+    right: 10px;
+    bottom: 12px;
+    width: 60px;
+    height: 28px;
   }
 
   .chart-box {
@@ -3858,7 +4447,7 @@ button {
   }
 
   .subject-content-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .subject-content-stats span {
@@ -4393,6 +4982,68 @@ button {
   background: var(--um-bg);
   color: var(--um-ink);
   padding: 26px clamp(16px, 4vw, 40px) 60px;
+}
+
+/* Inside the dashboard shell: no page chrome of its own, the shell's surfaces. */
+.um-page.um-embedded {
+  --um-surface: var(--panel);
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.um-embedded .um-table-wrap {
+  border: 0;
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+}
+
+.um-embedded .um-add {
+  margin-left: auto;
+}
+
+/* Never wider than the dashboard column it sits in. */
+.um-page.um-embedded {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .um-embedded .um-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .um-embedded .um-search {
+    max-width: none;
+    width: 100%;
+  }
+
+  .um-embedded .um-filter {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .um-embedded .um-filter::-webkit-scrollbar {
+    display: none;
+  }
+
+  .um-embedded .um-filter button {
+    flex: 1 0 auto;
+  }
+
+  .um-embedded .um-add {
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
+  }
+
+  .um-embedded .um-card-row > span:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
 }
 
 .um-loading {
@@ -5301,4 +5952,97 @@ input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   margin: 0;
   -webkit-appearance: none;
+}
+
+/* The registration form's sideways subject list: it scrolls with no visible
+   scrollbar, and the right edge fades out to show there is more. */
+.subject-scroller {
+  scrollbar-width: none;
+  mask-image: linear-gradient(90deg, #000 85%, transparent);
+}
+
+.subject-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+/* Scrolls, but shows no scrollbar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* A light that runs round a card's border: a rotating conic gradient, masked
+   down to a thin ring, with a blurred copy of it for the glow. */
+@property --border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.running-border {
+  position: relative;
+}
+
+.running-border::before,
+.running-border::after {
+  position: absolute;
+  inset: -1px;
+  padding: 1.5px;
+  content: "";
+  background: conic-gradient(from var(--border-angle), transparent 0 62%, #38bdf8 80%, #a78bfa 92%, transparent 100%);
+  border-radius: inherit;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: border-run 5s linear infinite;
+}
+
+.running-border::after {
+  padding: 3px;
+  filter: blur(10px);
+  opacity: 0.7;
+}
+
+@keyframes border-run {
+  to {
+    --border-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .running-border::before,
+  .running-border::after {
+    animation: none;
+  }
+}
+
+/* Every search box — the top bar, a table's filter, user management — wears
+   the same coloured ring while it has focus. Drawn with box-shadow so the
+   field does not shift. */
+.ec-search,
+.um-search,
+.table-filter .ec-input {
+  transition: box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
+}
+
+.ec-search:focus-within,
+.um-search:focus-within,
+.table-filter .ec-input:focus {
+  border-color: transparent;
+  box-shadow:
+    inset 0 0 0 1.5px #6366f1,
+    0 0 0 4px rgba(99, 102, 241, 0.2);
+}
+
+.um-search:focus-within {
+  color: #a5b4fc;
+}
+
+/* The ring replaces the top bar's underline. */
+.ec-search:focus-within::after {
+  background: transparent;
 }

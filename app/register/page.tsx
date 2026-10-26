@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { LoginView } from "@/components/auth/LoginView";
+import { RegisterView } from "@/components/auth/RegisterView";
 
 export default function RegisterPage() {
   return (
     <Suspense>
-      <LoginView mode="register" />
+      <RegisterView />
     </Suspense>
   );
 }

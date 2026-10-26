@@ -17,8 +17,8 @@ const PARTICLES = [
   { pos: "left-[12%] top-[46%]", size: "h-1.5 w-1.5", dur: 4.6, delay: 2 }
 ];
 
-/** Full-screen login (or registration) experience: dark gradient stage + split brand/form layout. */
-export function LoginView({ mode = "login" }: { mode?: "login" | "register" }) {
+/** Full-screen login experience: dark gradient stage + split brand/form layout. */
+export function LoginView() {
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#020617] px-4 py-8 text-white">
       {/* Gradient overlays */}
@@ -44,7 +44,7 @@ export function LoginView({ mode = "login" }: { mode?: "login" | "register" }) {
       <div className="relative z-10 grid w-full max-w-[1400px] lg:min-h-[82vh] lg:grid-cols-2 lg:overflow-hidden lg:rounded-[2rem] lg:border lg:border-white/10 lg:bg-white/[0.02] lg:shadow-[0_40px_120px_rgba(2,6,23,0.7)] lg:backdrop-blur-sm">
         <BrandPanel />
         <div className="flex items-center justify-center lg:bg-[#0b1020]/40 lg:p-12 lg:backdrop-blur-xl">
-          <LoginCard mode={mode} />
+          <LoginCard />
         </div>
       </div>
     </main>

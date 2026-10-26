@@ -1,7 +1,6 @@
 "use client";
 
 import { type CSSProperties, type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -11,8 +10,18 @@ import {
   BookOpen,
   Check,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
+  Wallet,
+  Users,
+  Megaphone,
+  GraduationCap,
+  ClipboardCheck,
+  CalendarDays,
+  BarChart3,
+  Award,
+  AlertTriangle,
+  TrendingUp,
+  Target,
   Download,
   ExternalLink,
   FileUp,
@@ -28,15 +37,13 @@ import {
   Trash2,
   UserCog,
   Video,
-  X
+  X,
+  type LucideIcon
 } from "lucide-react";
 import {
   Area,
   AreaChart,
   CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -46,6 +53,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { UserManagement } from "@/components/dashboard/UserManagement";
 import { WellbeingCorner } from "@/components/dashboard/WellbeingCorner";
 import {
   navItems,
@@ -115,14 +123,15 @@ type SubjectContentTarget = {
 } | null;
 
 type RevenuePoint = { month: string; revenue: number };
-type AttendanceSlice = { name: string; value: number; color: string };
+type AttendanceSlice = { status: string; name: string; value: number; color: string };
 
-const attendanceStatusColors: Record<string, string> = {
-  present: "#10b981",
-  late: "#f59e0b",
-  absent: "#ef4444",
-  excused: "#38bdf8"
-};
+/** Every attendance status, in the order the chart and its legend always show them. */
+const attendanceStatuses = [
+  { status: "present", color: "#2dd4bf", mn: "Ирсэн", en: "Present" },
+  { status: "excused", color: "#8b5cf6", mn: "Чөлөөтэй", en: "Excused" },
+  { status: "late", color: "#fbbf24", mn: "Хоцорсон", en: "Late" },
+  { status: "absent", color: "#fb7185", mn: "Ирээгүй", en: "Absent" }
+];
 
 const shortMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -238,16 +247,207 @@ function buildAttendanceMix(attendance: ResourceTableData, language: Language): 
 
   for (const status of cellValues(attendance, "Status")) {
     if (!status) continue;
-    counts.set(status, (counts.get(status) ?? 0) + 1);
+    counts.set(status.toLowerCase(), (counts.get(status.toLowerCase()) ?? 0) + 1);
   }
 
-  return [...counts.entries()]
-    .sort(([, a], [, b]) => b - a)
-    .map(([status, value]) => ({
-      name: translateValue(status, language),
-      value,
-      color: attendanceStatusColors[status.toLowerCase()] ?? "#6366f1"
-    }));
+  // All four statuses, zeros included, in a fixed order — a status keeps its
+  // place and colour as the numbers move. Anything unrecognised goes last.
+  const known = attendanceStatuses.map(({ status, color, mn, en }) => ({
+    status,
+    name: language === "mn" ? mn : en,
+    value: counts.get(status) ?? 0,
+    color
+  }));
+  const other = [...counts.entries()]
+    .filter(([status]) => !attendanceStatuses.some((item) => item.status === status))
+    .map(([status, value]) => ({ status, name: translateValue(status, language), value, color: "#94a3b8" }));
+
+  return [...known, ...other];
+}
+
+/**
+ * The revenue chart before any paid invoice exists: a faint grid and a dashed
+ * placeholder curve behind the message, so it reads as "a chart goes here",
+ * never as data.
+ */
+function RevenueEmpty({ language, onOpenPayments }: { language: Language; onOpenPayments?: () => void }) {
+  const mn = language === "mn";
+
+  return (
+    <div className="revenue-empty">
+      <svg aria-hidden="true" className="revenue-empty-ghost" preserveAspectRatio="none" viewBox="0 0 400 160">
+        <defs>
+          <linearGradient id="revenue-empty-fill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[32, 64, 96, 128].map((y) => (
+          <line key={y} x1="0" x2="400" y1={y} y2={y} />
+        ))}
+        <path className="revenue-empty-area" d="M0 130 C 50 120, 80 90, 130 96 S 210 120, 260 80 S 340 40, 400 30 L 400 160 L 0 160 Z" />
+        <path className="revenue-empty-curve" d="M0 130 C 50 120, 80 90, 130 96 S 210 120, 260 80 S 340 40, 400 30" />
+      </svg>
+      <div className="revenue-empty-body">
+        <span className="revenue-empty-icon">
+          <TrendingUp size={26} />
+        </span>
+        <strong>{mn ? "Төлбөрийн бүртгэл алга" : "No payment records yet"}</strong>
+        <p>
+          {mn
+            ? "Төлөгдсөн нэхэмжлэх бүртгэгдсэний дараа сарын орлого энд график хэлбэрээр харагдана."
+            : "Monthly revenue appears here as a chart once paid invoices are recorded."}
+        </p>
+        {onOpenPayments ? (
+          <button className="revenue-empty-action" onClick={onOpenPayments} type="button">
+            <Wallet size={16} />
+            {mn ? "Төлбөр рүү очих" : "Go to payments"}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** A filled gold trophy: cup, handles, stem and base, with a highlight on the cup. */
+function GoldTrophy() {
+  return (
+    <svg aria-hidden="true" height="24" viewBox="0 0 24 24" width="24">
+      <defs>
+        <linearGradient id="trophy-gold" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="#fde047" />
+          <stop offset="100%" stopColor="#f59e0b" />
+        </linearGradient>
+      </defs>
+      <path d="M7 5H5a2 2 0 0 0 0 4h1.6M17 5h2a2 2 0 0 1 0 4h-1.6" fill="none" stroke="#facc15" strokeLinecap="round" strokeWidth="1.8" />
+      <path d="M7 3h10v5.5a5 5 0 0 1-10 0V3z" fill="url(#trophy-gold)" />
+      <path d="M9.2 5v3.2a2.8 2.8 0 0 0 1.3 2.4" fill="none" stroke="#fffbeb" strokeLinecap="round" strokeOpacity="0.7" strokeWidth="1.2" />
+      <path d="M10.8 13.3h2.4l.5 3.7h-3.4z" fill="#eab308" />
+      <rect fill="url(#trophy-gold)" height="3.2" rx="1" width="9" x="7.5" y="17.6" />
+    </svg>
+  );
+}
+
+const MIX_RADIUS = 72;
+const MIX_STROKE = 18;
+const MIX_CIRCUMFERENCE = 2 * Math.PI * MIX_RADIUS;
+
+/**
+ * Attendance as a ring of status arcs with the present rate in its centre, a
+ * legend row per status with its count and share — so no status is told apart
+ * by colour alone — and a one-line verdict underneath. Hovering an arc or a
+ * row highlights the pair.
+ */
+function AttendanceMixChart({
+  slices,
+  language,
+  onOpen
+}: {
+  slices: AttendanceSlice[];
+  language: Language;
+  onOpen?: () => void;
+}) {
+  const [active, setActive] = useState<string | null>(null);
+  const [drawn, setDrawn] = useState(false);
+  const total = slices.reduce((sum, slice) => sum + slice.value, 0);
+  const percent = (value: number) => (total ? Math.round((value / total) * 100) : 0);
+  const rate = percent(slices.find((slice) => slice.status === "present")?.value ?? 0);
+  const shown = slices.filter((slice) => slice.value > 0);
+  const mn = language === "mn";
+
+  // Start the arcs empty and let the transition sweep them in.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setDrawn(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  // Round caps reach half a stroke past each end, so a gap between arcs has to clear both.
+  const gap = shown.length > 1 ? MIX_STROKE + 6 : 0;
+  const spans = shown.map((slice) => (slice.value / total) * MIX_CIRCUMFERENCE);
+  const arcs = shown.map((slice, index) => ({
+    slice,
+    offset: spans.slice(0, index).reduce((sum, span) => sum + span, 0),
+    length: Math.max(spans[index] - gap, 0.01)
+  }));
+
+  const verdict =
+    rate >= 90
+      ? { tone: "good", icon: <GoldTrophy />, title: mn ? "Сайн байна!" : "Great job!" }
+      : rate >= 75
+        ? { tone: "fair", icon: <TrendingUp size={20} />, title: mn ? "Дунджаас дээгүүр" : "Above average" }
+        : { tone: "low", icon: <AlertTriangle size={20} />, title: mn ? "Анхаарах шаардлагатай" : "Needs attention" };
+  const verdictBody = (
+    <>
+      <span className="attendance-mix-verdict-icon">{verdict.icon}</span>
+      <span className="attendance-mix-verdict-text">
+        <strong>{verdict.title}</strong>
+        <small>{mn ? `Нийт ирц ${rate}% байна.` : `Overall attendance is ${rate}%.`}</small>
+      </span>
+    </>
+  );
+
+  return (
+    <div className="attendance-mix" onMouseLeave={() => setActive(null)}>
+      <div className="attendance-mix-body">
+        <div className="attendance-mix-ring">
+          <svg viewBox="0 0 180 180" role="img" aria-label={slices.map((slice) => `${slice.name} ${slice.value}`).join(", ")}>
+            <defs>
+              {/* The ring is turned -90°, so these run top-left to bottom-right on screen. */}
+              <linearGradient gradientUnits="userSpaceOnUse" id="attendance-present" x1="160" x2="20" y1="20" y2="160">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="55%" stopColor="#22d3ee" />
+                <stop offset="100%" stopColor="#8b5cf6" />
+              </linearGradient>
+            </defs>
+            <circle className="attendance-mix-track" cx="90" cy="90" r={MIX_RADIUS} strokeWidth={MIX_STROKE} />
+            {arcs.map(({ slice, offset, length }) => (
+              <circle
+                className={active && active !== slice.status ? "dimmed" : undefined}
+                cx="90"
+                cy="90"
+                key={slice.status}
+                onMouseEnter={() => setActive(slice.status)}
+                r={MIX_RADIUS}
+                stroke={slice.status === "present" ? "url(#attendance-present)" : slice.color}
+                strokeDasharray={`${drawn ? length : 0} ${MIX_CIRCUMFERENCE}`}
+                strokeDashoffset={-(offset + gap / 2)}
+                strokeLinecap={shown.length > 1 ? "round" : "butt"}
+                strokeWidth={MIX_STROKE}
+              >
+                <title>{`${slice.name}: ${slice.value} (${percent(slice.value)}%)`}</title>
+              </circle>
+            ))}
+          </svg>
+          <div className="attendance-mix-center">
+            <strong>{rate}%</strong>
+            <span>{mn ? "Нийт ирц" : "Attendance"}</span>
+          </div>
+        </div>
+        <ul className="attendance-mix-legend">
+          {slices.map((slice) => (
+            <li
+              className={[active === slice.status ? "active" : "", slice.value === 0 ? "empty" : ""].filter(Boolean).join(" ") || undefined}
+              key={slice.status}
+              onMouseEnter={() => setActive(slice.status)}
+            >
+              <i style={{ background: slice.color }} />
+              <span>{slice.name}</span>
+              <strong>{slice.value}</strong>
+              <em>{percent(slice.value)}%</em>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {onOpen ? (
+        <button className={`attendance-mix-verdict ${verdict.tone}`} onClick={onOpen} type="button">
+          {verdictBody}
+          <ChevronRight size={18} />
+        </button>
+      ) : (
+        <div className={`attendance-mix-verdict ${verdict.tone}`}>{verdictBody}</div>
+      )}
+    </div>
+  );
 }
 
 const createConfig: Record<NavModule, { fields: string[] }> = {
@@ -671,6 +871,10 @@ type SubjectScopeOption = { id: string; name: string };
 
 /** Resources a student or parent may only read one subject at a time. */
 const subjectScopedResources = new Set<SchoolResource>(["assignments", "materials"]);
+/** Modules a teacher adds to, edits and deletes in, not only reads. */
+const teacherManagedModules = new Set<NavModule>(["attendance", "announcements", "assignments", "materials", "timetable"]);
+/** Of those, the ones whose rows belong to a subject — limited to the teacher's own. */
+const teacherSubjectModules = new Set<NavModule>(["assignments", "materials", "timetable"]);
 
 async function loadResourceData(resource: SchoolResource, options?: SchoolResourceRequestOptions) {
   try {
@@ -914,221 +1118,7 @@ function TopicDropdown({
   );
 }
 
-function AssignmentTypeDropdown({
-  language,
-  onChange,
-  value
-}: {
-  language: Language;
-  onChange: (value: string) => void;
-  value: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const { triggerRef, menuRef, menuStyle } = useFloatingMenu(open);
-  const options = [
-    { value: "Homework", labelEn: "Homework", labelMn: "Гэрийн даалгавар" },
-    { value: "Quiz", labelEn: "Quiz", labelMn: "Тест" },
-    { value: "Project", labelEn: "Project", labelMn: "Төсөл" },
-    { value: "Exam", labelEn: "Exam", labelMn: "Шалгалт" }
-  ];
-  const selected = options.find((option) => option.value === value);
-  const selectedLabel = selected ? (language === "mn" ? selected.labelMn : selected.labelEn) : "";
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(event: MouseEvent) {
-      if (triggerRef.current && !triggerRef.current.closest(".assignment-type-field")?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open, triggerRef]);
-
-  const menu = open ? createPortal(
-    <div className="ec-select-menu portal-dark" ref={menuRef} role="listbox" style={{ ...menuStyle, zIndex: 9999 }}>
-      {options.map((option) => {
-        const isSelected = option.value === value;
-        return (
-          <button
-            aria-selected={isSelected}
-            className={isSelected ? "selected" : ""}
-            key={option.value}
-            onMouseDown={(event) => {
-              event.preventDefault();
-              onChange(option.value);
-              setOpen(false);
-            }}
-            role="option"
-            type="button"
-          >
-            <span>{language === "mn" ? option.labelMn : option.labelEn}</span>
-            {isSelected ? <Check aria-hidden="true" size={16} /> : null}
-          </button>
-        );
-      })}
-    </div>,
-    document.body
-  ) : null;
-
-  return (
-    <div className={`ec-select-field assignment-type-field${open ? " open" : ""}`}>
-      <button
-        aria-expanded={open}
-        className={`ec-input ec-select-trigger${value ? " selected" : ""}`}
-        onMouseDown={() => setOpen((current) => !current)}
-        ref={triggerRef}
-        type="button"
-      >
-        <span>{selectedLabel}</span>
-        <ChevronDown aria-hidden="true" size={18} />
-      </button>
-      {menu}
-    </div>
-  );
-}
-
-function DatePicker({
-  value,
-  onChange,
-  placeholder
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [viewYear, setViewYear] = useState(() => value ? parseInt(value.split("-")[0]) : new Date().getFullYear());
-  const [viewMonth, setViewMonth] = useState(() => value ? parseInt(value.split("-")[1]) - 1 : new Date().getMonth());
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
-
-  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  const DAYS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
-
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const popupHeight = 320;
-    setMenuStyle({
-      position: "fixed",
-      left: rect.left,
-      width: Math.max(rect.width, 280),
-      zIndex: 9999,
-      ...(spaceBelow >= popupHeight
-        ? { top: rect.bottom + 6 }
-        : { bottom: window.innerHeight - rect.top + 6 })
-    });
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      const target = e.target as Node;
-      const clickedInsideTrigger = triggerRef.current?.closest(".ec-datepicker")?.contains(target);
-      const clickedInsidePopup = (target as HTMLElement).closest?.(".ec-datepicker-popup");
-      if (!clickedInsideTrigger && !clickedInsidePopup) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  function getDaysInMonth(year: number, month: number) {
-    return new Date(year, month + 1, 0).getDate();
-  }
-
-  function getFirstDayOfMonth(year: number, month: number) {
-    return new Date(year, month, 1).getDay();
-  }
-
-  function selectDate(day: number) {
-    const mm = String(viewMonth + 1).padStart(2, "0");
-    const dd = String(day).padStart(2, "0");
-    onChange(`${viewYear}-${mm}-${dd}`);
-    setOpen(false);
-  }
-
-  function prevMonth() {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
-    else setViewMonth(m => m - 1);
-  }
-
-  function nextMonth() {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
-    else setViewMonth(m => m + 1);
-  }
-
-  const daysInMonth = getDaysInMonth(viewYear, viewMonth);
-  const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
-  const selectedDay = value ? parseInt(value.split("-")[2]) : null;
-  const selectedMonth = value ? parseInt(value.split("-")[1]) - 1 : null;
-  const selectedYear = value ? parseInt(value.split("-")[0]) : null;
-  const today = new Date();
-
-  const displayValue = value
-    ? new Date(value + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
-    : "";
-
-  const popup = open ? createPortal(
-    <div className="ec-datepicker-popup dark" style={menuStyle}>
-      <div className="ec-datepicker-header">
-        <button type="button" onClick={prevMonth}><ChevronLeft size={16} /></button>
-        <span>{MONTHS[viewMonth]} {viewYear}</span>
-        <button type="button" onClick={nextMonth}><ChevronRight size={16} /></button>
-      </div>
-      <div className="ec-datepicker-grid">
-        {DAYS.map(d => <span key={d} className="ec-datepicker-dayname">{d}</span>)}
-        {Array.from({ length: firstDay }).map((_, i) => <span key={`e-${i}`} />)}
-        {Array.from({ length: daysInMonth }).map((_, i) => {
-          const day = i + 1;
-          const isSelected = day === selectedDay && viewMonth === selectedMonth && viewYear === selectedYear;
-          const isToday = day === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
-          return (
-            <button
-              key={day}
-              type="button"
-              className={`ec-datepicker-day${isSelected ? " selected" : ""}${isToday && !isSelected ? " today" : ""}`}
-              onClick={() => selectDate(day)}
-            >
-              {day}
-            </button>
-          );
-        })}
-      </div>
-    </div>,
-    document.body
-  ) : null;
-
-  return (
-    <div className="ec-datepicker">
-      <button
-        ref={triggerRef}
-        type="button"
-        className={`ec-input ec-datepicker-trigger${value ? " has-value" : ""}`}
-        onClick={() => {
-          if (value) {
-            setViewYear(parseInt(value.split("-")[0]));
-            setViewMonth(parseInt(value.split("-")[1]) - 1);
-          }
-          setOpen(o => !o);
-        }}
-      >
-        <span>{displayValue || placeholder || "Select date"}</span>
-        {value && (
-          <span className="ec-datepicker-clear" onMouseDown={e => { e.stopPropagation(); onChange(""); setOpen(false); }}>
-            <X size={14} />
-          </span>
-        )}
-      </button>
-      {popup}
-    </div>
-  );
-}
-
-function AppShell({ lockedRole }: { lockedRole: Role }) {
+function AppShell({ initialView, lockedRole }: { initialView?: "users"; lockedRole: Role }) {
   const router = useRouter();
   const [activeModule, setActiveModule] = useState<NavModule>("dashboard");
   const [role, setRole] = useState<Role>(lockedRole);
@@ -1152,6 +1142,8 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [materialFile, setMaterialFile] = useState<File | null>(null);
   const [notificationPageOpen, setNotificationPageOpen] = useState(false);
+  // User management is an admin-only page shown in place of a module.
+  const [usersPageOpen, setUsersPageOpen] = useState(initialView === "users" && lockedRole === "admin");
   const [activityNotifications, setActivityNotifications] = useState<ActivityNotification[]>([]);
   const [selectedSubjectContent, setSelectedSubjectContent] = useState<SubjectContentTarget>(null);
   // null while the parent dialog is still loading the student list.
@@ -1174,8 +1166,10 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   const modalAction = modalMode === "edit" ? copy.common.saveChanges : createCopy.action;
   const unreadNotifications = activityNotifications.filter((item) => !item.read).length;
   const canManageAttendance = role === "admin" || role === "teacher";
-  const canManageActiveModule =
-    activeModule === "attendance" || activeModule === "announcements" ? canManageAttendance : role === "admin";
+  const canManageActiveModule = teacherManagedModules.has(activeModule) ? canManageAttendance : role === "admin";
+  // A teacher only adds assignments, materials and timetable slots to their own
+  // subjects; the server enforces the same.
+  const teacherSubjectNames = role === "teacher" ? subjectScopeOptions.map((option) => option.name) : null;
 
   async function logout() {
     authService.signOut();
@@ -1209,6 +1203,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
     setActiveModule(module);
     setSelectedSubjectContent(null);
     setNotificationPageOpen(false);
+    setUsersPageOpen(false);
     setMobileOpen(false);
   }
 
@@ -1323,7 +1318,16 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
     setEditingRecordId(null);
     // Pre-fill the school-wide subject set so a new student can see their
     // assignments and grades without the admin typing catalogue names by hand.
-    setFormValues(activeModule === "students" ? { Subjects: defaultStudentSubjectsValue } : {});
+    setFormValues(
+      activeModule === "students"
+        ? { Subjects: defaultStudentSubjectsValue }
+        : teacherSubjectModules.has(activeModule) && teacherSubjectNames?.length
+          ? {
+              Subject: teacherSubjectNames[0],
+              ...(activeModule === "timetable" ? { Teacher: currentUserName } : {})
+            }
+          : {}
+    );
     setMaterialFile(null);
     setModalOpen(true);
 
@@ -1436,11 +1440,12 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
   }, [router, lockedRole]);
 
   // Pull the subjects this student/parent is enrolled in — they become the tabs
-  // above assignments and materials.
+  // above assignments and materials. For a teacher, the subjects they teach:
+  // the only ones the assignment dialog offers.
   useEffect(() => {
     // Nothing to clear on the way out: the tabs only render for the roles that
     // need them, and the role is fixed for the lifetime of the dashboard.
-    if (!authChecked || !needsSubjectScope) return;
+    if (!authChecked || !(needsSubjectScope || role === "teacher")) return;
 
     let ignore = false;
 
@@ -1463,7 +1468,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
     return () => {
       ignore = true;
     };
-  }, [authChecked, needsSubjectScope]);
+  }, [authChecked, needsSubjectScope, role]);
 
   useEffect(() => {
     let ignore = false;
@@ -1554,7 +1559,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
             const Icon = item.icon;
             return (
               <button
-                className={activeModule === item.id ? "active" : ""}
+                className={!usersPageOpen && activeModule === item.id ? "active" : ""}
                 data-nav-id={item.id}
                 key={item.id}
                 onClick={() => {
@@ -1569,10 +1574,15 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
           })}
           {role === "admin" ? (
             <button
-              className="ec-nav-external"
+              className={usersPageOpen && !notificationPageOpen ? "active" : ""}
               data-nav-id="users"
               key="users"
-              onClick={() => router.push("/admin/users")}
+              onClick={() => {
+                setUsersPageOpen(true);
+                setNotificationPageOpen(false);
+                setSelectedSubjectContent(null);
+                setMobileOpen(false);
+              }}
               type="button"
             >
               <UserCog size={20} />
@@ -1608,6 +1618,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
             className={`ec-icon-button notification-toggle${notificationPageOpen ? " active" : ""}`}
             onClick={() => {
               setNotificationPageOpen(true);
+              setUsersPageOpen(false);
               setMobileOpen(false);
               setQuery("");
               setToast("");
@@ -1632,6 +1643,21 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
             onMarkAllRead={markAllNotificationsRead}
             unreadCount={unreadNotifications}
           />
+        ) : usersPageOpen ? (
+          <>
+            <motion.section className="ec-hero" data-module="users" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+              <div>
+                <p className="mobile-hidden">{language === "mn" ? "Бүртгэл ба эрх" : "Accounts and access"}</p>
+                <h1>{language === "mn" ? "Хэрэглэгч удирдах" : "Manage Users"}</h1>
+                <span className="mobile-hidden">
+                  {language === "mn"
+                    ? "Админ, багш, сурагч, эцэг эхийн бүртгэлийг үүсгэж, засварлана."
+                    : "Create and manage Admin, Teacher, Student, and Parent accounts."}
+                </span>
+              </div>
+            </motion.section>
+            <UserManagement />
+          </>
         ) : (
           <>
             <motion.section className="ec-hero" data-module={activeModule} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} style={activeModule === "subjects" && selectedSubjectContent ? { display: "none" } : undefined}>
@@ -1648,7 +1674,14 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               ) : null}
             </motion.section>
 
-            {activeModule === "dashboard" ? <Dashboard copy={copy} currentUserEmail={currentUserEmail} language={language} role={role} /> : null}
+            {activeModule === "dashboard" ? <Dashboard
+                copy={copy}
+                currentUserEmail={currentUserEmail}
+                language={language}
+                onOpenAttendance={visibleModulesByRole[role].includes("attendance") ? () => openModule("attendance") : undefined}
+                onOpenPayments={visibleModulesByRole[role].includes("payments") ? () => openModule("payments") : undefined}
+                role={role}
+              /> : null}
             {activeModule === "students" ? (
               <StudentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
@@ -1691,9 +1724,9 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
                   <SubjectScopeTabs language={language} onChange={setSubjectScope} options={subjectScopeOptions} value={subjectScope} />
                 ) : null}
                 {subjectScopeOptions.length === 0 && scopeThisResource ? null : activeModule === "assignments" ? (
-                  <AssignmentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
+                  <AssignmentsModule apiData={resourceData} canManage={canManageActiveModule} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
                 ) : (
-                  <MaterialsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
+                  <MaterialsModule apiData={resourceData} canManage={canManageActiveModule} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} scopeLabel={scopeThisResource ? activeSubjectName : ""} />
                 )}
               </>
             ) : null}
@@ -1707,7 +1740,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               <PaymentsModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
             {activeModule === "timetable" ? (
-              <TimetableModule apiData={resourceData} canManage={role === "admin"} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
+              <TimetableModule apiData={resourceData} canManage={canManageActiveModule} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
             ) : null}
             {activeModule === "announcements" ? (
               <AnnouncementsModule apiData={resourceData} canManage={canManageAttendance} copy={copy} error={resourceError} language={language} loading={resourceLoading} onAdd={openCreateModal} onDelete={requestDeleteRecord} emptyLabel={copy.recordLabel[activeModule]} onEdit={openEditModal} />
@@ -1841,7 +1874,9 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
               }
               const options = picksStudent
                 ? (studentOptions ?? []).map((student) => student.value)
-                : statusOptionsFor(activeModule, field);
+                : teacherSubjectModules.has(activeModule) && field === "Subject" && teacherSubjectNames
+                  ? teacherSubjectNames
+                  : statusOptionsFor(activeModule, field);
 
               return options ? (
                 <div className="record-field" key={field}>
@@ -1926,6 +1961,7 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
           className={notificationPageOpen ? "active" : ""}
           onClick={() => {
             setNotificationPageOpen(true);
+            setUsersPageOpen(false);
             setMobileOpen(false);
             setQuery("");
           }}
@@ -2004,7 +2040,46 @@ function NotificationsPage({
   );
 }
 
-function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; currentUserEmail: string; language: Language; role: Role }) {
+const metricTones = ["blue", "violet", "green", "amber"];
+
+/** One icon per stat tile, in the order each role's stats are listed. */
+const metricIcons: Record<Role, LucideIcon[]> = {
+  admin: [Users, GraduationCap, Wallet, Target],
+  teacher: [Users, Target, ClipboardCheck, BarChart3],
+  student: [Award, Target, CalendarDays, Wallet],
+  parent: [Target, Award, Wallet, Megaphone]
+};
+
+/**
+ * The wave in the corner of a stat tile. Decoration only — the same shape on
+ * every tile, not a trend: there is no history behind these numbers yet.
+ */
+function MetricWave() {
+  return (
+    <svg aria-hidden="true" className="metric-card-wave" viewBox="0 0 100 44">
+      <path className="metric-card-wave-fill" d="M2 34 C 14 30, 20 18, 32 18 S 48 28, 56 26 S 76 12, 98 4 L 98 44 L 2 44 Z" />
+      <path className="metric-card-wave-line" d="M2 34 C 14 30, 20 18, 32 18 S 48 28, 56 26 S 76 12, 98 4" pathLength={1} />
+      <circle cx="32" cy="18" r="2.6" />
+      <circle cx="56" cy="26" r="2.6" />
+    </svg>
+  );
+}
+
+function Dashboard({
+  copy,
+  currentUserEmail,
+  language,
+  onOpenAttendance,
+  onOpenPayments,
+  role
+}: {
+  copy: AppCopy;
+  currentUserEmail: string;
+  language: Language;
+  onOpenAttendance?: () => void;
+  onOpenPayments?: () => void;
+  role: Role;
+}) {
   const dashboard = copy.dashboards[role];
   const [liveStats, setLiveStats] = useState<string[][] | null>(null);
   const [revenueSeries, setRevenueSeries] = useState<RevenuePoint[]>([]);
@@ -2151,13 +2226,22 @@ function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; 
   return (
     <>
       <section className="metric-grid">
-        {displayStats.map(([label, value, helper]) => (
-          <Card className="metric-card" key={label}>
-            <p>{label}</p>
-            <strong>{value}</strong>
-            <span>{helper}</span>
-          </Card>
-        ))}
+        {displayStats.map(([label, value, helper], index) => {
+          const Icon = metricIcons[role][index] ?? BarChart3;
+          return (
+            <Card className={`metric-card ${metricTones[index % metricTones.length]}`} key={label}>
+              <div className="metric-card-head">
+                <span className="metric-card-icon">
+                  <Icon size={20} />
+                </span>
+                <p>{label}</p>
+              </div>
+              <strong>{value}</strong>
+              <span className="metric-card-helper">{helper}</span>
+              <MetricWave />
+            </Card>
+          );
+        })}
       </section>
       <section className="analytics-grid">
         <Card>
@@ -2167,14 +2251,7 @@ function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; 
           </CardHeader>
           <CardContent className="chart-box">
             {revenueSeries.length === 0 ? (
-              <div className="table-empty">
-                <strong>{language === "mn" ? "Төлбөрийн бүртгэл алга" : "No payment records yet"}</strong>
-                <p>
-                  {language === "mn"
-                    ? "Төлөгдсөн нэхэмжлэх бүртгэгдсэний дараа сарын орлого энд харагдана."
-                    : "Monthly revenue appears here once paid invoices are recorded."}
-                </p>
-              </div>
+              <RevenueEmpty language={language} onOpenPayments={onOpenPayments} />
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <AreaChart data={revenueSeries}>
@@ -2199,13 +2276,18 @@ function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; 
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>{language === "mn" ? "Ирцийн бүтэц" : "Attendance Mix"}</CardTitle>
+            <div className="attendance-card-title">
+              <span>
+                <Target size={20} />
+              </span>
+              <CardTitle>{language === "mn" ? "Ирцийн бүтэц" : "Attendance Mix"}</CardTitle>
+            </div>
             <Badge tone="emerald">
               {attendanceTotal} {language === "mn" ? "бүртгэл" : attendanceTotal === 1 ? "record" : "records"}
             </Badge>
           </CardHeader>
           <CardContent className="chart-box">
-            {attendanceMix.length === 0 ? (
+            {attendanceTotal === 0 ? (
               <div className="table-empty">
                 <strong>{language === "mn" ? "Ирцийн бүртгэл алга" : "No attendance records yet"}</strong>
                 <p>
@@ -2215,16 +2297,7 @@ function Dashboard({ copy, currentUserEmail, language, role }: { copy: AppCopy; 
                 </p>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie data={attendanceMix} dataKey="value" innerRadius={62} outerRadius={90} paddingAngle={5}>
-                    {attendanceMix.map((entry) => (
-                      <Cell key={entry.name} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.3)", borderRadius: 14, color: "#e5eefc" }} />
-                </PieChart>
-              </ResponsiveContainer>
+              <AttendanceMixChart language={language} onOpen={onOpenAttendance} slices={attendanceMix} />
             )}
           </CardContent>
         </Card>
@@ -2403,20 +2476,17 @@ function SubjectContentPanel({
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  const [activeView, setActiveView] = useState<"overview" | "topics" | "lessons" | "videos" | "assignments">("overview");
+  const [activeView, setActiveView] = useState<"overview" | "topics" | "lessons" | "videos">("overview");
   const [topicForm, setTopicForm] = useState({ title: "", description: "" });
   const [lessonForm, setLessonForm] = useState({ title: "", topicId: "", duration: "", objectives: "" });
   const [videoForm, setVideoForm] = useState({ title: "", topicId: "", duration: "", videoUrl: "" });
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [assignmentForm, setAssignmentForm] = useState({ title: "", dueDate: "", maxScore: "", type: "Homework", description: "" });
-  const [activeEditorTab, setActiveEditorTab] = useState<"file" | "topic" | "lesson" | "video" | "assignment" | null>(null);
+  const [activeEditorTab, setActiveEditorTab] = useState<"file" | "topic" | "lesson" | "video" | null>(null);
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
-  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
   const [deleteLessonTarget, setDeleteLessonTarget] = useState<{ id: string; label: string } | null>(null);
   const [deleteTopicTarget, setDeleteTopicTarget] = useState<{ id: string; label: string } | null>(null);
-  const [deleteAssignmentTarget, setDeleteAssignmentTarget] = useState<{ id: string; label: string } | null>(null);
   const videoFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const currentContent = content ?? emptySubjectContent(subject.id);
@@ -2883,92 +2953,6 @@ function SubjectContentPanel({
     setEditingVideoId(null);
   }
 
-  async function addAssignment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const title = assignmentForm.title.trim();
-    if (!title) return;
-
-    const dueDate = assignmentForm.dueDate.trim() || undefined;
-    const maxScore = assignmentForm.maxScore.trim() ? Number(assignmentForm.maxScore.trim()) : undefined;
-    const type = assignmentForm.type.trim() || undefined;
-    const description = assignmentForm.description.trim() || undefined;
-
-    if (editingAssignmentId) {
-      const nextContent = {
-        ...currentContent,
-        assignments: currentContent.assignments.map((assignment: any) =>
-          assignment.id === editingAssignmentId
-            ? { ...assignment, title, dueDate, maxScore, type, description }
-            : assignment
-        )
-      };
-
-      await persistContent(nextContent, title);
-      setAssignmentForm({ title: "", dueDate: "", maxScore: "", type: "Homework", description: "" });
-      setEditingAssignmentId(null);
-      return;
-    }
-
-    const assignment = {
-      id: `A-${Date.now()}`,
-      title,
-      dueDate,
-      maxScore,
-      type,
-      description
-    };
-    const nextContent = {
-      ...currentContent,
-      assignments: [...currentContent.assignments, assignment]
-    };
-
-    await persistContent(nextContent, title);
-    setAssignmentForm({ title: "", dueDate: "", maxScore: "", type: "Homework", description: "" });
-  }
-
-  function startEditAssignment(assignment: any) {
-    setEditingAssignmentId(assignment.id);
-    setAssignmentForm({
-      title: assignment.title ?? "",
-      dueDate: assignment.dueDate ?? "",
-      maxScore: assignment.maxScore != null ? String(assignment.maxScore) : "",
-      type: assignment.type ?? "Homework",
-      description: assignment.description ?? ""
-    });
-    setActiveView("overview");
-    setActiveEditorTab("assignment");
-    requestAnimationFrame(() => {
-      document.getElementById("subject-editor-accordion")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }
-
-  function requestDeleteAssignment(assignment: any, index: number) {
-    setDeleteAssignmentTarget({
-      id: assignment.id ?? String(index),
-      label: assignment.title ?? (language === "mn" ? "Гарчиггүй даалгавар" : "Untitled assignment")
-    });
-  }
-
-  async function deleteAssignment() {
-    if (!deleteAssignmentTarget) return;
-
-    const assignmentId = deleteAssignmentTarget.id;
-    const label = deleteAssignmentTarget.label;
-    const nextContent = {
-      ...currentContent,
-      assignments: currentContent.assignments.filter((assignment: any, index: number) => (assignment.id ?? String(index)) !== assignmentId)
-    };
-
-    setDeleteAssignmentTarget(null);
-    if (editingAssignmentId === assignmentId) {
-      setEditingAssignmentId(null);
-      setAssignmentForm({ title: "", dueDate: "", maxScore: "", type: "Homework", description: "" });
-    }
-
-    await persistContent(nextContent, label);
-    setMessage(language === "mn" ? "Даалгавар устгагдлаа." : "Assignment deleted.");
-  }
 
   return (
     <section className="subject-content-panel">
@@ -2989,9 +2973,7 @@ function SubjectContentPanel({
               ? language === "mn" ? "Сэдвүүд" : "Topics"
               : activeView === "lessons"
               ? language === "mn" ? "Хичээлүүд" : "Lessons"
-              : activeView === "videos"
-              ? language === "mn" ? "Видео хичээлүүд" : "Video lessons"
-              : language === "mn" ? "Даалгаврууд" : "Assignments"}
+              : language === "mn" ? "Видео хичээлүүд" : "Video lessons"}
           </p>
           <h2>{translateValue(subject.name, language)}</h2>
         </div>
@@ -3021,10 +3003,6 @@ function SubjectContentPanel({
               <strong>{videoLessonCount}</strong>
               {language === "mn" ? "Видео" : "Videos"}
             </button>
-            <button className="subject-stat-button" onClick={() => setActiveView("assignments")} type="button">
-              <strong>{currentContent.assignments.length}</strong>
-              {language === "mn" ? "Даалгавар" : "Assignments"}
-            </button>
           </div>
 
           {canManage && activeView === "overview" ? (
@@ -3035,7 +3013,6 @@ function SubjectContentPanel({
         { id: "topic", icon: <BookOpen size={18} />, labelEn: "Add topic", labelMn: "Сэдэв нэмэх" },
         { id: "lesson", icon: <Plus size={18} />, labelEn: "Add lesson", labelMn: "Хичээл нэмэх" },
         { id: "video", icon: <Video size={18} />, labelEn: "Add video lesson", labelMn: "Видео хичээл нэмэх" },
-        { id: "assignment", icon: <Plus size={18} />, labelEn: "Add assignment", labelMn: "Даалгавар нэмэх" },
       ] as const
     ).map((item) => {
       const isOpen = activeEditorTab === item.id;
@@ -3191,43 +3168,6 @@ function SubjectContentPanel({
                   </form>
                 )}
 
-                {item.id === "assignment" && (
-                  <form className="subject-inline-form subject-lesson-form" onSubmit={addAssignment}>
-                    <Input onChange={(event) => setAssignmentForm((current) => ({ ...current, title: event.target.value }))} placeholder={language === "mn" ? "Даалгаврын нэр" : "Assignment title"} required value={assignmentForm.title} />
-                    <DatePicker
-                      onChange={(val) => setAssignmentForm((current) => ({ ...current, dueDate: val }))}
-                      placeholder={language === "mn" ? "Дуусах огноо" : "Due date"}
-                      value={assignmentForm.dueDate}
-                    />
-                    <Input onChange={(event) => setAssignmentForm((current) => ({ ...current, maxScore: event.target.value }))} placeholder={language === "mn" ? "Дээд оноо" : "Max score"} type="number" value={assignmentForm.maxScore} />
-                    <AssignmentTypeDropdown
-                      language={language}
-                      onChange={(type) => setAssignmentForm((current) => ({ ...current, type }))}
-                      value={assignmentForm.type}
-                    />
-                    <Input onChange={(event) => setAssignmentForm((current) => ({ ...current, description: event.target.value }))} placeholder={language === "mn" ? "Зааварчилгаа" : "Instructions"} value={assignmentForm.description} />
-                    <div className="subject-form-actions">
-                      <Button disabled={saving} type="submit">
-                        {editingAssignmentId ? <Check size={16} /> : <Plus size={16} />}
-                        {editingAssignmentId
-                          ? (language === "mn" ? "Хадгалах" : "Save changes")
-                          : (language === "mn" ? "Даалгавар нэмэх" : "Add assignment")}
-                      </Button>
-                      {editingAssignmentId ? (
-                        <Button
-                          onClick={() => {
-                            setEditingAssignmentId(null);
-                            setAssignmentForm({ title: "", dueDate: "", maxScore: "", type: "Homework", description: "" });
-                          }}
-                          type="button"
-                          variant="ghost"
-                        >
-                          {language === "mn" ? "Цуцлах" : "Cancel"}
-                        </Button>
-                      ) : null}
-                    </div>
-                  </form>
-                )}
 
               </div>
             </motion.div>
@@ -3468,49 +3408,6 @@ function SubjectContentPanel({
               </Card>
             </div>
           ) : null}
-
-          {activeView === "assignments" ? (
-            <div className="subject-content-grid">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{language === "mn" ? "Даалгаврууд" : "Assignments"}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="subject-list">
-                    {currentContent.assignments.length > 0 ? (
-                      currentContent.assignments.map((assignment: any, index: number) => (
-                        <article key={assignment.id ?? index}>
-                          <strong>{assignment.title ?? (language === "mn" ? "Гарчиггүй даалгавар" : "Untitled assignment")}</strong>
-                          {(assignment.type || assignment.dueDate || assignment.maxScore) ? (
-                            <p>
-                              {[
-                                assignment.type,
-                                assignment.dueDate ? (language === "mn" ? `Огноо: ${assignment.dueDate}` : `Due: ${assignment.dueDate}`) : null,
-                                assignment.maxScore ? (language === "mn" ? `Дээд оноо: ${assignment.maxScore}` : `Max score: ${assignment.maxScore}`) : null
-                              ].filter(Boolean).join(" · ")}
-                            </p>
-                          ) : null}
-                          {assignment.description ? <p>{assignment.description}</p> : null}
-                          {canManage ? (
-                            <div className="subject-file-actions">
-                              <button className="subject-item-edit" aria-label={language === "mn" ? "Засах" : "Edit"} onClick={() => startEditAssignment(assignment)} title={language === "mn" ? "Засах" : "Edit"} type="button">
-                                <Pencil size={15} />
-                              </button>
-                              <button className="subject-item-delete" aria-label={language === "mn" ? "Устгах" : "Delete"} onClick={() => requestDeleteAssignment(assignment, index)} title={language === "mn" ? "Устгах" : "Delete"} type="button">
-                                <Trash2 size={15} />
-                              </button>
-                            </div>
-                          ) : null}
-                        </article>
-                      ))
-                    ) : (
-                      <p className="subject-help-text">{language === "mn" ? "Даалгавар нэмэгдээгүй байна." : "No assignments yet."}</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          ) : null}
         </>
       )}
 
@@ -3576,32 +3473,6 @@ function SubjectContentPanel({
         </div>
       ) : null}
 
-      {deleteAssignmentTarget ? (
-        <div className="modal-layer">
-          <div className="delete-modal" role="dialog" aria-modal="true" aria-labelledby="assignment-delete-title">
-            <div className="delete-icon">
-              <Trash2 size={20} />
-            </div>
-            <div>
-              <strong id="assignment-delete-title">{language === "mn" ? "Даалгавар устгах" : "Delete assignment"}</strong>
-              <p>
-                {language === "mn"
-                  ? `"${deleteAssignmentTarget.label}"-ыг устгахдаа итгэлтэй байна уу?`
-                  : `Are you sure you want to delete "${deleteAssignmentTarget.label}"?`}
-              </p>
-            </div>
-            <div className="delete-actions">
-              <Button onClick={() => setDeleteAssignmentTarget(null)} type="button" variant="ghost">
-                {language === "mn" ? "Цуцлах" : "Cancel"}
-              </Button>
-              <Button onClick={() => deleteAssignment()} type="button" variant="danger">
-                <Trash2 size={16} />
-                {language === "mn" ? "Устгах" : "Delete"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -4012,7 +3883,10 @@ function ModuleTable({
           ) : null}
         </div>
         <div className="table-actions">
-          <Input value={filterQuery} onChange={(event) => setFilterQuery(event.target.value)} placeholder={copy.common.filterRecords} />
+          <label className="table-filter">
+            <Search aria-hidden="true" size={17} />
+            <Input aria-label={copy.common.filterRecords} value={filterQuery} onChange={(event) => setFilterQuery(event.target.value)} placeholder={copy.common.filterRecords} />
+          </label>
           {canManage ? (
             <Button onClick={onAdd} type="button">
               <Plus size={17} />
@@ -4104,8 +3978,8 @@ function ModuleTable({
   );
 }
 
-export function DashboardApp({ lockedRole }: { lockedRole: Role }) {
-  return <AppShell lockedRole={lockedRole} />;
+export function DashboardApp({ initialView, lockedRole }: { initialView?: "users"; lockedRole: Role }) {
+  return <AppShell initialView={initialView} lockedRole={lockedRole} />;
 }
 
 export default DashboardApp;

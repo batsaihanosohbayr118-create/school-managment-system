@@ -1093,6 +1093,17 @@ function manageRolesFor(resource: SchoolResource) {
   }
 }
 
+/**
+ * A teacher may add assignments, materials and timetable slots only to a subject they teach. Checked before
+ * the write, outside the fallback try block, like requireManageAccess.
+ */
+async function requireOwnSubject(resource: SchoolResource, values: Record<string, string>, context?: SchoolRequestContext) {
+  if ((resource !== "assignments" && resource !== "materials" && resource !== "timetable") || context?.session.role !== "teacher") return;
+  if (!(await allowedSubjectNames(context)).has(normalizedToken(values.Subject))) {
+    throw new ValidationError("You can only add to a subject you teach.");
+  }
+}
+
 function requireManageAccess(resource: SchoolResource, role: Role) {
   if (!manageRolesFor(resource).has(role)) {
     throw new Error("You do not have permission to manage this resource.");
@@ -1394,6 +1405,7 @@ export async function createResource(resource: SchoolResource, values: Record<st
   // path, or any role could write by tripping the fallback.
   requireManageAccess(resource, context?.session.role ?? "admin");
   rejectPlacementResultWrite(resource);
+  await requireOwnSubject(resource, values, context);
 
   if (resource === "placementQuestions") {
     values = placementQuestionValues(values);
@@ -1622,6 +1634,7 @@ export async function deleteResource(resource: SchoolResource, id: string, conte
 export async function updateResource(resource: SchoolResource, id: string, values: Record<string, string>, context?: SchoolRequestContext) {
   requireManageAccess(resource, context?.session.role ?? "admin");
   rejectPlacementResultWrite(resource);
+  if (values.Subject !== undefined) await requireOwnSubject(resource, values, context);
 
   if (resource === "placementQuestions") {
     values = placementQuestionValues(values);
