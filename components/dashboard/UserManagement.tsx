@@ -2,20 +2,25 @@
 
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  BookOpen,
   Check,
   ChevronDown,
+  GraduationCap,
   KeyRound,
   Pencil,
   Plus,
   Search,
   ShieldAlert,
+  ShieldCheck,
   Trash2,
   UserCog,
+  Users,
   X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { MetricWave } from "@/components/dashboard/MetricWave";
 import { getToken } from "@/lib/auth-client";
 import { ROLES } from "@/lib/auth-flow";
 import { subjectOptions } from "@/lib/subjects";
@@ -249,6 +254,12 @@ export function UserManagement() {
 
   const provisioningDisabled = Boolean(notice);
 
+  const countByRole = useMemo(() => {
+    const counts: Record<Role, number> = { admin: 0, teacher: 0, student: 0, parent: 0 };
+    for (const user of users) counts[user.role] += 1;
+    return counts;
+  }, [users]);
+
   /** Self-registered teachers who cannot sign in until approved here. */
   const pending = useMemo(() => users.filter((user) => !user.approved), [users]);
 
@@ -292,6 +303,27 @@ export function UserManagement() {
 
   return (
     <div className="um-page um-embedded">
+      <section className="metric-grid" aria-label="Account totals">
+        {[
+          { label: "Total Users", value: users.length, helper: "All accounts", icon: Users, tone: "blue" },
+          { label: "Teachers", value: countByRole.teacher, helper: "Teacher accounts", icon: GraduationCap, tone: "violet" },
+          { label: "Students", value: countByRole.student, helper: "Student accounts", icon: BookOpen, tone: "green" },
+          { label: "Admins", value: countByRole.admin, helper: "Admin accounts", icon: ShieldCheck, tone: "amber" }
+        ].map(({ label, value, helper, icon: Icon, tone }) => (
+          // The dashboard's stat tile, so both pages' tiles stay one design.
+          <article className={`ec-card metric-card ${tone}`} key={label}>
+            <div className="metric-card-head">
+              <span className="metric-card-icon">
+                <Icon size={20} />
+              </span>
+              <p>{label}</p>
+            </div>
+            <strong>{loading ? "—" : value.toLocaleString("en-US")}</strong>
+            <span className="metric-card-helper">{helper}</span>
+            <MetricWave />
+          </article>
+        ))}
+      </section>
 
       {notice ? (
         <div className="um-banner">
