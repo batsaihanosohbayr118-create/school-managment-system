@@ -1,13 +1,16 @@
 import { Pool } from "pg";
 import { randomBytes } from "node:crypto";
 import type { SubjectContent } from "@/lib/types";
+import { removeObjects } from "@/lib/subject-object-storage";
 
 /**
  * Subject content and lesson attachments, stored in Neon.
  *
- * Files live in a bytea column rather than object storage. That keeps the app
- * on a single database, at the cost of holding uploads in Postgres — fine for
- * lesson handouts, but not where you would put large video libraries.
+ * A file row holds either the bytes (a bytea column, the older path, still
+ * used when Supabase Storage is not configured) or a `storage_path` into the
+ * Storage bucket (see subject-object-storage.ts), which is how anything past
+ * Vercel's 4.5MB body limit gets in. Either way the file is addressed as
+ * /api/subjects/files/<id>.
  */
 
 declare global {
@@ -58,6 +61,8 @@ async function initialize() {
   `);
 
   await pool.query(`CREATE INDEX IF NOT EXISTS subject_files_subject_idx ON subject_files (subject_id);`);
+  await pool.query(`ALTER TABLE subject_files ADD COLUMN IF NOT EXISTS storage_path TEXT;`);
+  await pool.query(`ALTER TABLE subject_files ALTER COLUMN data DROP NOT NULL;`);
 }
 
 async function ensureReady() {
@@ -102,8 +107,13 @@ export type StoredFile = {
   fileName: string;
   contentType: string;
   byteSize: number;
-  data: Buffer;
+  data: Buffer | null;
+  storagePath: string | null;
 };
+
+export function newSubjectFileId() {
+  return `F-${Date.now().toString(36)}${randomBytes(4).toString("hex")}`;
+}
 
 export async function storeSubjectFile(input: {
   subjectId: string;
@@ -117,7 +127,7 @@ export async function storeSubjectFile(input: {
     throw new Error(`File is larger than the ${Math.round(MAX_FILE_BYTES / 1024 / 1024)}MB limit.`);
   }
 
-  const id = `F-${Date.now().toString(36)}${randomBytes(4).toString("hex")}`;
+  const id = newSubjectFileId();
 
   await getPool().query(
     `INSERT INTO subject_files (id, subject_id, file_name, content_type, byte_size, data)
@@ -128,6 +138,26 @@ export async function storeSubjectFile(input: {
   return { id, url: `/api/subjects/files/${id}` };
 }
 
+/** Records a file the browser already uploaded to Storage. */
+export async function recordStoredObject(input: {
+  id: string;
+  subjectId: string;
+  fileName: string;
+  contentType: string;
+  byteSize: number;
+  storagePath: string;
+}): Promise<{ id: string; url: string }> {
+  await ensureReady();
+
+  await getPool().query(
+    `INSERT INTO subject_files (id, subject_id, file_name, content_type, byte_size, storage_path)
+     VALUES ($1, $2, $3, $4, $5, $6);`,
+    [input.id, input.subjectId, input.fileName, input.contentType, input.byteSize, input.storagePath]
+  );
+
+  return { id: input.id, url: `/api/subjects/files/${input.id}` };
+}
+
 export async function readSubjectFile(id: string): Promise<StoredFile | null> {
   await ensureReady();
 
@@ -136,8 +166,9 @@ export async function readSubjectFile(id: string): Promise<StoredFile | null> {
     file_name: string;
     content_type: string;
     byte_size: number;
-    data: Buffer;
-  }>(`SELECT id, file_name, content_type, byte_size, data FROM subject_files WHERE id = $1;`, [id]);
+    data: Buffer | null;
+    storage_path: string | null;
+  }>(`SELECT id, file_name, content_type, byte_size, data, storage_path FROM subject_files WHERE id = $1;`, [id]);
 
   const row = rows[0];
   if (!row) return null;
@@ -147,13 +178,28 @@ export async function readSubjectFile(id: string): Promise<StoredFile | null> {
     fileName: row.file_name,
     contentType: row.content_type,
     byteSize: row.byte_size,
-    data: row.data
+    data: row.data,
+    storagePath: row.storage_path
   };
+}
+
+/** Where in the Storage bucket a file lives; null for a bytea file or an unknown id. */
+export async function subjectFileStoragePath(id: string): Promise<string | null> {
+  await ensureReady();
+  const { rows } = await getPool().query<{ storage_path: string | null }>(
+    `SELECT storage_path FROM subject_files WHERE id = $1;`,
+    [id]
+  );
+  return rows[0]?.storage_path ?? null;
 }
 
 /** Deletes a subject's stored attachments by id; scoped to the subject so one subject's save can never remove another's files. */
 export async function deleteSubjectFiles(subjectId: string, ids: string[]) {
   if (ids.length === 0) return;
   await ensureReady();
-  await getPool().query(`DELETE FROM subject_files WHERE subject_id = $1 AND id = ANY($2::text[]);`, [subjectId, ids]);
+  const { rows } = await getPool().query<{ storage_path: string | null }>(
+    `DELETE FROM subject_files WHERE subject_id = $1 AND id = ANY($2::text[]) RETURNING storage_path;`,
+    [subjectId, ids]
+  );
+  await removeObjects(rows.flatMap((row) => (row.storage_path ? [row.storage_path] : [])));
 }

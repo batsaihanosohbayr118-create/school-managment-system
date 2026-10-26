@@ -61,7 +61,15 @@ import {
   translateValue,
   translations
 } from "@/lib/i18n";
-import { loadSubjectContent, openStoredFile, saveSubjectContent, uploadMaterialFile, uploadSubjectFiles } from "@/lib/subjectContent";
+import {
+  FileTooLargeError,
+  loadSubjectContent,
+  openStoredFile,
+  resolveStoredFileUrl,
+  saveSubjectContent,
+  uploadMaterialFile,
+  uploadSubjectFiles
+} from "@/lib/subjectContent";
 import { getInitialDarkMode, setStoredDarkMode } from "@/lib/theme";
 import {
   createSchoolResource,
@@ -373,6 +381,36 @@ function videoEmbedUrl(value: string | undefined) {
 
 function isDirectVideoUrl(value: string | undefined) {
   return Boolean(value && /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(value));
+}
+
+function uploadErrorMessage(error: unknown, language: Language, fallback: string) {
+  if (!(error instanceof FileTooLargeError)) return fallback;
+  const limit = Math.round(error.maxBytes / 1024 / 1024);
+  return language === "mn"
+    ? `"${error.fileName}" файл хэт том байна. Дээд хэмжээ ${limit}MB.`
+    : `"${error.fileName}" is too large. The limit is ${limit}MB.`;
+}
+
+/**
+ * A <video> for a lesson video. A stored attachment needs a signed URL — the
+ * element cannot send the session header — so it renders once that arrives.
+ */
+function LessonVideo({ src }: { src: string }) {
+  const [resolved, setResolved] = useState<{ src: string; url: string } | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    resolveStoredFileUrl(src)
+      .then((url) => {
+        if (!ignore) setResolved({ src, url });
+      })
+      .catch(() => undefined);
+    return () => {
+      ignore = true;
+    };
+  }, [src]);
+
+  return resolved?.src === src ? <video controls preload="metadata" src={resolved.url} /> : <video controls preload="none" />;
 }
 
 function escapeHtml(value: string) {
@@ -1767,7 +1805,9 @@ function AppShell({ lockedRole }: { lockedRole: Role }) {
                 setModalOpen(false);
                 setToast(modalMode === "edit" ? copy.common.recordUpdated : copy.common.savedToDatabase(createCopy.action));
               } catch (error) {
-                setToast(error instanceof Error && error.message ? `${copy.common.databaseSaveFailed}: ${error.message}` : copy.common.databaseSaveFailed);
+                setToast(error instanceof FileTooLargeError
+                  ? uploadErrorMessage(error, language, copy.common.databaseSaveFailed)
+                  : error instanceof Error && error.message ? `${copy.common.databaseSaveFailed}: ${error.message}` : copy.common.databaseSaveFailed);
               }
             }}
           >
@@ -2436,16 +2476,17 @@ function SubjectContentPanel({
       setContent(nextContent);
       onSaved(files.map((file) => file.name).join(", "));
       setMessage(language === "mn" ? "Файл/видео амжилттай нэмэгдлээ." : "Files and videos uploaded successfully.");
-    } catch {
-      setMessage(language === "mn" ? "Файл/видео upload хийж чадсангүй." : "The files or videos could not be uploaded.");
+    } catch (error) {
+      setMessage(uploadErrorMessage(error, language, language === "mn" ? "Файл/видео upload хийж чадсангүй." : "The files or videos could not be uploaded."));
     } finally {
       setSaving(false);
     }
   }
 
-  function printLessonFile(lesson: SubjectLesson, topicTitle: string) {
+  async function printLessonFile(lesson: SubjectLesson, topicTitle: string) {
     if (!lesson.fileUrl) return;
 
+    // Opened before the await, so the popup blocker counts it as part of the click.
     const printWindow = window.open("", "_blank", "width=1080,height=760");
 
     if (!printWindow) {
@@ -2453,7 +2494,14 @@ function SubjectContentPanel({
       return;
     }
 
-    const fileUrl = new URL(lesson.fileUrl, window.location.origin).href;
+    let fileUrl: string;
+    try {
+      fileUrl = new URL(await resolveStoredFileUrl(lesson.fileUrl), window.location.origin).href;
+    } catch {
+      printWindow.close();
+      setMessage(language === "mn" ? "Файлыг нээж чадсангүй." : "Could not open the file.");
+      return;
+    }
     const fileName = lesson.fileName ?? lesson.title;
     const lowerFileName = fileName.toLowerCase();
     const fileType = (lesson.fileType ?? "").toLowerCase();
@@ -2793,8 +2841,8 @@ function SubjectContentPanel({
         setVideoFile(null);
         setEditingVideoId(null);
         if (videoFileInputRef.current) videoFileInputRef.current.value = "";
-      } catch {
-        setMessage(language === "mn" ? "Видео файл upload хийж чадсангүй." : "The video file could not be uploaded.");
+      } catch (error) {
+        setMessage(uploadErrorMessage(error, language, language === "mn" ? "Видео файл upload хийж чадсангүй." : "The video file could not be uploaded."));
       } finally {
         setSaving(false);
       }
@@ -3248,7 +3296,16 @@ function SubjectContentPanel({
                               <div className="subject-file-actions">
                                 {lesson.fileUrl ? (
                                   <>
-                                    <a className="subject-file-link" href={lesson.fileUrl} target="_blank" rel="noreferrer">
+                                    <a
+                                      className="subject-file-link"
+                                      href={lesson.fileUrl}
+                                      onClick={(event) => {
+                                        event.preventDefault();
+                                        openStoredFile(lesson.fileUrl ?? "").catch(() => setMessage(language === "mn" ? "Файлыг нээж чадсангүй." : "Could not open the file."));
+                                      }}
+                                      rel="noreferrer"
+                                      target="_blank"
+                                    >
                                       <Download size={15} />
                                       <span>{lesson.fileName ?? (language === "mn" ? "Файл нээх" : "Open file")}</span>
                                       {lesson.fileSize ? <small>{formatFileSize(lesson.fileSize)}</small> : null}
@@ -3319,7 +3376,7 @@ function SubjectContentPanel({
                                     title={lesson.title}
                                   />
                                 ) : showDirectVideo ? (
-                                  <video controls preload="metadata" src={lessonVideoUrl} />
+                                  <LessonVideo src={lessonVideoUrl ?? ""} />
                                 ) : (
                                   <a className="subject-video-link" href={lessonVideoUrl} target="_blank" rel="noreferrer">
                                     <Video size={15} />
@@ -3381,7 +3438,7 @@ function SubjectContentPanel({
                                       title={lesson.title}
                                     />
                                   ) : showDirectVideo ? (
-                                    <video controls preload="metadata" src={lessonVideoUrl} />
+                                    <LessonVideo src={lessonVideoUrl ?? ""} />
                                   ) : (
                                     <a className="subject-video-link" href={lessonVideoUrl} target="_blank" rel="noreferrer">
                                       <Video size={15} />

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readSubjectFile } from "@/lib/subject-storage";
+import { createSignedDownloadUrl } from "@/lib/subject-object-storage";
 import { resolveRequestSession } from "@/lib/school-session-server";
 import { verifyFileSignature } from "@/lib/auth-token";
 
@@ -10,7 +11,8 @@ type RouteContext = {
 };
 
 /**
- * Serves a lesson attachment out of Neon.
+ * Serves a lesson attachment: bytes kept in Postgres directly, or a redirect
+ * to a signed Storage URL for a file uploaded there.
  *
  * Unlike the public bucket URLs this replaced, every download is behind the
  * session check — attachments are no longer readable by anyone with the link.
@@ -29,6 +31,14 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const file = await readSubjectFile(fileId);
     if (!file) {
+      return NextResponse.json({ message: "File not found." }, { status: 404 });
+    }
+
+    // Too big to stream through a function; send the browser to Storage.
+    if (file.storagePath) {
+      return NextResponse.redirect(await createSignedDownloadUrl(file.storagePath), 302);
+    }
+    if (!file.data) {
       return NextResponse.json({ message: "File not found." }, { status: 404 });
     }
 
