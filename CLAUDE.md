@@ -101,7 +101,7 @@ must stay out of `shared/`, which is bundled into the phone app.
 
 `@shared/*` resolves to the root `shared/` — configured in `web/tsconfig.json`,
 `web/vitest.config.ts` (whose `root` is the repo root so shared tests run), `mobile/tsconfig.json`
-and `mobile/metro.config.js`, so keep them in sync. `web/next.config.js` sets
+and `mobile/metro.config.js`, so keep them in sync. `web/next.config.mjs` sets
 `experimental.externalDir` so Next compiles TS from outside `web/`.
 
 ## Architecture
@@ -154,8 +154,7 @@ block in `initializeSchoolDatabase`, `resourceColumns`, `rowToArray`, and the ro
 - i18n is en/mn lookup tables in `lib/i18n.ts` (`translateColumn` / `translateValue` /
   `translations`). New user-facing strings and new column/value names need entries there. The
   landing page defaults to `mn`.
-- Next config lives in `next.config.js`; `next.config.mjs` is an empty stub — put config changes in
-  the `.js` one.
+- Next config lives in `web/next.config.mjs` (the only one).
 - The web app is **not** a PWA any more (`next-pwa`, the manifest and the offline page were
   removed). `public/sw.js` is a hand-written kill switch that clears old caches and unregisters
   itself for browsers that installed the old service worker — do not delete it or add a new one.

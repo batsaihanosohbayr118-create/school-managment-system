@@ -11,6 +11,15 @@ import { translations } from "@shared/i18n-tables";
 
 const REMEMBER_KEY = "nm_remember_email";
 
+function readRememberedEmail(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(REMEMBER_KEY);
+  } catch {
+    return null; // ignore storage errors
+  }
+}
+
 /**
  * Login form. Credentials are checked against the app's own Neon-backed
  * endpoint, which returns a signed session token and the caller's role.
@@ -18,28 +27,21 @@ const REMEMBER_KEY = "nm_remember_email";
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [identifier, setIdentifier] = useState(searchParams.get("email") ?? "");
+  // useSearchParams() makes the page's <Suspense> boundary bail out of
+  // prerendering, so this component only renders in the browser and can read
+  // localStorage during the first render (no hydration mismatch).
+  const [remembered] = useState(() => (searchParams.get("email") ? null : readRememberedEmail()));
+  const [identifier, setIdentifier] = useState(searchParams.get("email") ?? remembered ?? "");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(Boolean(remembered));
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const resetComplete = searchParams.get("reset");
 
-  // Restore the remembered email and auto-forward users who already have a
-  // session.
+  // Auto-forward users who already have a session.
   useEffect(() => {
-    try {
-      const remembered = window.localStorage.getItem(REMEMBER_KEY);
-      if (remembered && !searchParams.get("email")) {
-        setIdentifier(remembered);
-        setRemember(true);
-      }
-    } catch {
-      // ignore storage errors
-    }
-
     let ignore = false;
     resolveActiveSession().then((session) => {
       if (!ignore && session) router.replace(dashboardPathForRole(session.role));
@@ -47,7 +49,7 @@ export function LoginForm() {
     return () => {
       ignore = true;
     };
-  }, [router, searchParams]);
+  }, [router]);
 
   async function handleLogin() {
     const cleanIdentifier = identifier.trim();
