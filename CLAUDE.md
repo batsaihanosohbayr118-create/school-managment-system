@@ -71,25 +71,14 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5433/school_management
 
 Tables are created on the first API request by `initializeSchoolDatabase()` in `lib/school-db/schema.ts`.
 
-## Mobile app — work in progress
+## Mobile app
 
-A native iOS app is being built with Expo. It is **not** a wrapper around this
-web app; that approach was designed, then abandoned. The web app here is
-unchanged by it apart from new `/api/mobile/*` routes, CORS, and a `shared/`
-directory.
-
-Start here before touching anything mobile-related:
-
-| Document | Purpose |
-| --- | --- |
-| `docs/superpowers/2026-07-27-status-and-next-steps.md` | Current state, what is verified, what is next |
-| `docs/mobile-app-brief.md` | Non-technical summary (Mongolian) for the team |
-| `docs/superpowers/specs/2026-07-27-expo-mobile-app-design.md` | The design |
-| `docs/superpowers/plans/2026-07-27-expo-plan-a-mobile-api.md` | Plan A, task by task |
-
-Two documents in `docs/superpowers/` carry a **SUPERSEDED** banner (the
-Capacitor spec and its plan). They are kept for the constraints they record.
-Do not execute them.
+`mobile/` is a native Expo app. It is **not** a wrapper around the web app (a
+Capacitor wrap was designed, then abandoned). It talks to the web app only
+through `/api/mobile/*` routes (with CORS) and shares pure code via `shared/`.
+`docs/mobile-app-brief.md` is a non-technical summary (Mongolian) for the team.
+The original July design/plan documents were removed once implemented; they
+remain in git history (before commit "docs: remove outdated mobile planning docs").
 
 **The rule that governs the mobile API:** `/api/mobile/*` route handlers call
 the existing `listResource` / `createResource` and project the result. They
