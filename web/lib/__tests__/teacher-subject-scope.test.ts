@@ -3,20 +3,18 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-// Runs against the local-store fallback (no DATABASE_URL), in a throwaway temp dir:
-// school-db puts the store under os.tmpdir()/educore when VERCEL is set.
+// Runs against the local-store fallback (no DATABASE_URL), in a throwaway temp dir
+// that school-db is pointed at via LOCAL_STORE_DIR.
 const scratch = mkdtempSync(path.join(tmpdir(), "teacher-scope-"));
-const storeFile = path.join(scratch, "educore", "school-store.json");
+const storeFile = path.join(scratch, "school-store.json");
 
 const teacher = { session: { role: "teacher" as const, email: "math@t.mn", name: "Math T", avatarUrl: "", source: "neon" as const } };
 
 let db: typeof import("@/lib/school-db");
 
 beforeAll(async () => {
-  process.env.TEMP = scratch;
-  process.env.TMP = scratch;
-  process.env.TMPDIR = scratch;
-  process.env.VERCEL = "1";
+  process.env.LOCAL_STORE_DIR = scratch;
+  delete process.env.VERCEL;
   delete process.env.DATABASE_URL;
   vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});

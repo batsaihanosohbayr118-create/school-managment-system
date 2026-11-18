@@ -1,7 +1,6 @@
 import { Pool } from "pg";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import path from "node:path";
 
 import type { NavModule, Role } from "@/lib/types";
@@ -81,7 +80,12 @@ const resourceColumns: Record<SchoolResource, string[]> = {
   placementResults: ["Student", "Subject", "Level", "Correct", "Total", "Date"]
 };
 
-const localStoreRoot = process.env.VERCEL ? path.join(tmpdir(), "educore") : path.join(process.cwd(), ".local-data");
+// The local JSON store is a development convenience for running without Postgres.
+// It is never used on Vercel: there it lived in the function's /tmp, so a write
+// during a database blip answered "saved" and then vanished. LOCAL_STORE_DIR
+// overrides the location (tests use a temp dir).
+const localStoreFallbackEnabled = !process.env.VERCEL;
+const localStoreRoot = process.env.LOCAL_STORE_DIR || path.join(process.cwd(), ".local-data");
 const localStorePath = path.join(localStoreRoot, "school-store.json");
 
 const localSeedData: LocalStore = {
@@ -593,8 +597,23 @@ async function deleteLocalResource(resource: SchoolResource, id: string) {
  */
 class ValidationError extends Error {}
 
+/**
+ * Every catch that falls back to the local store goes through here first. Where
+ * the fallback is disabled (production) it throws instead, so the request fails
+ * visibly rather than reporting success for a write that went nowhere. Errors
+ * from pg (they carry a string `code`: SQLSTATE or ECONNREFUSED/ETIMEDOUT...)
+ * become a generic message so connection details never reach the client;
+ * anything else is rethrown unchanged.
+ */
 function logDatabaseFallback(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
+  if (!localStoreFallbackEnabled) {
+    console.error("[school-db] PostgreSQL request failed:", message);
+    if (typeof (error as { code?: unknown } | null)?.code === "string") {
+      throw new Error("Database is temporarily unavailable. Please try again.");
+    }
+    throw error;
+  }
   console.warn(`PostgreSQL unavailable; using local file store at ${localStorePath}.`, message);
 }
 

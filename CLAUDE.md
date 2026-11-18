@@ -37,9 +37,10 @@ Running `npx next dev` directly is **not** equivalent — always use the npm scr
 
 **Test coverage is partial and deliberate.** Vitest covers pure logic only —
 `shared/` and `lib/mobile/`, matched by `vitest.config.ts`. React components,
-route handlers, and anything touching Postgres have no tests. The one exception is
-`lib/__tests__/teacher-subject-scope.test.ts`, which drives `school-db` through its local-store
-fallback (temp dir, no `DATABASE_URL`) to pin the teacher-own-subject write checks. Do not assume a
+route handlers, and anything touching Postgres have no tests. The exceptions are
+`lib/__tests__/teacher-subject-scope.test.ts` and `production-no-fallback.test.ts`, which drive
+`school-db` through its local-store fallback (`LOCAL_STORE_DIR` temp dir, no real database) to
+pin the teacher-own-subject write checks and the no-fallback-on-Vercel rule. Do not assume a
 passing suite exercised a change to `DashboardApp.tsx` or `lib/school-db.ts`.
 
 The verification loop:
@@ -115,10 +116,12 @@ otherwise the app runs a client-side demo (`lib/demo-auth.ts`, sessionStorage, f
 accounts). `isSupabaseConfigured` from `lib/supabase.ts` is the branch flag, and every auth path
 checks it. Supabase sessions are stored in `window.sessionStorage`, not cookies.
 
-**Data** — `lib/school-db.ts` talks to Postgres via `DATABASE_URL`, but **on any Postgres failure it
-silently falls back to a JSON file store** (`.local-data/school-store.json`, or tmpdir on Vercel)
-with only a `console.warn`. If writes appear to succeed but vanish, or data looks unexpectedly
-empty, check for that warning before debugging anything else.
+**Data** — `lib/school-db.ts` talks to Postgres via `DATABASE_URL`. **Locally, on any Postgres
+failure it silently falls back to a JSON file store** (`web/.local-data/school-store.json`, or
+`$LOCAL_STORE_DIR`) with only a `console.warn` — if local data looks odd, check for that warning
+first. **On Vercel the fallback is off**: `logDatabaseFallback()` (which every fallback catch calls
+first) throws instead, and pg errors reach the client as a generic "Database is temporarily
+unavailable" message. Pinned by `lib/__tests__/production-no-fallback.test.ts`.
 
 ### Auth is client-side; route protection is layered
 
