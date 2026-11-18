@@ -81,6 +81,22 @@ export async function PATCH(request: Request) {
   }
 
   try {
+    // Row-level access for students, parents and teachers is keyed by the
+    // session email (students.email, parents.email, teachers.email). Letting
+    // them pick a new one would let a parent take over a login-less parent
+    // record — and with it another child's grades — and would also detach
+    // them from their own record. Only an admin changes those emails, through
+    // user management, which updates both sides.
+    if (caller.role !== "admin" && typeof body.email === "string" && body.email.trim()) {
+      const current = await findAccountById(caller.sub);
+      if (!current) {
+        return withCors(NextResponse.json({ message: "Account not found." }, { status: 404 }), request, METHODS);
+      }
+      if (body.email.trim().toLowerCase() !== current.email.trim().toLowerCase()) {
+        return withCors(NextResponse.json({ message: "email-change-not-allowed" }, { status: 403 }), request, METHODS);
+      }
+    }
+
     // Changing a password requires proving the current one, so a stolen token
     // alone cannot lock the real owner out.
     if (body.newPassword) {

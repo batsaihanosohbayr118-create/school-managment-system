@@ -919,7 +919,12 @@ async function filterResourceTable(
       return { ...table, ids: [], rows: [] };
     }
 
-    const allowed = subjectFilter ? new Set([subjectNameById(subjectFilter) || subjectFilter]) : accessibleSubjects;
+    // ?subjectId= narrows within the caller's own subjects; it must never widen
+    // them, or a teacher could read another subject's grades by changing the URL.
+    const requestedSubject = subjectFilter ? subjectNameById(subjectFilter) || subjectFilter : null;
+    const allowed = requestedSubject
+      ? new Set(accessibleSubjects.has(requestedSubject) ? [requestedSubject] : [])
+      : accessibleSubjects;
     const bySubject = filterByColumnValues(table, "Subject", allowed);
 
     // Subject scoping alone is not enough for per-student records: two

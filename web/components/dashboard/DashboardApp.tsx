@@ -3657,6 +3657,9 @@ function SettingsModule({
                 className="ec-input"
                 onChange={(event) => setProfileEmail(event.target.value)}
                 placeholder="you@example.com"
+                // Access is keyed by email; only an admin can change it (the server enforces this too).
+                readOnly={role !== "admin"}
+                title={role !== "admin" ? (language === "mn" ? "Имэйлийг зөвхөн админ өөрчилнө" : "Only an administrator can change your email") : undefined}
                 type="email"
                 value={profileEmail}
               />

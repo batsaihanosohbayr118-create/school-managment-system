@@ -36,6 +36,22 @@ beforeAll(async () => {
 const rows = (resource: string) => (JSON.parse(readFileSync(storeFile, "utf8"))[resource] as { id: string; values: string[] }[]);
 
 describe("teacher subject scope", () => {
+  // Reads run first, while GR-ENG still exists.
+  it("?subjectId= of another subject returns nothing", async () => {
+    const table = await db.listResource("grades", { ...teacher, mode: "summary", subjectId: "SB-EN" });
+    expect(table.rows).toEqual([]);
+  });
+
+  it("?subjectId= of own subject still works", async () => {
+    const table = await db.listResource("grades", { ...teacher, mode: "summary", subjectId: "SB-MATH" });
+    expect(table.ids).toEqual(["GR-MATH"]);
+  });
+
+  it("without ?subjectId= only own subject is listed", async () => {
+    const table = await db.listResource("grades", { ...teacher, mode: "summary" });
+    expect(table.ids).toEqual(["GR-MATH"]);
+  });
+
   it("rejects a grade for another subject", async () => {
     await expect(db.createResource("grades", { Student: "Bat", Subject: "English", Score: "50", Semester: "1" }, teacher)).rejects.toThrow(/subject you teach/);
   });
