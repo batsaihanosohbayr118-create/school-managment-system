@@ -4,8 +4,8 @@ export type { Role };
 
 /**
  * Role -> visible mobile tabs. Mirrors the web's visibleModulesByRole
- * (DashboardApp.tsx:129) but with the reduced set the mobile design scopes
- * to — see docs/superpowers/specs/2026-07-27-expo-mobile-app-design.md.
+ * (web/components/dashboard/dashboard-shared.ts) but with the reduced set
+ * the mobile app scopes to.
  *
  * Payments has no tab: student/parent reach it from Home. Admin gets no
  * tabs at all — signing in as admin on mobile shows a single screen
