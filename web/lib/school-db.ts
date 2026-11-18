@@ -1088,14 +1088,59 @@ function manageRolesFor(resource: SchoolResource) {
   }
 }
 
+/** Resources whose rows belong to one subject; a teacher may only write rows of a subject they teach. */
+const teacherSubjectScoped = new Set<SchoolResource>(["assignments", "materials", "timetable", "grades", "attendance"]);
+
+function isTeacherScopedWrite(resource: SchoolResource, context?: SchoolRequestContext): context is SchoolRequestContext {
+  return teacherSubjectScoped.has(resource) && context?.session.role === "teacher";
+}
+
+/** The teacher's subject names as stored (not normalized), for filling in an omitted subject. */
+async function teacherSubjectNames(context: SchoolRequestContext) {
+  const teachers = await fetchRawTable("teachers");
+  const teacher = teachers.find((row) => normalizedToken((row as DbRow).email) === normalizedToken(context.session.email));
+  return csvList((teacher as DbRow | undefined)?.subject);
+}
+
 /**
- * A teacher may add assignments, materials and timetable slots only to a subject they teach. Checked before
- * the write, outside the fallback try block, like requireManageAccess.
+ * A teacher may write assignments, materials, timetable slots, grades and attendance only for a subject
+ * they teach. Checked before the write, outside the fallback try block, like requireManageAccess.
+ *
+ * Grades and attendance: the mobile entry forms leave the subject optional, so a teacher with exactly one
+ * subject who omits it gets that subject filled in (mutates `values`) rather than a row no one can see.
  */
 async function requireOwnSubject(resource: SchoolResource, values: Record<string, string>, context?: SchoolRequestContext) {
-  if ((resource !== "assignments" && resource !== "materials" && resource !== "timetable") || context?.session.role !== "teacher") return;
+  if (!isTeacherScopedWrite(resource, context)) return;
+
+  if (!stringValue(values.Subject).trim() && (resource === "grades" || resource === "attendance")) {
+    const own = await teacherSubjectNames(context);
+    if (own.length === 1) values.Subject = own[0];
+  }
+
   if (!(await allowedSubjectNames(context)).has(normalizedToken(values.Subject))) {
     throw new ValidationError("You can only add to a subject you teach.");
+  }
+}
+
+function rowSubject(resource: SchoolResource, row: DbRow | LocalResourceRow) {
+  const record = row as Record<string, unknown>;
+  if (record.subject !== undefined) return stringValue(record.subject);
+  const index = resourceColumns[resource].indexOf("Subject");
+  const values = (row as LocalResourceRow).values;
+  return index >= 0 && Array.isArray(values) ? stringValue(values[index]) : "";
+}
+
+/**
+ * Editing or deleting an existing row: the row's current subject must be one the teacher teaches,
+ * otherwise a teacher could change or remove another subject's grades by id. A missing row is left to
+ * the write itself.
+ */
+async function requireOwnExistingRow(resource: SchoolResource, id: string, context?: SchoolRequestContext) {
+  if (!isTeacherScopedWrite(resource, context)) return;
+  const row = (await fetchRawTable(resource)).find((item) => stringValue(item.id) === id);
+  if (!row) return;
+  if (!(await allowedSubjectNames(context)).has(normalizedToken(rowSubject(resource, row)))) {
+    throw new ValidationError("You can only change records of a subject you teach.");
   }
 }
 
@@ -1204,24 +1249,6 @@ async function getAssignedSubjectNameForTeacher(pool: Pool, teacherEmail: string
   );
 
   return stringValue(result.rows[0]?.name);
-}
-
-async function ensureTeacherSubject(pool: Pool, context: SchoolRequestContext | undefined, subjectToken: string | undefined) {
-  if (!context || context.session.role !== "teacher") {
-    return subjectToken;
-  }
-
-  const assignedSubject = await getAssignedSubjectNameForTeacher(pool, context.session.email);
-  if (!assignedSubject) {
-    throw new ValidationError("Teacher does not have an assigned subject.");
-  }
-
-  const requestedSubject = stringValue(subjectToken).trim();
-  if (requestedSubject && normalizedToken(requestedSubject) !== normalizedToken(assignedSubject)) {
-    throw new ValidationError("Teachers can only manage their assigned subject.");
-  }
-
-  return assignedSubject;
 }
 
 /**
@@ -1571,6 +1598,7 @@ export async function createResource(resource: SchoolResource, values: Record<st
 
 export async function deleteResource(resource: SchoolResource, id: string, context?: SchoolRequestContext) {
   requireManageAccess(resource, context?.session.role ?? "admin");
+  await requireOwnExistingRow(resource, id, context);
 
   try {
     await ensureSchoolDatabase();
@@ -1607,6 +1635,7 @@ export async function deleteResource(resource: SchoolResource, id: string, conte
 export async function updateResource(resource: SchoolResource, id: string, values: Record<string, string>, context?: SchoolRequestContext) {
   requireManageAccess(resource, context?.session.role ?? "admin");
   rejectPlacementResultWrite(resource);
+  await requireOwnExistingRow(resource, id, context);
   if (values.Subject !== undefined) await requireOwnSubject(resource, values, context);
 
   if (resource === "placementQuestions") {

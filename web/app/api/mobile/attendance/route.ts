@@ -28,8 +28,9 @@ export const POST = mobileRoute<AttendanceResponse>(METHODS, async (context, req
   }
 
   // requireManageAccess inside createResource rejects any role outside
-  // {admin, teacher}; ensureTeacherSubject forces a teacher onto their own
-  // subject. Neither check is repeated here.
+  // {admin, teacher}; requireOwnSubject restricts a teacher to a subject they
+  // teach (filling it in when omitted and they teach one). Neither check is
+  // repeated here.
   const table = await createResource(
     "attendance",
     {

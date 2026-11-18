@@ -37,7 +37,9 @@ Running `npx next dev` directly is **not** equivalent — always use the npm scr
 
 **Test coverage is partial and deliberate.** Vitest covers pure logic only —
 `shared/` and `lib/mobile/`, matched by `vitest.config.ts`. React components,
-route handlers, and anything touching Postgres have no tests. Do not assume a
+route handlers, and anything touching Postgres have no tests. The one exception is
+`lib/__tests__/teacher-subject-scope.test.ts`, which drives `school-db` through its local-store
+fallback (temp dir, no `DATABASE_URL`) to pin the teacher-own-subject write checks. Do not assume a
 passing suite exercised a change to `DashboardApp.tsx` or `lib/school-db.ts`.
 
 The verification loop:
