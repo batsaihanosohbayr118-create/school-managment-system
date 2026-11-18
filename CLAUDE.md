@@ -13,7 +13,7 @@ shared/   pure TS used by both — @shared/*
 ```
 
 Unless a path below starts with `mobile/`, `shared/` or `docs/`, it is relative to `web/`
-(`lib/school-db.ts` means `web/lib/school-db.ts`). Dependencies are hoisted to the root
+(`lib/i18n.ts` means `web/lib/i18n.ts`). Dependencies are hoisted to the root
 `node_modules`; run `npm install` from the repo root. Vercel's Root Directory is `web`.
 
 ## Commands
@@ -41,7 +41,7 @@ route handlers, and anything touching Postgres have no tests. The exceptions are
 `lib/__tests__/teacher-subject-scope.test.ts` and `production-no-fallback.test.ts`, which drive
 `school-db` through its local-store fallback (`LOCAL_STORE_DIR` temp dir, no real database) to
 pin the teacher-own-subject write checks and the no-fallback-on-Vercel rule. Do not assume a
-passing suite exercised a change to `DashboardApp.tsx` or `lib/school-db.ts`.
+passing suite exercised a change to `components/dashboard/` or most of `lib/school-db/`.
 
 The verification loop:
 
@@ -69,7 +69,7 @@ value is:
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/school_management
 ```
 
-Tables are created on the first API request by `initializeSchoolDatabase()` in `lib/school-db.ts`.
+Tables are created on the first API request by `initializeSchoolDatabase()` in `lib/school-db/schema.ts`.
 
 ## Mobile app — work in progress
 
@@ -97,9 +97,9 @@ never write their own SQL and never re-implement a role check. Duplicating that
 logic is how a student ends up able to read another student's grades.
 
 **English placement test** (mobile only): `placementQuestions` / `placementResults`
-are `SchoolResource`s with no web `NavModule` — `DashboardApp.tsx` keeps its own
+are `SchoolResource`s with no web `NavModule` — `components/dashboard/dashboard-shared.ts` keeps its own
 narrower `SchoolResource` alias. Grading is `submitPlacementTest()` in
-`lib/school-db.ts`; the answer-keyed starter bank is `lib/placement-bank.ts` and
+`lib/school-db/placement.ts`; the answer-keyed starter bank is `lib/placement-bank.ts` and
 must stay out of `shared/`, which is bundled into the phone app.
 
 `@shared/*` resolves to the root `shared/` — configured in `web/tsconfig.json`,
@@ -116,7 +116,7 @@ otherwise the app runs a client-side demo (`lib/demo-auth.ts`, sessionStorage, f
 accounts). `isSupabaseConfigured` from `lib/supabase.ts` is the branch flag, and every auth path
 checks it. Supabase sessions are stored in `window.sessionStorage`, not cookies.
 
-**Data** — `lib/school-db.ts` talks to Postgres via `DATABASE_URL`. **Locally, on any Postgres
+**Data** — `lib/school-db` talks to Postgres via `DATABASE_URL`. **Locally, on any Postgres
 failure it silently falls back to a JSON file store** (`web/.local-data/school-store.json`, or
 `$LOCAL_STORE_DIR`) with only a `console.warn` — if local data looks odd, check for that warning
 first. **On Vercel the fallback is off**: `logDatabaseFallback()` (which every fallback catch calls
@@ -129,7 +129,7 @@ unavailable" message. Pinned by `lib/__tests__/production-no-fallback.test.ts`.
   stale) cannot see the session. It only normalizes `/admin` → `/admin/dashboard` and sets
   security headers.
 - The **authoritative per-role guard** is the `useEffect` in
-  `components/dashboard/DashboardApp.tsx` (~line 1065). Each `app/<role>/dashboard/page.tsx` is a
+  `AppShell` in `components/dashboard/DashboardApp.tsx`. Each `app/<role>/dashboard/page.tsx` is a
   5-line shell rendering `<DashboardApp lockedRole="..." />`; the guard bounces a user whose session
   role ≠ `lockedRole` to `dashboardPathForRole(theirRole)`.
 - API routes authenticate independently via `resolveRequestSession()` (`lib/school-session.ts`):
@@ -143,19 +143,23 @@ Supabase `user_metadata.role` and **defaults to `student`** whenever it is missi
 
 ### Row-level authorization lives in the data layer
 
-`allowedSubjectNames()` and `filterResourceTable()` in `lib/school-db.ts` scope every resource per
+`allowedSubjectNames()` and `filterResourceTable()` in `lib/school-db/access.ts` scope every resource per
 role (teacher → their subjects, student → their own rows, parent → their child's rows, admin → all).
 The UI does not filter; it renders whatever the API returns as a `{ columns, ids, rows }` table.
 
-Adding a resource or a column means touching four spots in `lib/school-db.ts` — the `CREATE TABLE`
-block in `initializeSchoolDatabase`, `resourceColumns`, `rowToArray`, and the role filter — plus
-`visibleModulesByRole` (`DashboardApp.tsx:129`) for navigation.
+Adding a resource or a column means touching four spots in `lib/school-db/` — the `CREATE TABLE`
+block in `initializeSchoolDatabase` (`schema.ts`), `resourceColumns` and `rowToArray` (`base.ts`),
+and the role filter (`access.ts`) — plus `visibleModulesByRole`
+(`components/dashboard/dashboard-shared.ts`) for navigation.
 
 ### Other conventions
 
 - `@/*` resolves to `web/` (`web/tsconfig.json`).
-- `components/dashboard/DashboardApp.tsx` is ~3,500 lines and renders **all four** role dashboards;
-  the `lockedRole` prop is what differentiates them.
+- `components/dashboard/DashboardApp.tsx` (`AppShell`) renders **all four** role dashboards; the
+  `lockedRole` prop is what differentiates them. The modules, table, charts, settings and subject
+  content editor are split into sibling files; shared types/helpers are in `dashboard-shared.ts`.
+- `lib/school-db.ts` is only the public re-export list; the code is in `lib/school-db/` (see the
+  header comment there). Import from `@/lib/school-db`, not the inner files.
 - i18n is en/mn lookup tables in `lib/i18n.ts` (`translateColumn` / `translateValue` /
   `translations`). New user-facing strings and new column/value names need entries there. The
   landing page defaults to `mn`.
@@ -165,7 +169,7 @@ block in `initializeSchoolDatabase`, `resourceColumns`, `rowToArray`, and the ro
   itself for browsers that installed the old service worker — do not delete it or add a new one.
 - Accounts are made by an admin (`/admin/users`, or a record's Password field) **or by
   self-registration** (`/register` on web, `mobile/app/register.tsx`, both calling
-  `app/api/auth/register` → `registerAccount()` in `lib/school-db.ts`). Students sign straight in;
+  `app/api/auth/register` → `registerAccount()` in `lib/school-db/registration.ts`). Students sign straight in;
   a parent must give their child's email *and password*; a teacher's account starts with
   `app_users.approved = false`, cannot sign in (`/api/auth/login` returns `pending-approval`), and
   gets their teacher record only when an admin approves them on `/admin/users`. Rules shared by
