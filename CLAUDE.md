@@ -2,7 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Repo layout
+
+One repo, npm workspaces (`web`, `mobile`):
+
+```
+web/      Next.js web app (app/, components/, lib/, public/, its own package.json)
+mobile/   Expo app
+shared/   pure TS used by both — @shared/*
+```
+
+Unless a path below starts with `mobile/`, `shared/` or `docs/`, it is relative to `web/`
+(`lib/school-db.ts` means `web/lib/school-db.ts`). Dependencies are hoisted to the root
+`node_modules`; run `npm install` from the repo root. Vercel's Root Directory is `web`.
+
 ## Commands
+
+Run from the repo root (they forward to the `web` workspace) or from inside `web/`.
 
 ```bash
 npm run dev          # dev server (http://localhost:3000)
@@ -29,7 +45,7 @@ The verification loop:
 ```bash
 npm run lint
 npm test
-npx tsc --noEmit     # tsconfig already sets noEmit
+(cd web && npx tsc --noEmit)   # tsconfig already sets noEmit
 npm run build
 ```
 
@@ -37,7 +53,7 @@ A build rewrites the committed `next-env.d.ts`. Restore it before committing
 so it stays out of the diff:
 
 ```bash
-git checkout -- next-env.d.ts
+git checkout -- web/next-env.d.ts
 ```
 
 ## Local database
@@ -83,8 +99,10 @@ narrower `SchoolResource` alias. Grading is `submitPlacementTest()` in
 `lib/school-db.ts`; the answer-keyed starter bank is `lib/placement-bank.ts` and
 must stay out of `shared/`, which is bundled into the phone app.
 
-`@shared/*` resolves to `shared/` — configured in both `tsconfig.json` and
-`vitest.config.ts`, so keep the two in sync.
+`@shared/*` resolves to the root `shared/` — configured in `web/tsconfig.json`,
+`web/vitest.config.ts` (whose `root` is the repo root so shared tests run), `mobile/tsconfig.json`
+and `mobile/metro.config.js`, so keep them in sync. `web/next.config.js` sets
+`experimental.externalDir` so Next compiles TS from outside `web/`.
 
 ## Architecture
 
@@ -130,7 +148,7 @@ block in `initializeSchoolDatabase`, `resourceColumns`, `rowToArray`, and the ro
 
 ### Other conventions
 
-- `@/*` resolves to the repo root (`tsconfig.json`).
+- `@/*` resolves to `web/` (`web/tsconfig.json`).
 - `components/dashboard/DashboardApp.tsx` is ~3,500 lines and renders **all four** role dashboards;
   the `lockedRole` prop is what differentiates them.
 - i18n is en/mn lookup tables in `lib/i18n.ts` (`translateColumn` / `translateValue` /

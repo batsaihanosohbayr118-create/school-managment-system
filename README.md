@@ -2,6 +2,14 @@
 
 Premium modern school management system built with Next.js, React, TypeScript, PostgreSQL, Supabase helpers, Framer Motion, Recharts, and reusable UI components.
 
+## Repo layout
+
+- `web/` — Next.js web app
+- `mobile/` — Expo mobile app
+- `shared/` — TypeScript shared by both
+
+Run `npm install` and the `npm run ...` scripts from the repo root.
+
 ## Navigation flow
 
 ```
@@ -50,7 +58,7 @@ app runs a fully client-side demo with four seeded accounts:
 
 ## Supabase
 
-Add these to `.env.local` for Supabase Auth:
+Add these to `web/.env.local` for Supabase Auth:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
@@ -82,7 +90,7 @@ In Supabase Auth -> Providers -> Google, enable Google and add the Client ID and
 
 ## PostgreSQL Setup
 
-Create `.env.local` from `.env.example`, then start PostgreSQL:
+Create `web/.env.local` from `web/.env.example`, then start PostgreSQL:
 
 ```bash
 npm run db:up

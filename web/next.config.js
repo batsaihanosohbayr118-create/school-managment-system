@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 export default {
   reactStrictMode: false,
+  // shared/ lives at the repo root, outside web/ — let webpack compile
+  // TypeScript imported from there via the @shared/* path alias.
+  experimental: { externalDir: true },
   // Lets a phone on the same Wi-Fi reach the dev server's HMR websocket via
   // the LAN IP — Next.js blocks cross-origin dev requests by default, which
   // otherwise hangs the client mid-hydration (stuck on "Checking session...")
