@@ -1,4 +1,4 @@
-import { Pool, type PoolClient } from "pg";
+import { Pool } from "pg";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -496,11 +496,6 @@ function toResourceTable(resource: SchoolResource, rows: LocalResourceRow[]): Re
     ids: sortedRows.map((row) => row.id),
     rows: sortedRows.map((row) => row.values || rowToArray(resource, row))
   };
-}
-
-async function listLocalResource(resource: SchoolResource): Promise<ResourceTable> {
-  const store = await readLocalStore();
-  return toResourceTable(resource, store[resource]);
 }
 
 function valuesForCreatedResource(resource: SchoolResource, values: Record<string, string>) {
@@ -1174,28 +1169,6 @@ async function resolveStudentByToken(pool: Pool | null, token: string) {
 
   const store = await readLocalStore();
   return store.students.find((row) => normalizedToken(row.id) === normalizedToken(token) || normalizedToken((row as DbRow).email) === normalizedToken(token) || normalizedToken((row as DbRow).full_name) === normalizedToken(token)) ?? null;
-}
-
-async function resolveParentByToken(pool: Pool | null, token: string) {
-  const normalized = token.trim();
-  if (!normalized) return null;
-
-  if (pool) {
-    const result = await pool.query<QueryRow>(
-      `
-      SELECT id, name, email, student, student_email, student_id
-      FROM parents
-      WHERE id = $1 OR email = $1 OR name = $1
-      LIMIT 1
-    `,
-      [normalized]
-    );
-
-    return result.rows[0] ?? null;
-  }
-
-  const store = await readLocalStore();
-  return store.parents.find((row) => normalizedToken(row.id) === normalizedToken(token) || normalizedToken((row as DbRow).email) === normalizedToken(token) || normalizedToken((row as DbRow).name) === normalizedToken(token)) ?? null;
 }
 
 function subjectNamesFromTokens(tokens: string[]) {

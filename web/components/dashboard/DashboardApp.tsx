@@ -90,7 +90,7 @@ import {
 import { authService } from "@/lib/auth-client";
 import { dashboardPathForRole } from "@/lib/auth-flow";
 import { defaultStudentSubjectsValue, subjectCatalog, subjectOptions } from "@/lib/subjects";
-import type { NavModule, Role, SubjectAssignment, SubjectContent, SubjectLesson } from "@/lib/types";
+import type { NavModule, Role, SubjectContent, SubjectLesson } from "@/lib/types";
 /** The web dashboard's resources: one per navigation module. The data layer also has mobile-only ones. */
 type SchoolResource = Exclude<NavModule, "dashboard" | "settings">;
 
@@ -1677,7 +1677,6 @@ function AppShell({ initialView, lockedRole }: { initialView?: "users"; lockedRo
 
             {activeModule === "dashboard" ? <Dashboard
                 copy={copy}
-                currentUserEmail={currentUserEmail}
                 language={language}
                 onOpenAttendance={visibleModulesByRole[role].includes("attendance") ? () => openModule("attendance") : undefined}
                 onOpenPayments={visibleModulesByRole[role].includes("payments") ? () => openModule("payments") : undefined}
@@ -2053,14 +2052,12 @@ const metricIcons: Record<Role, LucideIcon[]> = {
 
 function Dashboard({
   copy,
-  currentUserEmail,
   language,
   onOpenAttendance,
   onOpenPayments,
   role
 }: {
   copy: AppCopy;
-  currentUserEmail: string;
   language: Language;
   onOpenAttendance?: () => void;
   onOpenPayments?: () => void;

@@ -171,9 +171,8 @@ block in `initializeSchoolDatabase`, `resourceColumns`, `rowToArray`, and the ro
 - `database/schema.sql` is an aspirational normalized target schema, **not** what runs. The live
   tables are created at runtime by `initializeSchoolDatabase()`. `database/supabase-schema.sql` is
   meant to be pasted into the Supabase SQL editor.
-- `lib/school-supabase.ts` (~400 lines) is reachable only through a type-only import in
-  `DashboardApp.tsx` — it is not wired into the UI.
-- `lib/db.ts` and `app/api/records/route.ts` are unused by the UI.
+- `public/sw.js` looks unused but is deliberate: it is a kill-switch that clears the old next-pwa
+  service worker from browsers that installed it. Keep it.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
