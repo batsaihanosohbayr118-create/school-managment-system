@@ -8,14 +8,6 @@ export type BankQuestion = {
   answer: AnswerLetter;
 };
 
-/**
- * The starter English placement test, five questions per CEFR level.
- * Seeded into `placement_questions` only while that table is empty; after
- * that the English teacher owns the questions and edits them from the app.
- *
- * Server-only on purpose: it carries the answer key, and anything under
- * shared/ is bundled into the phone app.
- */
 export const placementBank: BankQuestion[] = [
   { id: "PQ-A1-1", level: "A1", question: "She ___ a student.", options: ["is", "are", "am", "be"], answer: "A" },
   { id: "PQ-A1-2", level: "A1", question: "I have two ___.", options: ["cat", "cats", "a cat", "cates"], answer: "B" },

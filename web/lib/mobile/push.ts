@@ -1,8 +1,3 @@
-/**
- * Sends push notifications through Expo's push service. No SDK needed — it's
- * a plain HTTPS endpoint that fans a batch out to Apple/Google on Expo's side.
- * https://docs.expo.dev/push-notifications/sending-notifications/
- */
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
@@ -44,9 +39,6 @@ export async function sendPushNotifications(tokens: string[], message: PushMessa
         )
       });
 
-      // Expo's API returns 200 even when an individual token failed — the
-      // per-token result (e.g. DeviceNotRegistered, a missing FCM/APNs
-      // credential) is only visible in the response body's ticket list.
       const body = (await response.json().catch(() => null)) as { data?: unknown; errors?: unknown } | null;
       const tickets = Array.isArray(body?.data) ? body.data : [];
       const errorTickets = tickets.filter((ticket: { status?: string }) => ticket?.status === "error");

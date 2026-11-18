@@ -2,15 +2,6 @@ import type { Language, Role } from "./i18n-tables";
 
 export type { Role };
 
-/**
- * Role -> visible mobile tabs. Mirrors the web's visibleModulesByRole
- * (web/components/dashboard/dashboard-shared.ts) but with the reduced set
- * the mobile app scopes to.
- *
- * Payments has no tab: student/parent reach it from Home. Admin gets no
- * tabs at all — signing in as admin on mobile shows a single screen
- * directing them to the web, not a tab layout.
- */
 export type MobileTab = "home" | "timetable" | "subjects" | "grades" | "attendance" | "announcements";
 
 export const visibleTabsByRole: Record<Role, MobileTab[]> = {

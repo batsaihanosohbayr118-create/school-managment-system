@@ -3,18 +3,6 @@ import { resolveRequestSession } from "@/lib/school-session-server";
 import type { SchoolRequestContext } from "@/lib/school-db";
 import { preflight, withCors } from "@/lib/cors";
 
-/**
- * Every mobile route follows the same shape: resolve the session, refuse
- * without one, run the handler, map thrown errors to a status, attach CORS.
- *
- * The context is always passed to school-db helpers. `createResource` computes
- * `context?.session.role ?? "admin"`, so calling it without a context silently
- * grants admin.
- *
- * Note: `mode` is deliberately left unset. `listResource` throws
- * "subjectId is required." for a student or parent in page mode; summary mode
- * returns every row they are allowed to see, which is what a phone screen wants.
- */
 export function errorStatus(error: unknown): number {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
 

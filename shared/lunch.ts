@@ -1,8 +1,3 @@
-/**
- * The school lunch fee. Shared so the phone shows the same price the server
- * bills — the server recomputes the amount from the dates and never trusts a
- * total sent by the client.
- */
 export const LUNCH_FEE_PER_DAY = 5000;
 
 /** More than any month has school days; caps one payment at roughly a month. */

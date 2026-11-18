@@ -4,15 +4,6 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { markSiteReady } from "@/lib/site-ready";
 
-/**
- * Full-screen intro shown while the site itself is coming up.
- *
- * It is rendered straight into the server HTML so it covers the first paint,
- * then dismisses itself once the document has finished loading. Because it
- * lives in the root layout it plays on a fresh page load only — client-side
- * navigations keep the layout mounted, so moving between pages never replays
- * it.
- */
 
 /** Keeps the animation from flashing by on a warm cache. */
 const MIN_VISIBLE_MS = 900;

@@ -27,11 +27,7 @@ export function LessonVideo({ src }: { src: string }) {
   return resolved?.src === src ? <video controls preload="metadata" src={resolved.url} /> : <video controls preload="none" />;
 }
 
-/**
- * Places an open dropdown list with position: fixed beside its trigger, so a
- * scrolling container (the record modal has overflow-y: auto) cannot clip it.
- * Opens upward when there is more room above. Re-measures on scroll/resize.
- */
+
 function useFloatingMenu(open: boolean) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);

@@ -24,11 +24,7 @@ export default function SubjectsScreen() {
   const [query, setQuery] = useState('');
   const dangerColor = useThemeColor({}, 'danger');
   const tint = useThemeColor({}, 'tint');
-  // Students and parents browse read-only, so subjects page sideways instead
-  // of stacking; teachers keep the stacked list, since they also need the
-  // full-width "Add content" row at the bottom of each card. Cards stay full
-  // width — one subject per page — rather than shrinking to fit several on
-  // screen.
+  
   const isReadOnlyViewer = session?.role === 'student' || session?.role === 'parent';
   const { width: windowWidth } = useWindowDimensions();
   const horizontalCardWidth = windowWidth - styles.container.paddingHorizontal * 2;

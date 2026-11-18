@@ -1,8 +1,3 @@
-/**
- * Self-registration rules, shared by the web form, the mobile form and the
- * server (lib/school-db.ts registerAccount), so all three agree on what is
- * acceptable. The server re-checks everything; the forms only check early.
- */
 
 /** Admin is never self-registered — admins are made by other admins. */
 export const REGISTRATION_ROLES = ["student", "parent", "teacher"] as const;

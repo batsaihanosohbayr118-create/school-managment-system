@@ -1,15 +1,4 @@
-/**
- * The contract between the mobile API routes and the Expo client.
- *
- * Imported by both sides so a shape change breaks the build rather than
- * failing at runtime on a phone.
- *
- * Design note: the underlying tables store every value as a string
- * (`rowToArray` in lib/school-db.ts maps everything through `stringValue`).
- * Fields that we parse therefore come in pairs — a parsed value that may be
- * null, and the original label. A phone should render the label and use the
- * parsed number only for sorting or arithmetic.
- */
+
 export type MobileRole = "admin" | "teacher" | "student" | "parent";
 
 export type MobileProfile = {

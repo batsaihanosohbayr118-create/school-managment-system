@@ -1,10 +1,5 @@
 import Image from "next/image";
 
-/**
- * Shown by the App Router while a route segment loads. Kept free of client
- * state so it can render instantly — it follows the OS colour scheme instead
- * of the in-app dark mode toggle.
- */
 export default function Loading() {
   return (
     <main className="route-loading">

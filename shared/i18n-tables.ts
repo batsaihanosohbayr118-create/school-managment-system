@@ -1,15 +1,3 @@
-/**
- * The translation tables themselves, shared between the web app and the
- * Expo mobile client. Window/localStorage-dependent helpers
- * (getInitialLanguage, getStoredLanguage, languageStorageKey) stay in
- * lib/i18n.ts, which re-exports everything here so no web import path
- * changes.
- *
- * Role and NavModule below are structural duplicates of the same types in
- * lib/types.ts. They can't be imported from there — that file pulls in
- * lucide-react, a web-only dependency shared/ must not carry — so keep the
- * two lists in sync by hand if a role or module is ever added or renamed.
- */
 import type { RegistrationErrorCode } from "./registration";
 
 export type Language = "en" | "mn";

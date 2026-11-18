@@ -98,10 +98,6 @@ export default function AttendanceScreen() {
   );
 }
 
-/**
- * The attendance tab's checkmark (as on the tab bar), varied by status so a
- * missed class reads at a glance: a cross for absent, a clock for late.
- */
 function attendanceIcon(status: string): keyof typeof Ionicons.glyphMap {
   const normalized = status.trim().toLowerCase();
   if (normalized === 'absent' || normalized === 'тасалсан') return 'close-circle';

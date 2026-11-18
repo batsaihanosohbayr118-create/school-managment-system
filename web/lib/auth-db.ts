@@ -3,12 +3,6 @@ import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:cry
 import { promisify } from "node:util";
 import type { Role } from "@/lib/types";
 
-/**
- * Account storage, backed by the same Neon database as the rest of the app.
- *
- * Passwords are hashed with scrypt from Node's standard library — no external
- * dependency, and unlike a bare SHA it is deliberately slow and salted.
- */
 
 const scrypt = promisify(scryptCallback) as (
   password: string,
@@ -36,11 +30,6 @@ export type AccountRecord = {
   subject: string;
   /** Parents only — the email of the student they are guardian for. */
   studentEmail: string;
-  /**
-   * False only for a self-registered teacher an admin has not approved yet.
-   * Such an account cannot sign in (see app/api/auth/login), so it never holds
-   * a token and cannot reach any data.
-   */
   approved: boolean;
   createdAt: string;
 };
@@ -110,10 +99,6 @@ async function initialize() {
   // Every account that existed before self-registration was admin-made, so approved.
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT TRUE;`);
 
-  // One row per device: an account signed in on a phone and a tablet gets
-  // notified on both. Keyed by the token itself (not email) so re-registering
-  // the same device is an upsert, and a different account signing in on a
-  // shared device reassigns that device's token instead of duplicating it.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS push_tokens (
       token TEXT PRIMARY KEY,
@@ -141,12 +126,6 @@ async function initialize() {
   }
 }
 
-/**
- * Bump whenever initialize() gains a migration. The ready promise lives on
- * globalThis so it survives hot reloads — without this, a dev server started
- * before the migration keeps its old promise, never runs the new ALTER, and
- * every query naming the new column fails until a restart.
- */
 const SCHEMA_VERSION = 2;
 
 async function ensureReady() {
@@ -365,23 +344,7 @@ export async function updateAccount(id: string, input: UpdateAccountInput): Prom
   }
 }
 
-/**
- * Sets someone's sign-in password, creating the account when they do not have
- * one yet — people added before the password field existed have a school
- * record but no login.
- *
- * The UPDATE is scoped to the given role on purpose: an administrator editing
- * a student or a parent must never be able to reset a teacher's or an admin's
- * password by reusing their email. In that case no row matches, and
- * createAccount raises the email conflict instead.
- */
-/**
- * Keeps a login's display name following the school record it was created
- * from. `app_users` and `students`/`teachers`/`parents` are separate tables
- * (see applyLogin in lib/school-db.ts) — editing a record's Name there only
- * reaches this table if this is called too. A no-op when no account with
- * that email/role exists, since not every school record has a login.
- */
+
 export async function syncAccountName(email: string, role: Role, name: string): Promise<void> {
   await ensureReady();
   await getPool().query(

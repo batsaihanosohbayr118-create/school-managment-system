@@ -354,13 +354,6 @@ async function teacherSubjectNames(context: SchoolRequestContext) {
   return csvList((teacher as DbRow | undefined)?.subject);
 }
 
-/**
- * A teacher may write assignments, materials, timetable slots, grades and attendance only for a subject
- * they teach. Checked before the write, outside the fallback try block, like requireManageAccess.
- *
- * Grades and attendance: the mobile entry forms leave the subject optional, so a teacher with exactly one
- * subject who omits it gets that subject filled in (mutates `values`) rather than a row no one can see.
- */
 export async function requireOwnSubject(resource: SchoolResource, values: Record<string, string>, context?: SchoolRequestContext) {
   if (!isTeacherScopedWrite(resource, context)) return;
 
@@ -417,27 +410,6 @@ export async function getAssignedSubjectNameForTeacher(pool: Pool, teacherEmail:
   return stringValue(result.rows[0]?.name);
 }
 
-/**
- * Push notification for a newly-created announcement. "Audience" is free
- * text on the admin form (no fixed dropdown), so this matches loosely on the
- * role name and falls back to everyone — an unrecognized audience should
- * still reach people, not silently notify nobody.
- *
- * The caller awaits this despite it being "fire and forget" in spirit: on
- * Vercel, a serverless function's execution is frozen as soon as its
- * response is sent, so an un-awaited async call here would race the
- * response and routinely get cut off before the push actually went out.
- * Errors are swallowed at the call site instead — a failed or slow push
- * must never fail the announcement save that triggered it.
- */
-/**
- * Loosely matches an announcement's free-text Audience field to a role —
- * matches both the English and Mongolian labels the create form actually
- * produces. Returns null for "All" or anything unrecognized, meaning
- * everyone: both the push fan-out and the list-visibility filter below
- * treat null the same way, so a typo'd or unusual audience value fails open
- * to "everyone can see/hear this" rather than silently going nowhere.
- */
 export function audienceRole(audience: string): Role | null {
   const normalized = audience.trim().toLowerCase();
   if (normalized.includes("teacher") || normalized.includes("багш")) return "teacher";
@@ -446,10 +418,6 @@ export function audienceRole(audience: string): Role | null {
   return null;
 }
 
-/**
- * manageRolesFor lets any teacher through; the placement test belongs to the
- * English teacher alone. A ValidationError, so the fallback catch rethrows it.
- */
 export async function requirePlacementTeacher(pool: Pool, context?: SchoolRequestContext) {
   if (context?.session.role !== "teacher") return;
 
@@ -466,16 +434,7 @@ export function rejectPlacementResultWrite(resource: SchoolResource) {
   }
 }
 
-/**
- * Who may change a subject's lesson content (topics, lessons, files,
- * assignments): an admin, or the teacher of that subject. The content route
- * used to check only "is a teacher", so any teacher could rewrite or delete
- * any other subject's material.
- *
- * `subjectId` is the subjects table id (what web and mobile both send); a
- * code is accepted too. Uses the same teacher → subject mapping as every
- * other resource's row filter (allowedSubjectNames).
- */
+
 export async function requireSubjectContentAccess(context: SchoolRequestContext, subjectId: string) {
   const role = context.session.role;
   if (role === "admin") return;

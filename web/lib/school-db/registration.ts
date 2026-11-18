@@ -5,11 +5,6 @@ import { type SchoolRequestContext, normalizedToken, rawRowValues, stringValue }
 import { fetchRawTable } from "./local-store";
 import { createResource, listResource } from "./resources";
 
-/**
- * Self-registration acts with admin rights, but only through the fixed values
- * built in registerAccount — never with anything a client could steer into
- * another resource or another person's record.
- */
 const REGISTRATION_SESSION: SchoolSession = { role: "admin", email: "registration@system", name: "Registration", avatarUrl: "", source: "neon" };
 
 export class RegistrationError extends Error {
@@ -51,19 +46,7 @@ async function openSubjectFor(subjectName: string) {
   return subject.name;
 }
 
-/**
- * Creates an account for someone signing themselves up.
- *
- *  - student — the student record and login, through createResource exactly as
- *    the admin form does. Only the subjects they pick that actually exist are kept.
- *  - parent  — only after the child's own email and password check out, which
- *    is what stops anyone who merely knows a child's email from linking to them.
- *  - teacher — a login only, marked unapproved, so it cannot sign in. The
- *    teacher record that grants access to a subject is made on approval
- *    (approveTeacher), by an admin.
- *
- * Returns "signed-in" when the caller may sign in now, "pending-approval" for a teacher.
- */
+
 export async function registerAccount(input: RegistrationInput): Promise<"signed-in" | "pending-approval"> {
   const problem = validateRegistration(input);
   if (problem) throw new RegistrationError(problem);
@@ -106,12 +89,7 @@ export async function registerAccount(input: RegistrationInput): Promise<"signed
   return "pending-approval";
 }
 
-/**
- * Lets a self-registered teacher in: creates their teacher record for the
- * subject they asked for (through createResource, so the one-teacher-per-
- * subject rule still holds), then marks the login approved. Returns null
- * when there is nothing to approve.
- */
+
 export async function approveTeacher(accountId: string, context: SchoolRequestContext) {
   if (context.session.role !== "admin") throw new Error("You do not have permission to approve accounts.");
 

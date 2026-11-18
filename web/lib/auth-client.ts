@@ -4,13 +4,6 @@ import type { Role } from "@/lib/types";
 import { isRole } from "@/lib/auth-flow";
 import type { RegistrationInput, RegistrationOptions, RegistrationResponse } from "@shared/registration";
 
-/**
- * Browser-side authentication against the app's own Neon-backed endpoints.
- *
- * The token is opaque to the client: it is stored, echoed back on every
- * request, and its payload is read only to render the current user. All
- * verification happens server-side in lib/auth-token.ts.
- */
 
 export const tokenStorageKey = "educore_token";
 

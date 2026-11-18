@@ -1,9 +1,6 @@
 import { BookOpen, GraduationCap, Languages, LayoutGrid, ShieldCheck, Trophy, Users } from "lucide-react";
 import type { LandingDict, LandingLang } from "./types";
 
-/**
- * Brand palette (kept as constants so every section stays consistent).
- */
 export const COLORS = {
   primary: "#2563EB",
   secondary: "#4F46E5",

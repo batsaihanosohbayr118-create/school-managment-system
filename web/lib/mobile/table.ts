@@ -1,14 +1,3 @@
-/**
- * Helpers for projecting a `ResourceTable` into typed objects.
- *
- * Columns are resolved by name, never by index, so reordering
- * `resourceColumns` in lib/school-db.ts cannot silently corrupt a mobile
- * response — it throws instead.
- *
- * Every table value is a string (`rowToArray` maps everything through
- * `stringValue`), so the parsers below all return null rather than NaN when the
- * source is free text.
- */
 export function columnIndex(columns: string[], name: string): number {
   const index = columns.findIndex((column) => column.toLowerCase() === name.toLowerCase());
   if (index < 0) {

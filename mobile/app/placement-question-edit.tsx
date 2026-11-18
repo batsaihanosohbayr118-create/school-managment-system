@@ -11,11 +11,6 @@ import { ApiError } from '@shared/api-error';
 import type { PlacementResponse } from '@shared/api-types';
 import { ANSWER_LETTERS, CEFR_LEVELS, type AnswerLetter, type CefrLevel } from '@shared/placement';
 
-/**
- * Adds a placement question, or edits one when opened with `?id=`. The
- * question is read from the 'placement' cache the list screen just filled,
- * so editing does not need its own fetch.
- */
 export default function PlacementQuestionEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();

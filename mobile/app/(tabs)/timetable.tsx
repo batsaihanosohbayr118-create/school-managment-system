@@ -175,10 +175,6 @@ export default function TimetableScreen() {
   );
 }
 
-/**
- * The picked day has no classes: the home screen's sunny "day off" card, plus
- * a shortcut to the next day that does have some.
- */
 function DayOff({
   day,
   nextDay,

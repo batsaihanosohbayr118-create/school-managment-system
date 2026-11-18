@@ -10,12 +10,6 @@ const METHODS = ["GET", "POST", "DELETE"];
 
 export const OPTIONS = preflight(METHODS);
 
-/**
- * Everything the placement screen needs in one request. Every list goes
- * through listResource, so the role scoping — a student's answer key
- * blanked, a parent seeing only their child's result, a teacher of another
- * subject seeing nothing — is decided in lib/school-db.ts, not here.
- */
 export const GET = mobileRoute<PlacementResponse>(METHODS, async (context) => {
   const [questions, results, subjects] = await Promise.all([
     listResource("placementQuestions", context),

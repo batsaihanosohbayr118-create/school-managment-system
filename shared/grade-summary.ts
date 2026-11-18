@@ -1,8 +1,3 @@
-/**
- * Turns raw grade rows (a 0–100 score per subject per semester) into what the
- * grades screen shows: letter grades, a 4.0-scale GPA, and a per-semester trend.
- */
-
 export type LetterGrade = { letter: string; points: number };
 
 /** The common Mongolian 4.0 scale: [minimum score, letter, grade points]. */

@@ -1,16 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-/**
- * Server-only client for the QPay Merchant API v2. The merchant username and
- * password must never reach the phone — the mobile app only ever sees the
- * invoice (QR + bank deeplinks) this module creates on its behalf.
- *
- * Env:
- *   QPAY_USERNAME, QPAY_PASSWORD, QPAY_INVOICE_CODE  (from QPay)
- *   QPAY_BASE_URL            default https://merchant.qpay.mn (sandbox: https://merchant-sandbox.qpay.mn)
- *   QPAY_CALLBACK_BASE_URL   public origin QPay calls back, e.g. https://www.nova-edu.mn
- *   QPAY_SIGNING_SECRET      signs check tokens and callback URLs; falls back to QPAY_PASSWORD
- */
 type QpayConfig = {
   baseUrl: string;
   username: string;

@@ -21,12 +21,7 @@ import { ApiError } from '@shared/api-error';
 import type { PlacementQuestion, PlacementResponse, PlacementResult } from '@shared/api-types';
 import { ANSWER_LETTERS } from '@shared/placement';
 
-/**
- * The English placement test. One screen, three audiences:
- * a student sits the test (once) and sees their level; a parent sees their
- * child's level; the English teacher sees every result and can reset one so
- * the student may retake it.
- */
+
 export default function PlacementScreen() {
   const { data, error, loading, refetch, isOffline } = useApiData('placement', api.placement);
   const { session } = useAuth();

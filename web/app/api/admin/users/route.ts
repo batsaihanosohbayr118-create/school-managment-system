@@ -21,17 +21,6 @@ const METHODS = ["GET", "POST", "PATCH", "DELETE"];
 
 export const OPTIONS = preflight(METHODS);
 
-/**
- * Role-specific requirements when provisioning an account:
- *
- *  - teacher — must name the subject they teach. Free text on purpose: a school
- *    may hire for a subject before it exists in the catalogue, so this is NOT
- *    checked against the database.
- *  - parent  — must be linked to a student, and that student MUST already exist
- *    in the students table. A guardian for nobody is always a mistake.
- *
- * Returns an error code, or null when the link is acceptable.
- */
 async function checkRoleLink(
   role: Role,
   subject: string | undefined,

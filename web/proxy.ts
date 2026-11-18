@@ -1,22 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-/**
- * Proxy (Next.js 16's successor to middleware) — the first layer of route
- * protection.
- *
- * Authentication in this app is client-side (Supabase stores its session in
- * sessionStorage, and demo mode uses sessionStorage too), so the session token
- * is NOT available to the server. The authoritative per-role access check
- * therefore lives in the client guard inside `components/dashboard/DashboardApp`
- * (and the `/admin/*` page guards). This proxy complements that by:
- *
- *  1. Normalizing structural routes (e.g. `/admin` -> `/admin/dashboard`).
- *  2. Applying baseline security headers to every response.
- *
- * To move enforcement fully server-side, switch to cookie-based Supabase SSR
- * (`@supabase/ssr`) and read the session from cookies here.
- */
 
 const ROLE_ROOTS = new Set(["/admin", "/teacher", "/student", "/parent"]);
 
@@ -41,7 +25,5 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on application routes; skip Next internals, the service-worker
-  // cleanup script, and static files.
   matcher: ["/((?!_next/static|_next/image|favicon.ico|sw.js|icon-|data/).*)"]
 };

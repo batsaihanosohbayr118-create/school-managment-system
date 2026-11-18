@@ -7,11 +7,6 @@ export const runtime = "nodejs";
 
 const METHODS = ["POST"];
 
-// The mobile app's browser preview (and any Expo dev client) calls this
-// cross-origin, same as /api/mobile/* — without this, the POST has no
-// Content-Type-triggered preflight handler and the browser blocks it before
-// the response body is ever read, which mobile/lib/auth.ts reports as
-// "No connection." even though the request never actually failed.
 export const OPTIONS = preflight(METHODS);
 
 export async function POST(request: Request) {

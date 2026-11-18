@@ -3,15 +3,6 @@ import { randomBytes } from "node:crypto";
 import type { SubjectContent } from "@/lib/types";
 import { removeObjects } from "@/lib/subject-object-storage";
 
-/**
- * Subject content and lesson attachments, stored in Neon.
- *
- * A file row holds either the bytes (a bytea column, the older path, still
- * used when Supabase Storage is not configured) or a `storage_path` into the
- * Storage bucket (see subject-object-storage.ts), which is how anything past
- * Vercel's 4.5MB body limit gets in. Either way the file is addressed as
- * /api/subjects/files/<id>.
- */
 
 declare global {
   var subjectStoragePool: Pool | undefined;

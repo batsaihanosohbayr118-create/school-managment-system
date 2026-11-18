@@ -6,8 +6,6 @@ import { Text, View, useThemeColor } from '@/components/Themed';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 
-// Unset until NEXT_PUBLIC_SITE_URL is set on the web deployment (see the
-// mobile design spec's prerequisites) — do not hardcode a guessed domain.
 const WEB_ADMIN_URL = process.env.EXPO_PUBLIC_WEB_ADMIN_URL;
 
 export default function AdminWebOnlyScreen() {

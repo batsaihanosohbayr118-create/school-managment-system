@@ -10,24 +10,8 @@ import { logDatabaseFallback, readLocalStore, writeLocalStore } from "./local-st
 import { ownStudentRow } from "./access";
 import { listResource, updateResource } from "./resources";
 
-/**
- * Grades a student's English placement test and records the level.
- *
- * Lives here rather than in the route so the route keeps to the mobile API
- * rule — no SQL, no role checks of its own. The answer key is read from the
- * raw table, which the student's own listResource view never exposes.
- *
- * One attempt per student: a second submission is refused until the English
- * teacher deletes the first result.
- */
 const QPAY_SYSTEM_SESSION: SchoolSession = { role: "admin", email: "qpay@system", name: "QPay", avatarUrl: "", source: "neon" };
 
-/**
- * Marks a payment Paid once QPay has confirmed `paidAmount` against it.
- * The caller verifies the money with QPay; this only checks it covers the
- * recorded amount, then writes through updateResource like the admin
- * dashboard does. Returns whether the payment is now Paid.
- */
 export async function settleQpayPayment(id: string, paidAmount: number): Promise<boolean> {
   const context: SchoolRequestContext = { session: QPAY_SYSTEM_SESSION };
   const table = await listResource("payments", context);
@@ -52,15 +36,6 @@ export async function settleQpayPayment(id: string, paidAmount: number): Promise
 
 const LUNCH_FEE_TYPE = "Lunch fee";
 
-/**
- * Issues the lunch fee for the days a parent picked, so it can be paid with
- * QPay like any other payment record. The amount is recomputed here from the
- * dates; the client never sends one.
- *
- * The id hashes the child and the dates, so paying again for the same
- * selection (after a cancelled or failed QPay attempt) reuses the record
- * instead of piling up duplicates.
- */
 export async function requestLunchPayment(dates: unknown, context: SchoolRequestContext) {
   if (context.session.role !== "parent") {
     throw new Error("Only parents have permission to pay the lunch fee.");

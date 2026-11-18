@@ -10,13 +10,6 @@ type RouteContext = {
   params: Promise<{ fileId: string }>;
 };
 
-/**
- * Serves a lesson attachment: bytes kept in Postgres directly, or a redirect
- * to a signed Storage URL for a file uploaded there.
- *
- * Unlike the public bucket URLs this replaced, every download is behind the
- * session check — attachments are no longer readable by anyone with the link.
- */
 export async function GET(request: Request, context: RouteContext) {
   const { fileId } = await context.params;
 

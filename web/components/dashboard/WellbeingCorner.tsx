@@ -6,12 +6,6 @@ import { Button } from "@/components/ui/button";
 import { listSchoolResource } from "@/lib/school-api";
 import type { AppCopy } from "@/lib/i18n";
 
-/**
- * The student-facing half of the Wellbeing Corner: a floating button pinned to
- * the bottom-right of the dashboard that opens the questions an administrator
- * published under the `wellbeing` resource. Read-only — nothing is submitted
- * back, so a student can think about a prompt without it being recorded.
- */
 
 type Prompt = {
   question: string;
@@ -47,11 +41,6 @@ export function WellbeingCorner({ copy }: { copy: AppCopy }) {
   const [failed, setFailed] = useState(false);
   const text = copy.wellbeing;
 
-  /**
-   * Opening is an event, not a synchronization — so the fetch lives here rather
-   * than in an effect. Re-fetching on every open means a question the
-   * psychologist publishes mid-session shows up without a page reload.
-   */
   async function openCorner() {
     setIndex(0);
     setOpen(true);

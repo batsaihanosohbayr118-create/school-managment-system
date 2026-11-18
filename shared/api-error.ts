@@ -1,8 +1,3 @@
-/**
- * A client that collapses every failure into a bare Error cannot tell "you are
- * offline" from "your session expired". On a phone those need different
- * responses: one shows cached data, the other returns to the login screen.
- */
 export type ApiErrorKind =
   | "offline"
   | "session-expired"

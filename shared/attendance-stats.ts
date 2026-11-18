@@ -1,8 +1,3 @@
-/**
- * Pure attendance summaries for the mobile Home card: overall counts, the
- * current run of attended days, and a Monday-first view of this week.
- * Kept free of React/RN so vitest can cover it.
- */
 
 export type AttendanceDayStatus = "present" | "absent" | "none" | "future";
 

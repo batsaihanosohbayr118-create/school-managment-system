@@ -5,11 +5,7 @@ export function groupThousands(digits: string): string {
   return fraction === undefined ? grouped : `${grouped}.${fraction}`;
 }
 
-/**
- * Re-groups the number inside an amount label however the admin typed it —
- * "1000000₮", "1 000 000₮" or "1,000,000₮" all become "1,000,000₮" — keeping
- * any currency sign around it. A label with no number is returned unchanged.
- */
+
 export function formatAmountLabel(label: string): string {
   return label.replace(/\d[\d\s,]*(\.\d+)?/, (match) => {
     const digits = match.replace(/[\s,]/g, "");

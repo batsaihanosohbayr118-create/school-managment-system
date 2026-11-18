@@ -49,12 +49,6 @@ async function failure(res: Response, fallback: string) {
   return new Error(payload?.message ?? fallback);
 }
 
-/**
- * Uploads one file straight into Storage (see app/api/subjects/[id]/uploads),
- * so its size is not bound by the 4.5MB a request through Vercel may carry.
- * Resolves to null when the server has no Storage configured; the caller then
- * uses the multipart route instead.
- */
 async function uploadDirect(
   subjectId: string,
   file: File,

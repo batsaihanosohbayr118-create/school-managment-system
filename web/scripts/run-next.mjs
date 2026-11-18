@@ -3,9 +3,6 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
 
-// Resolve through Node's module lookup rather than <cwd>/node_modules: with
-// npm workspaces these packages are usually hoisted to the repo root's
-// node_modules, not web/node_modules.
 const require = createRequire(import.meta.url);
 
 const args = process.argv.slice(2);

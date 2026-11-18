@@ -66,14 +66,6 @@ export default function RootLayout() {
   );
 }
 
-/**
- * Redirects between /login, the admin-only notice, and the (tabs) group
- * based on the resolved session. Runs on every session change, not just at
- * boot, so a sign-out from any screen bounces back to /login.
- *
- * A LOCKED_ROLES user with an outstanding payment is held on /payment-required (QPay
- * may open over it as a modal) until it is paid; see lib/payment-lock.tsx.
- */
 function useAuthGate() {
   const { session, loading } = useAuth();
   const { state: lockState } = usePaymentLock();
@@ -123,11 +115,6 @@ function RootLayoutNav() {
   // glimpses them before the payment screen.
   const checkingLock = !!session && LOCKED_ROLES.includes(session.role) && lockState === 'unknown';
 
-  // React Navigation's own screen canvas defaults to DefaultTheme/DarkTheme's
-  // background (#fff / #000), which does not match our own Colors.ts palette.
-  // Any Themed <View> left without an explicit override paints our custom
-  // background over that mismatched canvas — visible as a stray band. Aligning
-  // the two here fixes every such spot at once instead of patching each one.
   const navigationTheme = {
     ...(colorScheme === 'dark' ? DarkTheme : DefaultTheme),
     colors: {
@@ -144,17 +131,11 @@ function RootLayoutNav() {
     <NavigationThemeProvider value={navigationTheme}>
       <Stack
         screenOptions={{
-          // On iOS, native-stack renders the header as a native UINavigationBar
-          // and the screen content in its own native container — neither
-          // picks up NavigationThemeProvider's colors on its own, so both
-          // stay the native light chrome/background regardless of the app's
-          // own dark-mode override unless set explicitly here.
+       
           headerStyle: { backgroundColor: Colors[colorScheme].card },
           headerTintColor: Colors[colorScheme].text,
           contentStyle: { backgroundColor: Colors[colorScheme].background },
-          // The previous screen's title as back-button text crowds a long
-          // current title (e.g. "Хичээлүүд" next to "Математик") — just the
-          // chevron reads cleaner and is the more common iOS pattern anyway.
+         
           headerBackButtonDisplayMode: 'minimal'
         }}
       >

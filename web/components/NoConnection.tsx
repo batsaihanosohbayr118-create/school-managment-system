@@ -2,16 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-/**
- * Full-screen "offline" notice.
- *
- * `navigator.onLine` is notoriously unreliable (it frequently reports `false`
- * even when the machine is online), so we never block the app on that flag
- * alone. Instead we confirm with a real request to the server before showing
- * anything. We also proactively unregister any stale service worker left over
- * from a previous production build, which can otherwise hijack navigations in
- * development and serve a cached offline page.
- */
 export default function NoConnection() {
   const [isOffline, setIsOffline] = useState(false);
 

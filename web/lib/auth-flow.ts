@@ -1,12 +1,5 @@
 import type { Role } from "@/lib/types";
 
-/**
- * Single source of truth for the login -> role-based dashboard flow.
- *
- * The four roles each own a dedicated dashboard route. Both the login redirect
- * and the per-route access guard resolve the destination through the helpers
- * here so the mapping can never drift between call sites.
- */
 
 export const ROLES: Role[] = ["admin", "teacher", "student", "parent"];
 

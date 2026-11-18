@@ -4,13 +4,6 @@ import { qpayPayment, verifyQpaySignature } from "@/lib/qpay";
 
 export const runtime = "nodejs";
 
-/**
- * QPay calls this once an invoice is paid. The URL carries our payment id
- * and a signature only the server can produce; the callback itself is never
- * trusted — the payment is re-fetched from QPay before anything is marked
- * Paid. If QPay's request carries no qpay_payment_id, nothing happens here
- * and the app's own check (/api/mobile/payments/qpay/check) settles it.
- */
 async function handle(request: Request) {
   const url = new URL(request.url);
   const paymentId = url.searchParams.get("payment") ?? "";

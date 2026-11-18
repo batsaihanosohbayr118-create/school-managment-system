@@ -1,13 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Role } from "@/lib/types";
 
-/**
- * Stateless session tokens, signed with HMAC-SHA256.
- *
- * Server-only — importing this from a client component would leak AUTH_SECRET.
- * The browser only ever holds the encoded token and reads its payload for
- * display; every trust decision happens here, on the server.
- */
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 12;
 
@@ -36,14 +29,6 @@ function sign(body: string) {
   return createHmac("sha256", getSecret()).update(body).digest("base64url");
 }
 
-// Both clients store the profile photo as a raw base64 data URI (no upload
-// bucket involved — see mobile/app/settings.tsx and DashboardApp.tsx's
-// profile editor) and this token rides along as a bearer header on every
-// request. An uncapped photo pushed the header past Vercel's edge limit,
-// returning a 494 with no body a client can parse — it surfaced as a plain
-// "Request failed." with no clue this was the cause. Anything over this cap
-// is dropped from the token; the UI falls back to the initial-letter avatar
-// rather than carrying it on every request.
 const MAX_TOKEN_AVATAR_LENGTH = 6000;
 
 export function issueToken(user: Omit<TokenPayload, "exp">) {
@@ -74,16 +59,7 @@ export function verifyToken(token: string): TokenPayload | null {
   }
 }
 
-/**
- * Short-lived signed URLs for lesson attachments.
- *
- * A phone opens an attachment in the system browser, which cannot send the
- * Authorization header the file route requires — the request arrived bare and
- * got a 401. Instead the app, still authenticated, asks for a link signed for
- * one file and a few minutes; the session token itself never goes in a URL.
- * The "file:" prefix keeps these signatures from ever validating as a session
- * token body, or the reverse.
- */
+
 export const FILE_LINK_TTL_SECONDS = 5 * 60;
 
 function fileSignature(fileId: string, exp: number) {

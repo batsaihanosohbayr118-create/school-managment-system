@@ -10,15 +10,6 @@ type RouteContext = {
   params: Promise<{ fileId: string }>;
 };
 
-/**
- * Hands an authenticated caller a few-minute link to one attachment, for
- * opening in a browser that cannot carry the Authorization header. Grants
- * exactly what the file route already grants any signed-in user.
- *
- * `url` is what to load directly: for a file in Storage, the signed Storage
- * URL itself (a <video> keeps re-requesting ranges, which would outlive the
- * five-minute `path`). `path` stays as it was for the mobile app.
- */
 export async function GET(request: Request, context: RouteContext) {
   const session = await resolveRequestSession(request);
   if (!session) {
