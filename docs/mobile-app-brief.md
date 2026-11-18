@@ -106,12 +106,3 @@ Home Screen widget зэрэг native функцүүдийг нэмэх шаар�
 Apple-ийн шалгалтыг давна гэсэн **баталгаа байхгүй**. Гэхдээ жинхэнэ native апп
 нь боосон вэбсайтаас хамаагүй хүчтэй байр суурьтай. Эрсдэл тэг биш, харин огт
 өөр зэрэглэлийн эрсдэл.
-
-## Дэлгэрэнгүй баримтууд
-
-| Баримт | Хаана |
-| --- | --- |
-| Одоогийн байдал, дараагийн алхам | `docs/superpowers/2026-07-27-status-and-next-steps.md` |
-| Дизайн (техникийн) | `docs/superpowers/specs/2026-07-27-expo-mobile-app-design.md` |
-| А үеийн хэрэгжүүлэлтийн төлөвлөгөө | `docs/superpowers/plans/2026-07-27-expo-plan-a-mobile-api.md` |
-| Орхисон Capacitor хувилбар + шалтгаан | `docs/superpowers/specs/2026-07-27-ios-app-store-phase1-design.md` |
