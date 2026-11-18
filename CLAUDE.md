@@ -12,7 +12,7 @@ mobile/   Expo app
 shared/   pure TS used by both — @shared/*
 ```
 
-Unless a path below starts with `mobile/`, `shared/` or `docs/`, it is relative to `web/`
+Unless a path below starts with `mobile/` or `shared/`, it is relative to `web/`
 (`lib/i18n.ts` means `web/lib/i18n.ts`). Dependencies are hoisted to the root
 `node_modules`; run `npm install` from the repo root. Vercel's Root Directory is `web`.
 
@@ -76,8 +76,7 @@ Tables are created on the first API request by `initializeSchoolDatabase()` in `
 `mobile/` is a native Expo app. It is **not** a wrapper around the web app (a
 Capacitor wrap was designed, then abandoned). It talks to the web app only
 through `/api/mobile/*` routes (with CORS) and shares pure code via `shared/`.
-`docs/mobile-app-brief.md` is a non-technical summary (Mongolian) for the team.
-The original July design/plan documents were removed once implemented; they
+The original July design/plan documents and team brief were removed as outdated; they
 remain in git history (before commit "docs: remove outdated mobile planning docs").
 
 **The rule that governs the mobile API:** `/api/mobile/*` route handlers call
