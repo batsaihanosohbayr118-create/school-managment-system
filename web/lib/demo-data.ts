@@ -26,18 +26,6 @@ import type {
 } from "@/lib/types";
 import { subjectCatalog } from "@/lib/subjects";
 
-// IMPORTANT: These exports are NOT unused leftovers.
-// - navItems drives the sidebar (icons can't be stored as JSON/DB data).
-// - students/teachers/subjects/attendance/grades/payments/timetable/
-//   announcements are used as a FALLBACK data source in
-//   app/page.tsx (demoResourceData / fetchFallbackResource) whenever
-//   the local /api/school API is unreachable, and by
-//   the top-bar global search (searchableRows), which reads these arrays
-//   directly. Do not remove these exports without also updating
-//   app/page.tsx, or the app will crash or lose its offline fallback.
-//
-// They are intentionally EMPTY: the app must never render invented records.
-// Every number shown in the UI is derived from the live /api/school data.
 
 export const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Role-based analytics and activity center" },
